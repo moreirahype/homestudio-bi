@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0E120D">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="HOMESTUDIO BI">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>HOMESTUDIO BI</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js"></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacao principal">
+        <a class="brand" href="#dashboard" data-view="dashboard" aria-label="HOMESTUDIO BI">
+          <img src="assets/icon.svg" alt="" width="38" height="38">
+          <span>HOMESTUDIO BI</span>
+        </a>
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
+          <button class="nav-item" type="button" data-view="transactions">Transações</button>
+          <button class="nav-item" type="button" data-view="attendant-sales">Vendas atendentes</button>
+          <button class="nav-item" type="button" data-view="attendants">Atendentes</button>
+          <button class="nav-item" type="button" id="refreshButtonSide">Atualizar</button>
+        </nav>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <a class="mobile-brand" href="#dashboard" data-view="dashboard" aria-label="HOMESTUDIO BI">
+            <img src="assets/icon.svg" alt="" width="34" height="34">
+            <span>HOMESTUDIO BI</span>
+          </a>
+          <div class="status-pill" id="statusText">Carregando</div>
+        </header>
+
+        <section class="controls" aria-label="Filtros">
+          <div class="control-group period-group" role="group" aria-label="Periodo">
+            <button class="period-button active" type="button" data-period="today">Hoje</button>
+            <button class="period-button" type="button" data-period="yesterday">Ontem</button>
+            <button class="period-button" type="button" data-period="7d">7 dias</button>
+            <button class="period-button" type="button" data-period="30d">30 dias</button>
+            <button class="period-button" type="button" data-period="max">Maximo</button>
+            <button class="period-button" type="button" data-period="custom">Personalizado</button>
+          </div>
+
+          <div class="custom-range" id="customRange" hidden>
+            <label>
+              <span>Inicio</span>
+              <input id="startDate" type="date">
+            </label>
+            <label>
+              <span>Fim</span>
+              <input id="endDate" type="date">
+            </label>
+          </div>
+
+          <label class="attendant-input">
+            <span>Atendente</span>
+            <select id="attendantSelect"></select>
+          </label>
+
+          <button class="refresh-button" type="button" id="refreshButton">Atualizar</button>
+        </section>
+
+        <section class="view active" id="dashboardView" data-view-panel="dashboard">
+        <section class="cards-grid metrics-grid" aria-label="Indicadores principais">
+          <article class="metric-card metric-revenue">
+            <span class="metric-label">Faturamento</span>
+            <strong class="metric-value" id="revenueValue">R$ 0,00</strong>
+          </article>
+          <article class="metric-card compact metric-meta">
+            <span class="metric-label">Gasto Meta</span>
+            <strong class="metric-value" id="metaSpendValue">R$ 0,00</strong>
+          </article>
+          <article class="metric-card metric-sales">
+            <span class="metric-label">Vendas</span>
+            <strong class="metric-value" id="salesValue">0</strong>
+          </article>
+          <article class="metric-card compact metric-cpa">
+            <span class="metric-label">CPA</span>
+            <strong class="metric-value" id="cpaValue">R$ 0,00</strong>
+          </article>
+          <article class="metric-card compact metric-ticket">
+            <span class="metric-label">Ticket médio</span>
+            <strong class="metric-value" id="avgTicketValue">R$ 0,00</strong>
+          </article>
+          <article class="metric-card compact metric-profit">
+            <span class="metric-label">Lucro</span>
+            <strong class="metric-value" id="profitValue">R$ 0,00</strong>
+          </article>
+          <article class="metric-card compact metric-margin">
+            <span class="metric-label">Margem</span>
+            <strong class="metric-value" id="marginValue">0,0%</strong>
+          </article>
+          <article class="metric-card compact metric-roas">
+            <span class="metric-label">ROAS</span>
+            <strong class="metric-value" id="roasValue">0,00</strong>
+          </article>
+          <article class="metric-card metric-attendant-revenue">
+            <span class="metric-label">Faturamento atendente</span>
+            <strong class="metric-value" id="attendantRevenueValue">R$ 0,00</strong>
+          </article>
+          <article class="metric-card metric-attendant-sales">
+            <span class="metric-label">Vendas atendente</span>
+            <strong class="metric-value" id="attendantSalesValue">0</strong>
+          </article>
+          <article class="metric-card compact metric-tax">
+            <span class="metric-label">Imposto Meta Ads</span>
+            <strong class="metric-value" id="metaTaxValue">R$ 0,00</strong>
+          </article>
+        </section>
+
+        <section class="analysis-grid">
+          <article class="panel chart-panel">
+            <div class="panel-header">
+              <h1>Faturamento semanal</h1>
+              <span id="periodLabel">Hoje</span>
+            </div>
+            <svg class="line-chart" id="weeklyChart" viewBox="0 0 720 280" role="img" aria-label="Grafico semanal"></svg>
+          </article>
+
+          <article class="panel table-panel">
+            <div class="panel-header">
+              <h2>Semana atual</h2>
+            </div>
+            <div class="table-scroll">
+              <table class="weekly-table">
+                <thead>
+                  <tr>
+                    <th>Dia</th>
+                    <th>Faturamento</th>
+                    <th>Lucro</th>
+                    <th>Vendas</th>
+                  </tr>
+                </thead>
+                <tbody id="weeklyRows"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+        </section>
+
+        <section class="view" id="transactionsView" data-view-panel="transactions">
+          <article class="panel page-panel">
+            <div class="panel-header">
+              <h1>Transações</h1>
+              <input class="search-input" id="transactionSearch" type="search" placeholder="Buscar por pagador, valor ou descrição">
+            </div>
+            <div class="table-scroll">
+              <table class="transactions-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Pagador</th>
+                    <th>Moeda</th>
+                    <th>Valor</th>
+                    <th>Descrição</th>
+                  </tr>
+                </thead>
+                <tbody id="transactionRows"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="view" id="attendantSalesView" data-view-panel="attendant-sales">
+          <article class="panel page-panel">
+            <div class="panel-header">
+              <h1>Vendas atendentes</h1>
+              <span id="attendantSalesPeriod">Período atual</span>
+            </div>
+            <div class="table-scroll">
+              <table class="attendant-sales-table">
+                <thead>
+                  <tr>
+                    <th>Atendente</th>
+                    <th>Final</th>
+                    <th>Vendas</th>
+                    <th>Faturamento</th>
+                    <th>Ticket médio</th>
+                  </tr>
+                </thead>
+                <tbody id="attendantSalesRows"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel page-panel">
+            <div class="panel-header">
+              <h2>Vendas atribuídas</h2>
+            </div>
+            <div class="table-scroll">
+              <table class="attendant-sales-detail-table">
+                <thead>
+                  <tr>
+                    <th>Atendente</th>
+                    <th>Data</th>
+                    <th>Pagador</th>
+                    <th>Valor</th>
+                  </tr>
+                </thead>
+                <tbody id="attendantSalesDetailRows"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="view" id="attendantsView" data-view-panel="attendants">
+          <article class="panel page-panel">
+            <div class="panel-header">
+              <h1>Atendentes</h1>
+              <button class="secondary-button" id="addAttendantButton" type="button">Adicionar</button>
+            </div>
+            <div class="attendant-editor" id="attendantEditor"></div>
+            <div class="save-row">
+              <input class="admin-input" id="adminKey" type="password" placeholder="PIN admin para salvar na planilha">
+              <button class="refresh-button" id="saveAttendantsButton" type="button">Salvar atendentes</button>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+    <div class="chart-tooltip" id="chartTooltip" hidden></div>
+  </body>
+</html>
