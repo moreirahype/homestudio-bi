@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homestudio-bi-v1';
+const CACHE_NAME = 'homestudio-bi-v6';
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const APP_SHELL = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -21,11 +22,17 @@ self.addEventListener('activate', (event) => {
       keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
     ))
   );
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    event.respondWith(fetch(request));
+    return;
+  }
   event.respondWith(
     fetch(request)
       .then((response) => {

@@ -24,10 +24,10 @@
         </a>
         <nav class="nav-list">
           <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
+          <button class="nav-item" type="button" data-view="insights">Insights</button>
           <button class="nav-item" type="button" data-view="transactions">Transações</button>
           <button class="nav-item" type="button" data-view="attendant-sales">Vendas atendentes</button>
           <button class="nav-item" type="button" data-view="attendants">Atendentes</button>
-          <button class="nav-item" type="button" id="refreshButtonSide">Atualizar</button>
         </nav>
       </aside>
 
@@ -147,6 +147,56 @@
         </section>
         </section>
 
+        <section class="view" id="insightsView" data-view-panel="insights">
+          <section class="cards-grid insights-metrics-grid" aria-label="Indicadores de mensagens">
+            <article class="metric-card compact">
+              <span class="metric-label">Conversa</span>
+              <strong class="metric-value" id="insightConversationsValue">0</strong>
+            </article>
+            <article class="metric-card compact">
+              <span class="metric-label">Custo por conversa</span>
+              <strong class="metric-value" id="insightCostPerConversationValue">R$ 0,00</strong>
+            </article>
+            <article class="metric-card compact">
+              <span class="metric-label">CPM</span>
+              <strong class="metric-value" id="insightCpmValue">R$ 0,00</strong>
+            </article>
+            <article class="metric-card compact">
+              <span class="metric-label">CTR</span>
+              <strong class="metric-value" id="insightCtrValue">0,0%</strong>
+            </article>
+          </section>
+
+          <section class="insights-grid">
+            <article class="panel chart-panel">
+              <div class="panel-header">
+                <h1>Conversão semanal</h1>
+                <span id="insightsPeriodLabel">Semana atual</span>
+              </div>
+              <svg class="line-chart conversion-chart" id="conversionChart" viewBox="0 0 720 280" role="img" aria-label="Taxa de conversao semanal"></svg>
+            </article>
+
+            <article class="panel table-panel">
+              <div class="panel-header">
+                <h2>Funil semanal</h2>
+              </div>
+              <div class="table-scroll">
+                <table class="insights-weekly-table">
+                  <thead>
+                    <tr>
+                      <th>Dia</th>
+                      <th>Cliques</th>
+                      <th>Conversas</th>
+                      <th>Vendas</th>
+                    </tr>
+                  </thead>
+                  <tbody id="insightsRows"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+        </section>
+
         <section class="view" id="transactionsView" data-view-panel="transactions">
           <article class="panel page-panel">
             <div class="panel-header">
@@ -213,9 +263,35 @@
         </section>
 
         <section class="view" id="attendantsView" data-view-panel="attendants">
+          <div class="attendant-analytics-grid">
+            <article class="panel analytics-panel">
+              <div class="panel-header">
+                <h1>Mix de vendas</h1>
+                <span id="attendantAnalyticsPeriod">Período atual</span>
+              </div>
+              <svg class="donut-chart" id="salesMixChart" viewBox="0 0 220 164" role="img" aria-label="Percentual de vendas automáticas e de atendentes"></svg>
+              <div class="mix-legend" id="salesMixLegend"></div>
+            </article>
+
+            <article class="panel analytics-panel">
+              <div class="panel-header">
+                <h1>Mix de faturamento</h1>
+              </div>
+              <svg class="donut-chart" id="revenueMixChart" viewBox="0 0 220 164" role="img" aria-label="Percentual de faturamento automático e de atendentes"></svg>
+              <div class="mix-legend" id="revenueMixLegend"></div>
+            </article>
+
+            <article class="panel analytics-panel performance-panel">
+              <div class="panel-header">
+                <h1>Desempenho por atendente</h1>
+              </div>
+              <svg class="attendant-bar-chart" id="attendantBarChart" viewBox="0 0 720 260" role="img" aria-label="Comparativo de desempenho por atendente"></svg>
+            </article>
+          </div>
+
           <article class="panel page-panel">
             <div class="panel-header">
-              <h1>Atendentes</h1>
+              <h1>Configurar atendentes</h1>
               <button class="secondary-button" id="addAttendantButton" type="button">Adicionar</button>
             </div>
             <div class="attendant-editor" id="attendantEditor"></div>
@@ -231,6 +307,10 @@
       <button class="mobile-tab active" type="button" data-view="dashboard" aria-label="Dashboard">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>
         <span>Dashboard</span>
+      </button>
+      <button class="mobile-tab" type="button" data-view="insights" aria-label="Insights">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h14v2H5v-2Zm1-3.5 4.3-4.3 3 3L19 7.6V11h2V4h-7v2h3.6l-4.3 4.3-3-3L4.6 13 6 14.5Z"/></svg>
+        <span>Insights</span>
       </button>
       <button class="mobile-tab" type="button" data-view="transactions" aria-label="Transações">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v2H5V6Zm0 5h14v2H5v-2Zm0 5h14v2H5v-2Z"/></svg>

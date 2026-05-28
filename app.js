@@ -2,6 +2,9 @@ const CONFIG = window.HOMESTUDIO_BI_CONFIG || {};
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: CONFIG.currency || 'BRL' });
 const NUMBER = new Intl.NumberFormat('pt-BR');
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v6';
+const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
 
 const state = {
   period: CONFIG.defaultPeriod || 'today',
@@ -31,6 +34,19 @@ const els = {
   attendantSalesPeriod: $('#attendantSalesPeriod'),
   attendantSalesRows: $('#attendantSalesRows'),
   attendantSalesDetailRows: $('#attendantSalesDetailRows'),
+  attendantAnalyticsPeriod: $('#attendantAnalyticsPeriod'),
+  salesMixChart: $('#salesMixChart'),
+  salesMixLegend: $('#salesMixLegend'),
+  revenueMixChart: $('#revenueMixChart'),
+  revenueMixLegend: $('#revenueMixLegend'),
+  attendantBarChart: $('#attendantBarChart'),
+  insightConversations: $('#insightConversationsValue'),
+  insightCostPerConversation: $('#insightCostPerConversationValue'),
+  insightCpm: $('#insightCpmValue'),
+  insightCtr: $('#insightCtrValue'),
+  insightsPeriodLabel: $('#insightsPeriodLabel'),
+  conversionChart: $('#conversionChart'),
+  insightsRows: $('#insightsRows'),
   attendantEditor: $('#attendantEditor'),
   addAttendant: $('#addAttendantButton'),
   saveAttendants: $('#saveAttendantsButton'),
@@ -59,7 +75,7 @@ function init() {
     button.addEventListener('click', () => {
       state.period = button.dataset.period;
       updatePeriodButtons();
-      loadDashboard();
+      renderCachedDashboard();
     });
   });
 
@@ -70,10 +86,10 @@ function init() {
     });
   });
 
-  [els.startDate, els.endDate].forEach((input) => input.addEventListener('change', loadDashboard));
+  [els.startDate, els.endDate].forEach((input) => input.addEventListener('change', renderCachedDashboard));
   els.attendantSelect.addEventListener('change', () => {
     localStorage.setItem('homestudio.attendant', els.attendantSelect.value);
-    loadDashboard();
+    renderCachedDashboard();
   });
   els.transactionSearch.addEventListener('input', () => renderTransactions(state.transactions));
   els.addAttendant.addEventListener('click', () => {
@@ -81,12 +97,12 @@ function init() {
     renderAttendantEditor(state.attendants);
   });
   els.saveAttendants.addEventListener('click', saveAttendants);
-  els.refresh.addEventListener('click', loadDashboard);
-  els.refreshSide.addEventListener('click', loadDashboard);
+  els.refresh.addEventListener('click', refreshDashboardSnapshots);
+  if (els.refreshSide) els.refreshSide.addEventListener('click', refreshDashboardSnapshots);
 
   updatePeriodButtons();
   setView('dashboard');
-  loadDashboard();
+  renderCachedDashboard();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -106,29 +122,171 @@ function updatePeriodButtons() {
   els.customRange.hidden = state.period !== 'custom';
 }
 
-async function loadDashboard() {
-  setStatus('Atualizando');
+function currentAttendantName() {
+  return els.attendantSelect.value ||
+    localStorage.getItem('homestudio.attendant') ||
+    state.payload?.attendant?.name ||
+    state.attendants[0]?.name ||
+    'Sheila';
+}
+
+function snapshotKey(options = {}) {
+  const period = options.period || state.period;
+  const attendant = normalizeText(options.attendant || currentAttendantName()) || 'geral';
+  const start = period === 'custom' ? (options.start || els.startDate.value || '') : '';
+  const end = period === 'custom' ? (options.end || els.endDate.value || '') : '';
+  const apiPart = String(CONFIG.apiUrl || 'demo').replace(/[^\w.-]/g, '_').slice(-96);
+  return `${CACHE_PREFIX}:${apiPart}:${period}:${attendant}:${start}:${end}`;
+}
+
+function readSnapshot(options = {}) {
   try {
-    const payload = CONFIG.apiUrl ? await fetchPayload() : demoPayload();
-    state.payload = payload;
-    render(normalizeFinancialMetrics(payload));
-    setStatus(formatStatus(payload));
-  } catch (error) {
-    console.error(error);
+    const raw = localStorage.getItem(snapshotKey(options));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeSnapshot(payload, options = {}) {
+  const record = {
+    cachedAt: Date.now(),
+    payload
+  };
+  localStorage.setItem(snapshotKey(options), JSON.stringify(record));
+}
+
+function cacheAttendants(attendants) {
+  const clean = (attendants || []).filter(Boolean);
+  if (clean.length) localStorage.setItem(ATTENDANTS_CACHE_KEY, JSON.stringify(clean));
+}
+
+function readCachedAttendants() {
+  try {
+    const attendants = JSON.parse(localStorage.getItem(ATTENDANTS_CACHE_KEY) || '[]');
+    return Array.isArray(attendants) ? attendants : [];
+  } catch {
+    return [];
+  }
+}
+
+async function loadDashboard() {
+  return refreshDashboardSnapshots();
+}
+
+function renderCachedDashboard() {
+  const record = readSnapshot();
+  if (record && record.payload) {
+    state.payload = record.payload;
+    render(normalizeFinancialMetrics(record.payload));
+    setStatus(formatCachedStatus(record));
+    return;
+  }
+
+  if (!CONFIG.apiUrl) {
     const payload = demoPayload();
     state.payload = payload;
     render(normalizeFinancialMetrics(payload));
     setStatus('Demo local');
+    return;
+  }
+
+  const payload = emptyPayload();
+  state.payload = payload;
+  render(normalizeFinancialMetrics(payload));
+  setStatus('Clique em Atualizar');
+}
+
+async function refreshDashboardSnapshots() {
+  setStatus('Atualizando');
+  const attendant = currentAttendantName();
+
+  try {
+    if (!CONFIG.apiUrl) {
+      const payload = demoPayload();
+      state.payload = payload;
+      render(normalizeFinancialMetrics(payload));
+      setStatus('Demo local');
+      return;
+    }
+
+    const periods = state.period === 'custom'
+      ? [...SNAPSHOT_PERIODS, 'custom']
+      : SNAPSHOT_PERIODS;
+    let payloadsByPeriod = {};
+    try {
+      payloadsByPeriod = await fetchBatchPayload({ periods, attendant });
+    } catch (error) {
+      console.warn('Batch indisponivel, usando fallback por periodo.', error);
+      payloadsByPeriod = await fetchPayloadsIndividually(periods, attendant);
+    }
+
+    let successCount = 0;
+    Object.keys(payloadsByPeriod).forEach((period) => {
+      const payload = payloadsByPeriod[period];
+      if (!payload || !payload.ok) return;
+      storeSnapshot(payload, {
+        period,
+        attendant,
+        start: period === 'custom' ? els.startDate.value : '',
+        end: period === 'custom' ? els.endDate.value : ''
+      });
+      cacheAttendants(payload.attendants || [payload.attendant].filter(Boolean));
+      successCount += 1;
+    });
+
+    if (!successCount) throw new Error('Nenhum periodo foi atualizado.');
+    renderCachedDashboard();
+    setStatus(`Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+  } catch (error) {
+    console.error(error);
+    renderCachedDashboard();
+    setStatus('Erro ao atualizar');
   }
 }
 
-async function fetchPayload() {
+async function fetchBatchPayload({ periods, attendant }) {
   const url = new URL(CONFIG.apiUrl);
-  url.searchParams.set('period', state.period);
-  if (els.attendantSelect.value) url.searchParams.set('attendant', els.attendantSelect.value);
-  if (state.period === 'custom') {
+  url.searchParams.set('action', 'batch');
+  url.searchParams.set('periods', periods.join(','));
+  url.searchParams.set('_', String(Date.now()));
+  if (attendant) url.searchParams.set('attendant', attendant);
+  if (periods.includes('custom')) {
     url.searchParams.set('start', els.startDate.value);
     url.searchParams.set('end', els.endDate.value);
+  }
+
+  const response = await fetch(url.toString(), { cache: 'no-store' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const payload = await response.json();
+  if (!payload.ok) throw new Error(payload.error || 'API em lote sem retorno valido');
+  return payload.payloads || {};
+}
+
+async function fetchPayloadsIndividually(periods, attendant) {
+  const results = await Promise.allSettled(
+    periods.map((period) => fetchPayload({
+      period,
+      attendant,
+      start: period === 'custom' ? els.startDate.value : '',
+      end: period === 'custom' ? els.endDate.value : ''
+    }))
+  );
+  return results.reduce((payloads, result, index) => {
+    if (result.status === 'fulfilled') payloads[periods[index]] = result.value;
+    return payloads;
+  }, {});
+}
+
+async function fetchPayload(options = {}) {
+  const url = new URL(CONFIG.apiUrl);
+  const period = options.period || state.period;
+  url.searchParams.set('period', period);
+  url.searchParams.set('_', String(Date.now()));
+  if (options.attendant) url.searchParams.set('attendant', options.attendant);
+  if (period === 'custom') {
+    url.searchParams.set('start', options.start || els.startDate.value);
+    url.searchParams.set('end', options.end || els.endDate.value);
   }
 
   const response = await fetch(url.toString(), { cache: 'no-store' });
@@ -145,7 +303,12 @@ function normalizeFinancialMetrics(payload) {
   const sales = Number(payload.metrics.sales) || 0;
   const investment = metaSpend + metaTax;
   const profit = roundMoney(revenue - investment);
-  const weekly = allocateWeeklyProfit(payload.weekly || [], investment);
+  const weekly = (payload.weekly || []).map((day) => ({
+    ...day,
+    revenue: Number(day.revenue) || 0,
+    profit: Number(day.profit) || 0,
+    sales: Number(day.sales) || 0
+  }));
 
   return {
     ...payload,
@@ -163,17 +326,6 @@ function normalizeFinancialMetrics(payload) {
       adjustedRoas: investment ? revenue / investment : 0
     }
   };
-}
-
-function allocateWeeklyProfit(days, totalCost) {
-  const revenue = days.reduce((total, day) => total + (Number(day.revenue) || 0), 0);
-  return days.map((day) => {
-    const allocatedCost = revenue ? totalCost * ((Number(day.revenue) || 0) / revenue) : 0;
-    return {
-      ...day,
-      profit: roundMoney((Number(day.revenue) || 0) - allocatedCost)
-    };
-  });
 }
 
 function render(payload) {
@@ -196,17 +348,21 @@ function render(payload) {
   els.metaSpendValue.title = {
     api: 'Gasto Meta vindo automaticamente da API da Meta.',
     sheet: 'Gasto Meta vindo da planilha.',
-    not_configured: 'Meta Ads ainda nao configurado no Apps Script.'
+    not_configured: 'Meta Ads ainda nao configurado no Apps Script.',
+    api_error: metrics.metaSpendError || 'Nao foi possivel ler o gasto da Meta.'
   }[metrics.metaSpendSource] || 'Gasto Meta';
 
   const toneValue = metrics.profit;
   setTone(els.profit.closest('.metric-card'), toneValue);
   setTone(els.margin.closest('.metric-card'), toneValue);
   setTone(els.roas.closest('.metric-card'), toneValue);
+  const attendantSales = payload.attendantSales || buildAttendantSalesFromTransactions(state.transactions, state.attendants);
   renderTable(payload.weekly);
   renderChart(payload.weekly);
   renderTransactions(state.transactions);
-  renderAttendantSales(payload.attendantSales || buildAttendantSalesFromTransactions(state.transactions, state.attendants), payload.period);
+  renderInsights(payload.insights || buildEmptyInsights(payload.weekly || []));
+  renderAttendantSales(attendantSales, payload.period);
+  renderAttendantAnalytics(attendantSales, metrics, payload.period);
   renderAttendantEditor(state.attendants);
 }
 
@@ -320,10 +476,231 @@ function renderAttendantSales(attendantSales, period) {
   });
 }
 
+function renderAttendantAnalytics(attendantSales, metrics, period) {
+  if (!els.salesMixChart || !els.revenueMixChart || !els.attendantBarChart) return;
+
+  const rows = completeAttendantSales(attendantSales);
+  const totalSales = Math.max(Number(metrics.sales) || 0, 0);
+  const totalRevenue = Math.max(Number(metrics.revenue) || 0, 0);
+  const rawAttendantSales = rows.reduce((total, item) => total + (Number(item.sales) || 0), 0);
+  const rawAttendantRevenue = rows.reduce((total, item) => total + (Number(item.revenue) || 0), 0);
+  const attendantSalesTotal = totalSales ? Math.min(totalSales, rawAttendantSales) : rawAttendantSales;
+  const attendantRevenueTotal = totalRevenue ? Math.min(totalRevenue, rawAttendantRevenue) : rawAttendantRevenue;
+  const automaticSales = Math.max(0, totalSales - attendantSalesTotal);
+  const automaticRevenue = Math.max(0, totalRevenue - attendantRevenueTotal);
+
+  if (els.attendantAnalyticsPeriod) {
+    els.attendantAnalyticsPeriod.textContent = period?.label || 'Período atual';
+  }
+
+  renderDonutChart(els.salesMixChart, els.salesMixLegend, [
+    { label: 'Automático', value: automaticSales, color: '#566151' },
+    { label: 'Atendentes', value: attendantSalesTotal, color: '#9FE870' }
+  ], (value) => NUMBER.format(value));
+
+  renderDonutChart(els.revenueMixChart, els.revenueMixLegend, [
+    { label: 'Automático', value: automaticRevenue, color: '#566151' },
+    { label: 'Atendentes', value: attendantRevenueTotal, color: '#9FE870' }
+  ], (value) => BRL.format(value));
+
+  renderAttendantBarChart(rows);
+}
+
+function renderInsights(insights) {
+  if (!els.insightConversations || !els.conversionChart || !els.insightsRows) return;
+  const weekly = Array.isArray(insights.weekly) ? insights.weekly : [];
+  const metrics = insights.metrics || {};
+  els.insightConversations.textContent = NUMBER.format(Number(metrics.conversations) || 0);
+  els.insightCostPerConversation.textContent = BRL.format(Number(metrics.costPerConversation) || 0);
+  els.insightCpm.textContent = BRL.format(Number(metrics.cpm) || 0);
+  els.insightCtr.textContent = PERCENT.format(Number(metrics.ctr) || 0);
+  els.insightsPeriodLabel.textContent = insights.source === 'api'
+    ? 'Semana atual'
+    : (insights.error ? 'Meta indisponivel' : 'Meta nao configurada');
+
+  renderConversionChart(weekly);
+  renderInsightsTable(weekly);
+}
+
+function renderInsightsTable(days) {
+  els.insightsRows.innerHTML = '';
+  if (!days.length) {
+    els.insightsRows.innerHTML = '<tr><td colspan="4">Sem dados na semana atual.</td></tr>';
+    return;
+  }
+  days.forEach((day) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${escapeHtml(day.label || '')}</td>
+      <td>${NUMBER.format(Number(day.clicks) || 0)} <span class="subpercent">(100%)</span></td>
+      <td>${NUMBER.format(Number(day.conversations) || 0)} <span class="subpercent">(${PERCENT.format(Number(day.conversationClickRate) || 0)})</span></td>
+      <td>${NUMBER.format(Number(day.sales) || 0)} <span class="subpercent">(${PERCENT.format(Number(day.salesClickRate) || 0)})</span></td>
+    `;
+    els.insightsRows.appendChild(row);
+  });
+}
+
+function renderConversionChart(days) {
+  const width = 720;
+  const height = 280;
+  const left = 58;
+  const right = 22;
+  const top = 22;
+  const bottom = 42;
+  const innerW = width - left - right;
+  const innerH = height - top - bottom;
+  const values = days.map((day) => Number(day.conversionRate) || 0);
+  const max = Math.max(0.01, ...values);
+  const paddedMax = max < 0.1 ? 0.1 : max * 1.2;
+  const x = (index) => left + (innerW / Math.max(days.length - 1, 1)) * index;
+  const y = (value) => top + innerH - ((value / paddedMax) * innerH);
+  const points = days.map((day, index) => `${x(index)},${y(Number(day.conversionRate) || 0)}`).join(' ');
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => paddedMax * ratio);
+
+  els.conversionChart.innerHTML = '';
+  yTicks.forEach((value) => {
+    const yy = y(value);
+    els.conversionChart.append(svg('line', { x1: left, x2: width - right, y1: yy, y2: yy, class: 'chart-grid' }));
+    els.conversionChart.append(svg('text', { x: 8, y: yy + 4, class: 'chart-label' }, PERCENT.format(value)));
+  });
+  els.conversionChart.append(svg('polyline', { points, class: 'chart-line-conversion' }));
+
+  days.forEach((day, index) => {
+    const xx = x(index);
+    const rate = Number(day.conversionRate) || 0;
+    const dot = svg('circle', { cx: xx, cy: y(rate), r: 4, class: 'chart-dot' });
+    bindTooltip(dot, `${day.label}\nConversao: ${PERCENT.format(rate)}\nVendas: ${NUMBER.format(Number(day.sales) || 0)}\nConversas: ${NUMBER.format(Number(day.conversations) || 0)}`);
+    els.conversionChart.append(dot);
+    els.conversionChart.append(svg('text', { x: xx, y: height - 10, 'text-anchor': 'middle', class: 'chart-label' }, String(day.label || '').split(' ')[0]));
+  });
+}
+
+function buildEmptyInsights(weekly) {
+  return {
+    source: 'cache_empty',
+    error: '',
+    metrics: {
+      conversations: 0,
+      costPerConversation: 0,
+      cpm: 0,
+      ctr: 0
+    },
+    weekly: (weekly || []).map((day) => ({
+      label: day.label,
+      date: day.date,
+      clicks: 0,
+      conversations: 0,
+      sales: Number(day.sales) || 0,
+      conversionRate: 0,
+      conversationClickRate: 0,
+      salesClickRate: 0
+    }))
+  };
+}
+
+function completeAttendantSales(attendantSales) {
+  const byName = new Map((attendantSales || []).map((item) => [normalizeText(item.name), item]));
+  const seen = new Set();
+  const configured = state.attendants.map((attendant) => {
+    const key = normalizeText(attendant.name);
+    const item = byName.get(key) || {};
+    seen.add(key);
+    return {
+      name: attendant.name || item.name || '',
+      centsLabel: item.centsLabel || (attendant.cents !== '' && attendant.cents !== null && attendant.cents !== undefined ? `,${String(attendant.cents).padStart(2, '0')}` : ''),
+      sales: Number(item.sales) || 0,
+      revenue: Number(item.revenue) || 0,
+      avgTicket: Number(item.avgTicket) || 0
+    };
+  });
+
+  const extras = (attendantSales || [])
+    .filter((item) => !seen.has(normalizeText(item.name)))
+    .map((item) => ({
+      name: item.name || '',
+      centsLabel: item.centsLabel || '',
+      sales: Number(item.sales) || 0,
+      revenue: Number(item.revenue) || 0,
+      avgTicket: Number(item.avgTicket) || 0
+    }));
+
+  return [...configured, ...extras].filter((item) => item.name || item.sales || item.revenue);
+}
+
+function renderDonutChart(svg, legend, values, formatValue) {
+  const total = values.reduce((sum, item) => sum + Math.max(0, Number(item.value) || 0), 0);
+  const highlight = values[1] || { value: 0, label: 'Atendentes', color: '#9FE870' };
+  const pct = total ? Math.max(0, Math.min(1, Number(highlight.value) / total)) : 0;
+  const radius = 48;
+  const circumference = 2 * Math.PI * radius;
+  const activeLength = pct * circumference;
+  const percentLabel = total ? `${Math.round(pct * 100)}%` : '0%';
+
+  svg.innerHTML = `
+    <circle class="donut-track" cx="72" cy="78" r="${radius}"></circle>
+    <circle class="donut-segment" cx="72" cy="78" r="${radius}"
+      stroke="${highlight.color}" stroke-dasharray="${activeLength} ${circumference - activeLength}"
+      stroke-dashoffset="0"></circle>
+    <text class="donut-percent" x="72" y="72" text-anchor="middle">${percentLabel}</text>
+    <text class="donut-label" x="72" y="94" text-anchor="middle">atendentes</text>
+    <text class="donut-total" x="142" y="70">${escapeHtml(formatValue(total))}</text>
+    <text class="donut-total-label" x="142" y="92">total</text>
+  `;
+
+  legend.innerHTML = values.map((item) => {
+    const value = Math.max(0, Number(item.value) || 0);
+    const itemPct = total ? value / total : 0;
+    return `
+      <div class="mix-legend-row">
+        <span class="legend-dot" style="background:${item.color}"></span>
+        <span>${escapeHtml(item.label)}</span>
+        <strong>${escapeHtml(formatValue(value))} - ${PERCENT.format(itemPct)}</strong>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderAttendantBarChart(rows) {
+  const sorted = [...rows]
+    .sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0) || (Number(b.sales) || 0) - (Number(a.sales) || 0));
+  const width = 720;
+  const left = 150;
+  const right = 170;
+  const top = 24;
+  const rowH = 42;
+  const height = Math.max(190, top + (Math.max(sorted.length, 1) * rowH) + 24);
+  const innerW = width - left - right;
+  const maxRevenue = Math.max(1, ...sorted.map((item) => Number(item.revenue) || 0));
+  els.attendantBarChart.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+  if (!sorted.length) {
+    els.attendantBarChart.innerHTML = '<text class="bar-empty" x="24" y="72">Nenhuma atendente configurada.</text>';
+    return;
+  }
+
+  els.attendantBarChart.innerHTML = sorted.map((item, index) => {
+    const y = top + index * rowH;
+    const revenue = Number(item.revenue) || 0;
+    const sales = Number(item.sales) || 0;
+    const barW = Math.max(0, (revenue / maxRevenue) * innerW);
+    return `
+      <text class="bar-name" x="0" y="${y + 18}">${escapeHtml(item.name || 'Sem nome')}</text>
+      <rect class="bar-track" x="${left}" y="${y}" width="${innerW}" height="18" rx="6"></rect>
+      <rect class="bar-fill" x="${left}" y="${y}" width="${barW}" height="18" rx="6"></rect>
+      <text class="bar-value" x="${left + innerW + 14}" y="${y + 14}">${escapeHtml(BRL.format(revenue))}</text>
+      <text class="bar-sales" x="${left}" y="${y + 35}">${NUMBER.format(sales)} vendas - ticket ${escapeHtml(BRL.format(sales ? revenue / sales : 0))}</text>
+    `;
+  }).join('');
+}
+
 function buildAttendantSalesFromTransactions(transactions, attendants) {
   return attendants.map((attendant) => {
     const cents = Number(attendant.cents);
-    const rows = transactions.filter((tx) => amountMatchesCents(Number(tx.amount) || 0, cents));
+    const rows = transactions.filter((tx) => {
+      const manual = normalizeText(tx.manualAttendant);
+      if (manual) return manual === normalizeText(attendant.name);
+      return amountMatchesCents(Number(tx.amount) || 0, cents);
+    });
     const revenue = roundMoney(rows.reduce((total, tx) => total + (Number(tx.amount) || 0), 0));
     return {
       name: attendant.name,
@@ -407,7 +784,7 @@ async function saveAttendants() {
     const payload = await response.json();
     if (!payload.ok) throw new Error(payload.error || 'Nao foi possivel salvar.');
     alert('Atendentes salvos na planilha.');
-    loadDashboard();
+    await refreshDashboardSnapshots();
   } catch (error) {
     alert(error.message || 'Nao foi possivel salvar os atendentes.');
   }
@@ -489,6 +866,13 @@ function setStatus(text) {
   els.status.textContent = text;
 }
 
+function formatCachedStatus(record) {
+  if (!record || !record.cachedAt) return 'Salvo';
+  const date = new Date(record.cachedAt);
+  if (Number.isNaN(date.getTime())) return 'Salvo';
+  return `Salvo ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
 function formatStatus(payload) {
   if (!CONFIG.apiUrl) return 'Demo local';
   if (!payload.lastSync || !payload.lastSync.when) return 'Atualizado';
@@ -518,7 +902,10 @@ function compactMoney(value) {
 }
 
 function toInputDate(date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function formatDateDisplay(value) {
@@ -611,6 +998,86 @@ function demoPayload() {
   };
 }
 
+function emptyPayload() {
+  const today = new Date();
+  const attendants = readCachedAttendants();
+  const attendantName = currentAttendantName();
+  const selected = attendants.find((attendant) => normalizeText(attendant.name) === normalizeText(attendantName)) ||
+    attendants[0] ||
+    { name: attendantName || 'Sheila', cents: 97, note: 'Vendas com final ,97' };
+  const period = buildLocalPeriod();
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  const labels = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM'];
+  const weekly = labels.map((label, index) => {
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + index);
+    return {
+      label: `${label} (${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})`,
+      date: toInputDate(date),
+      revenue: 0,
+      profit: 0,
+      sales: 0
+    };
+  });
+
+  return {
+    ok: true,
+    app: 'HOMESTUDIO BI',
+    generatedAt: today.toISOString(),
+    period,
+    attendant: selected,
+    attendants: attendants.length ? attendants : [selected],
+    metrics: {
+      revenue: 0,
+      sales: 0,
+      attendantRevenue: 0,
+      attendantSales: 0,
+      metaSpend: 0,
+      metaTax: 0,
+      investment: 0,
+      profit: 0,
+      margin: 0,
+      avgTicket: 0,
+      cpa: 0,
+      roas: 0,
+      adjustedRoas: 0,
+      metaSpendSource: 'cache_empty'
+    },
+    weekly,
+    transactions: [],
+    attendantSales: [],
+    lastSync: null,
+    currencies: []
+  };
+}
+
+function buildLocalPeriod() {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (state.period === 'yesterday') {
+    return { key: 'yesterday', label: 'Ontem', start: toInputDate(yesterday), end: toInputDate(yesterday), referenceDate: toInputDate(today) };
+  }
+  if (state.period === '7d') {
+    const start = new Date(today);
+    start.setDate(start.getDate() - 7);
+    return { key: '7d', label: 'Últimos 7 dias', start: toInputDate(start), end: toInputDate(yesterday), referenceDate: toInputDate(today) };
+  }
+  if (state.period === 'this_month') {
+    return { key: 'this_month', label: 'Este mês', start: startOfMonthInput(today), end: toInputDate(today), referenceDate: toInputDate(today) };
+  }
+  if (state.period === 'last_month') {
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return { key: 'last_month', label: 'Mês passado', start: startOfMonthInput(lastMonth), end: endOfMonthInput(lastMonth), referenceDate: toInputDate(today) };
+  }
+  if (state.period === 'custom') {
+    return { key: 'custom', label: 'Personalizado', start: els.startDate.value, end: els.endDate.value, referenceDate: toInputDate(today) };
+  }
+  return { key: 'today', label: 'Hoje', start: toInputDate(today), end: toInputDate(today), referenceDate: toInputDate(today) };
+}
+
 function selectDemoPeriod(weekly) {
   const todayInput = toInputDate(new Date());
   const todayIndex = weekly.findIndex((day) => day.date === todayInput);
@@ -623,6 +1090,23 @@ function selectDemoPeriod(weekly) {
   if (state.period === 'yesterday') {
     return { days: [weekly[yesterdayIndex]], start: weekly[yesterdayIndex].date, end: weekly[yesterdayIndex].date };
   }
+  if (state.period === '7d') {
+    const labels = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+    const amounts = [112.9, 148.7, 212.5, 176.4, 198.8, 164.5, 96.9];
+    const days = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (7 - index));
+      const weekday = labels[date.getDay()];
+      return {
+        label: `${weekday} (${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})`,
+        date: toInputDate(date),
+        revenue: amounts[index],
+        profit: amounts[index],
+        sales: Math.max(1, Math.round(amounts[index] / 12.9))
+      };
+    });
+    return { days, start: days[0].date, end: days[6].date };
+  }
   if (state.period === 'this_month') {
     return { days: weekly, start: startOfMonthInput(new Date()), end: todayInput, multiplier: 4.2 };
   }
@@ -634,7 +1118,9 @@ function selectDemoPeriod(weekly) {
   if (state.period === 'custom') {
     return { days: weekly.slice(1, 5), start: els.startDate.value || weekly[1].date, end: els.endDate.value || weekly[4].date, multiplier: 1.4 };
   }
-  return { days: weekly, start: weekly[0].date, end: weekly[6].date };
+  const endIndex = Math.max(0, safeTodayIndex - 1);
+  const startIndex = Math.max(0, endIndex - 6);
+  return { days: weekly.slice(startIndex, endIndex + 1), start: weekly[startIndex].date, end: weekly[endIndex].date };
 }
 
 function buildDemoTransactions(days, multiplier) {

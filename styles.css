@@ -314,6 +314,21 @@ button {
   margin-top: 18px;
 }
 
+.insights-metrics-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.insights-metrics-grid .metric-card {
+  grid-column: auto;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
 .panel {
   min-width: 0;
   padding: 18px;
@@ -344,6 +359,118 @@ button {
   font-size: 13px;
   font-weight: var(--font-medium);
   white-space: nowrap;
+}
+
+.attendant-analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(220px, 0.7fr) minmax(360px, 1.4fr);
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.analytics-panel {
+  min-height: 254px;
+}
+
+.performance-panel {
+  min-width: 0;
+}
+
+.donut-chart,
+.attendant-bar-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.donut-chart {
+  max-height: 180px;
+}
+
+.donut-track,
+.donut-segment {
+  fill: none;
+  stroke-width: 16;
+  transform: rotate(-90deg);
+  transform-origin: 72px 78px;
+  stroke-linecap: round;
+}
+
+.donut-track {
+  stroke: #566151;
+}
+
+.donut-percent {
+  fill: var(--text);
+  font-size: 22px;
+  font-weight: var(--font-medium);
+}
+
+.donut-label,
+.donut-total-label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.donut-total {
+  fill: var(--text);
+  font-size: 16px;
+  font-weight: var(--font-medium);
+}
+
+.mix-legend {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mix-legend-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mix-legend-row strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.bar-name {
+  fill: var(--text);
+  font-size: 13px;
+  font-weight: var(--font-medium);
+}
+
+.bar-track {
+  fill: #2b3529;
+}
+
+.bar-fill {
+  fill: var(--green);
+}
+
+.bar-value {
+  fill: var(--text);
+  font-size: 12px;
+  font-weight: var(--font-medium);
+}
+
+.bar-sales,
+.bar-empty {
+  fill: var(--muted);
+  font-size: 11px;
 }
 
 .line-chart {
@@ -380,6 +507,14 @@ button {
 .chart-line-profit {
   fill: none;
   stroke: var(--blue);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chart-line-conversion {
+  fill: none;
+  stroke: var(--green);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -459,6 +594,32 @@ td {
   padding-left: 6px;
   padding-right: 6px;
   font-size: 13px;
+}
+
+.insights-weekly-table th,
+.insights-weekly-table td {
+  padding-left: 6px;
+  padding-right: 6px;
+  font-size: 13px;
+}
+
+.insights-weekly-table th:nth-child(1),
+.insights-weekly-table td:nth-child(1) {
+  width: 28%;
+}
+
+.insights-weekly-table th:nth-child(2),
+.insights-weekly-table td:nth-child(2),
+.insights-weekly-table th:nth-child(3),
+.insights-weekly-table td:nth-child(3),
+.insights-weekly-table th:nth-child(4),
+.insights-weekly-table td:nth-child(4) {
+  width: 24%;
+}
+
+.subpercent {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .money-negative {
@@ -630,7 +791,10 @@ td {
   }
 
   .metrics-grid,
-  .analysis-grid {
+  .analysis-grid,
+  .insights-metrics-grid,
+  .insights-grid,
+  .attendant-analytics-grid {
     grid-template-columns: 1fr;
   }
 
@@ -652,7 +816,7 @@ td {
     bottom: 0;
     z-index: 20;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 0;
     padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #263223;
@@ -674,8 +838,8 @@ td {
   }
 
   .mobile-tab svg {
-    width: 25px;
-    height: 25px;
+    width: 23px;
+    height: 23px;
     fill: currentColor;
   }
 
@@ -694,6 +858,18 @@ td {
   .metric-margin,
   .metric-roas {
     grid-column: auto;
+  }
+
+  .attendant-analytics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .insights-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .performance-panel {
+    grid-column: 1 / -1;
   }
 }
 
@@ -760,6 +936,19 @@ td {
   .weekly-table th,
   .weekly-table td {
     font-size: 11px;
+  }
+
+  .analytics-panel {
+    min-height: 220px;
+  }
+
+  .mix-legend-row {
+    grid-template-columns: 10px minmax(0, 1fr);
+  }
+
+  .mix-legend-row strong {
+    grid-column: 2;
+    white-space: normal;
   }
 
   .attendant-row,
