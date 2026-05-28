@@ -195,7 +195,8 @@ function render(payload) {
   els.periodLabel.textContent = payload.period.label;
   els.metaSpendValue.title = {
     api: 'Gasto Meta vindo automaticamente da API da Meta.',
-    sheet: 'Gasto Meta vindo da planilha.'
+    sheet: 'Gasto Meta vindo da planilha.',
+    not_configured: 'Meta Ads ainda nao configurado no Apps Script.'
   }[metrics.metaSpendSource] || 'Gasto Meta';
 
   const toneValue = metrics.profit;
@@ -622,11 +623,13 @@ function selectDemoPeriod(weekly) {
   if (state.period === 'yesterday') {
     return { days: [weekly[yesterdayIndex]], start: weekly[yesterdayIndex].date, end: weekly[yesterdayIndex].date };
   }
-  if (state.period === '30d') {
-    return { days: weekly, start: weekly[0].date, end: weekly[6].date, multiplier: 4.2 };
+  if (state.period === 'this_month') {
+    return { days: weekly, start: startOfMonthInput(new Date()), end: todayInput, multiplier: 4.2 };
   }
-  if (state.period === 'max') {
-    return { days: weekly, start: weekly[0].date, end: weekly[6].date, multiplier: 6 };
+  if (state.period === 'last_month') {
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    return { days: weekly, start: startOfMonthInput(lastMonth), end: endOfMonthInput(lastMonth), multiplier: 3.8 };
   }
   if (state.period === 'custom') {
     return { days: weekly.slice(1, 5), start: els.startDate.value || weekly[1].date, end: els.endDate.value || weekly[4].date, multiplier: 1.4 };
@@ -649,14 +652,22 @@ function buildDemoTransactions(days, multiplier) {
 }
 
 function periodName(period) {
-  return {
-    today: 'Hoje',
-    yesterday: 'Ontem',
-    '7d': 'Últimos 7 dias',
-    '30d': 'Últimos 30 dias',
-    max: 'Máximo',
-    custom: 'Personalizado'
-  }[period] || 'Hoje';
+  const names = {};
+  names.today = 'Hoje';
+  names.yesterday = 'Ontem';
+  names['7d'] = 'Últimos 7 dias';
+  names.this_month = 'Este mês';
+  names.last_month = 'Mês passado';
+  names.custom = 'Personalizado';
+  return names[period] || 'Hoje';
+}
+
+function startOfMonthInput(date) {
+  return toInputDate(new Date(date.getFullYear(), date.getMonth(), 1));
+}
+
+function endOfMonthInput(date) {
+  return toInputDate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
 }
 
 init();

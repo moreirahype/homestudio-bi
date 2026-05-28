@@ -44,9 +44,9 @@
           <div class="control-group period-group" role="group" aria-label="Periodo">
             <button class="period-button active" type="button" data-period="today">Hoje</button>
             <button class="period-button" type="button" data-period="yesterday">Ontem</button>
-            <button class="period-button" type="button" data-period="7d">7 dias</button>
-            <button class="period-button" type="button" data-period="30d">30 dias</button>
-            <button class="period-button" type="button" data-period="max">Maximo</button>
+            <button class="period-button" type="button" data-period="7d">Últimos 7 dias</button>
+            <button class="period-button" type="button" data-period="this_month">Este mês</button>
+            <button class="period-button" type="button" data-period="last_month">Mês passado</button>
             <button class="period-button" type="button" data-period="custom">Personalizado</button>
           </div>
 
@@ -227,6 +227,24 @@
         </section>
       </main>
     </div>
+    <nav class="mobile-tabbar" aria-label="Navegação mobile">
+      <button class="mobile-tab active" type="button" data-view="dashboard" aria-label="Dashboard">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="mobile-tab" type="button" data-view="transactions" aria-label="Transações">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v2H5V6Zm0 5h14v2H5v-2Zm0 5h14v2H5v-2Z"/></svg>
+        <span>Transações</span>
+      </button>
+      <button class="mobile-tab" type="button" data-view="attendant-sales" aria-label="Vendas atendentes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h3V9H5v10Zm5 0h3V5h-3v14Zm5 0h3v-7h-3v7Z"/></svg>
+        <span>Vendas</span>
+      </button>
+      <button class="mobile-tab" type="button" data-view="attendants" aria-label="Atendentes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-7 8a7 7 0 0 1 14 0H5Z"/></svg>
+        <span>Atendentes</span>
+      </button>
+    </nav>
     <div class="chart-tooltip" id="chartTooltip" hidden></div>
   </body>
 </html>
