@@ -8,12 +8,12 @@
     <meta name="apple-mobile-web-app-title" content="HOMESTUDIO BI">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>HOMESTUDIO BI</title>
-    <link rel="manifest" href="manifest.webmanifest?v=10">
+    <link rel="manifest" href="manifest.webmanifest?v=11">
     <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=10">
-    <script src="config.js?v=10"></script>
-    <script src="app.js?v=10" defer></script>
+    <link rel="stylesheet" href="styles.css?v=11">
+    <script src="config.js?v=11"></script>
+    <script src="app.js?v=11" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -174,13 +174,10 @@
             </div>
             <div class="insights-range-controls" aria-label="Período de vendas por horário">
               <button class="secondary-button" id="hourlyPrevDay" type="button">Dia anterior</button>
+              <button class="secondary-button" id="hourlyToday" type="button">Dia atual</button>
               <label>
-                <span>Início</span>
-                <input id="hourlyStartDate" type="date">
-              </label>
-              <label>
-                <span>Fim</span>
-                <input id="hourlyEndDate" type="date">
+                <span>Data</span>
+                <input id="hourlyDate" type="date">
               </label>
               <button class="secondary-button" id="hourlyNextDay" type="button">Próximo dia</button>
             </div>
@@ -195,6 +192,7 @@
               </div>
               <div class="insights-range-controls" aria-label="Semana dos insights">
                 <button class="secondary-button" id="insightsPrevWeek" type="button">Semana anterior</button>
+                <button class="secondary-button" id="insightsCurrentWeek" type="button">Semana atual</button>
                 <label>
                   <span>Início</span>
                   <input id="insightsStartDate" type="date">

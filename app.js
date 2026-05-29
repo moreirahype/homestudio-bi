@@ -3,7 +3,7 @@ const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: CONFIG
 const NUMBER = new Intl.NumberFormat('pt-BR');
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
-const CACHE_PREFIX = 'homestudio.bi.snapshot.v10';
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v11';
 const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
 const TRANSACTIONS_PAGE_SIZE = 50;
 
@@ -64,10 +64,11 @@ const els = {
   hourlyPeriodLabel: $('#hourlyPeriodLabel'),
   hourlyChart: $('#hourlyChart'),
   hourlyPrevDay: $('#hourlyPrevDay'),
+  hourlyToday: $('#hourlyToday'),
   hourlyNextDay: $('#hourlyNextDay'),
-  hourlyStartDate: $('#hourlyStartDate'),
-  hourlyEndDate: $('#hourlyEndDate'),
+  hourlyDate: $('#hourlyDate'),
   insightsPrevWeek: $('#insightsPrevWeek'),
+  insightsCurrentWeek: $('#insightsCurrentWeek'),
   insightsNextWeek: $('#insightsNextWeek'),
   insightsStartDate: $('#insightsStartDate'),
   insightsEndDate: $('#insightsEndDate'),
@@ -150,6 +151,9 @@ function init() {
   if (els.insightsPrevWeek) {
     els.insightsPrevWeek.addEventListener('click', () => shiftInsightsWeek(-7));
   }
+  if (els.insightsCurrentWeek) {
+    els.insightsCurrentWeek.addEventListener('click', () => setInsightsRange(currentWeekRange(new Date())));
+  }
   if (els.insightsNextWeek) {
     els.insightsNextWeek.addEventListener('click', () => shiftInsightsWeek(7));
   }
@@ -162,15 +166,15 @@ function init() {
   if (els.hourlyPrevDay) {
     els.hourlyPrevDay.addEventListener('click', () => shiftHourlyPeriod(-1));
   }
+  if (els.hourlyToday) {
+    els.hourlyToday.addEventListener('click', () => setHourlyDate(new Date()));
+  }
   if (els.hourlyNextDay) {
     els.hourlyNextDay.addEventListener('click', () => shiftHourlyPeriod(1));
   }
-  [els.hourlyStartDate, els.hourlyEndDate].filter(Boolean).forEach((input) => {
-    input.addEventListener('change', () => {
-      setHourlyRangeFromInputs();
-      renderCurrentHourly();
-    });
-  });
+  if (els.hourlyDate) {
+    els.hourlyDate.addEventListener('change', () => setHourlyDateFromInput());
+  }
   els.addAttendant.addEventListener('click', () => {
     state.attendants.push({ name: '', cents: '', note: '' });
     renderAttendantEditor(state.attendants);
@@ -184,7 +188,7 @@ function init() {
   renderCachedDashboard();
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=10')
+    navigator.serviceWorker.register('sw.js?v=11')
       .then((registration) => registration.update())
       .catch(() => {});
   }
@@ -230,34 +234,27 @@ function shiftInsightsWeek(days) {
 }
 
 function setHourlyRange(range, options = {}) {
-  state.hourlyStart = toInputDate(range.start);
-  state.hourlyEnd = toInputDate(range.end);
-  if (els.hourlyStartDate) els.hourlyStartDate.value = state.hourlyStart;
-  if (els.hourlyEndDate) els.hourlyEndDate.value = state.hourlyEnd;
+  const day = parseInputDate(toInputDate(range.start)) || new Date();
+  state.hourlyStart = toInputDate(day);
+  state.hourlyEnd = state.hourlyStart;
+  if (els.hourlyDate) els.hourlyDate.value = state.hourlyStart;
   if (options.render !== false) renderCurrentHourly();
 }
 
-function setHourlyRangeFromInputs() {
-  const today = new Date();
-  let start = parseInputDate(els.hourlyStartDate?.value) || parseInputDate(state.hourlyStart) || today;
-  let end = parseInputDate(els.hourlyEndDate?.value) || parseInputDate(state.hourlyEnd) || start;
-  if (end < start) {
-    const temp = start;
-    start = end;
-    end = temp;
-  }
-  const maxEnd = new Date(start);
-  maxEnd.setDate(maxEnd.getDate() + 30);
-  if (end > maxEnd) end = maxEnd;
-  setHourlyRange({ start, end }, { render: false });
+function setHourlyDate(date) {
+  const day = parseInputDate(toInputDate(date)) || new Date();
+  setHourlyRange({ start: day, end: day });
+}
+
+function setHourlyDateFromInput() {
+  const day = parseInputDate(els.hourlyDate?.value) || parseInputDate(state.hourlyStart) || new Date();
+  setHourlyDate(day);
 }
 
 function shiftHourlyPeriod(days) {
-  const start = parseInputDate(state.hourlyStart) || new Date();
-  const end = parseInputDate(state.hourlyEnd) || start;
-  start.setDate(start.getDate() + days);
-  end.setDate(end.getDate() + days);
-  setHourlyRange({ start, end });
+  const day = parseInputDate(state.hourlyStart) || new Date();
+  day.setDate(day.getDate() + days);
+  setHourlyDate(day);
 }
 
 function currentWeekRange(reference) {
@@ -761,10 +758,12 @@ function renderAttendantAnalytics(attendantSales, metrics, period) {
 
 function renderCurrentInsights() {
   renderInsights(resolveInsights(state.payload || emptyPayload()));
+  requestInsightsRefreshIfMissing();
 }
 
 function renderCurrentHourly() {
   renderHourly(resolveHourly(state.payload || emptyPayload()));
+  requestHourlyRefreshIfMissing();
 }
 
 function resolveHourly(payload) {
@@ -804,6 +803,40 @@ function resolveInsights(payload) {
     return payloadInsights;
   }
   return buildEmptyInsightsForRange();
+}
+
+function requestHourlyRefreshIfMissing() {
+  if (!CONFIG.apiUrl) return;
+  if (readHourlySnapshot()?.hourly) return;
+  const payloadHourly = state.payload && state.payload.hourly;
+  if (payloadHourly?.period?.start === state.hourlyStart && payloadHourly?.period?.end === state.hourlyEnd) return;
+  fetchPayload({ period: state.period, attendant: currentAttendantName(), start: els.startDate.value, end: els.endDate.value })
+    .then((payload) => {
+      if (!payload || !payload.ok) return;
+      storeHourlySnapshot(payload.hourly);
+      if (state.payload && payload.period?.key === state.payload.period?.key) {
+        state.payload.hourly = payload.hourly;
+      }
+      renderHourly(resolveHourly(state.payload || payload));
+    })
+    .catch(() => {});
+}
+
+function requestInsightsRefreshIfMissing() {
+  if (!CONFIG.apiUrl) return;
+  if (readInsightsSnapshot()?.insights) return;
+  const payloadInsights = state.payload && state.payload.insights;
+  if (payloadInsights?.period?.start === state.insightsStart && payloadInsights?.period?.end === state.insightsEnd) return;
+  fetchPayload({ period: state.period, attendant: currentAttendantName(), start: els.startDate.value, end: els.endDate.value })
+    .then((payload) => {
+      if (!payload || !payload.ok) return;
+      storeInsightsSnapshot(payload.insights);
+      if (state.payload && payload.period?.key === state.payload.period?.key) {
+        state.payload.insights = payload.insights;
+      }
+      renderInsights(resolveInsights(state.payload || payload));
+    })
+    .catch(() => {});
 }
 
 function renderHourlyChart(hours) {
