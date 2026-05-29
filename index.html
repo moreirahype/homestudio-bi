@@ -76,7 +76,7 @@
             <strong class="metric-value" id="revenueValue">R$ 0,00</strong>
           </article>
           <article class="metric-card compact metric-meta">
-            <span class="metric-label">Gasto Meta</span>
+            <span class="metric-label">Valor gasto</span>
             <strong class="metric-value" id="metaSpendValue">R$ 0,00</strong>
           </article>
           <article class="metric-card metric-sales">
@@ -167,11 +167,43 @@
             </article>
           </section>
 
+          <article class="panel hourly-panel">
+            <div class="panel-header">
+              <h1>Vendas por horário</h1>
+              <span id="hourlyPeriodLabel">Hoje</span>
+            </div>
+            <div class="insights-range-controls" aria-label="Período de vendas por horário">
+              <button class="secondary-button" id="hourlyPrevDay" type="button">Dia anterior</button>
+              <label>
+                <span>Início</span>
+                <input id="hourlyStartDate" type="date">
+              </label>
+              <label>
+                <span>Fim</span>
+                <input id="hourlyEndDate" type="date">
+              </label>
+              <button class="secondary-button" id="hourlyNextDay" type="button">Próximo dia</button>
+            </div>
+            <svg class="bar-chart hourly-chart" id="hourlyChart" viewBox="0 0 720 280" role="img" aria-label="Vendas por horario"></svg>
+          </article>
+
           <section class="insights-grid">
             <article class="panel chart-panel">
               <div class="panel-header">
                 <h1>Conversão semanal</h1>
                 <span id="insightsPeriodLabel">Semana atual</span>
+              </div>
+              <div class="insights-range-controls" aria-label="Semana dos insights">
+                <button class="secondary-button" id="insightsPrevWeek" type="button">Semana anterior</button>
+                <label>
+                  <span>Início</span>
+                  <input id="insightsStartDate" type="date">
+                </label>
+                <label>
+                  <span>Fim</span>
+                  <input id="insightsEndDate" type="date">
+                </label>
+                <button class="secondary-button" id="insightsNextWeek" type="button">Próxima semana</button>
               </div>
               <svg class="line-chart conversion-chart" id="conversionChart" viewBox="0 0 720 280" role="img" aria-label="Taxa de conversao semanal"></svg>
             </article>
@@ -195,27 +227,43 @@
               </div>
             </article>
           </section>
+
+          <section class="funnel-summary" aria-label="Resumo do funil">
+            <article class="metric-card compact">
+              <span class="metric-label">Cliques por venda</span>
+              <strong class="metric-value" id="clicksPerSaleValue">0</strong>
+            </article>
+            <article class="metric-card compact">
+              <span class="metric-label">Conversas por venda</span>
+              <strong class="metric-value" id="conversationsPerSaleValue">0</strong>
+            </article>
+          </section>
         </section>
 
         <section class="view" id="transactionsView" data-view-panel="transactions">
           <article class="panel page-panel">
             <div class="panel-header">
               <h1>Transações</h1>
-              <input class="search-input" id="transactionSearch" type="search" placeholder="Buscar por pagador, valor ou descrição">
+              <input class="search-input" id="transactionSearch" type="search" placeholder="Buscar por pagador ou valor">
             </div>
             <div class="table-scroll">
               <table class="transactions-table">
                 <thead>
                   <tr>
                     <th>Data</th>
+                    <th>Horário</th>
                     <th>Pagador</th>
                     <th>Moeda</th>
                     <th>Valor</th>
-                    <th>Descrição</th>
                   </tr>
                 </thead>
                 <tbody id="transactionRows"></tbody>
               </table>
+            </div>
+            <div class="pagination-row">
+              <button class="secondary-button" id="transactionPrevPage" type="button">Anterior</button>
+              <span id="transactionPageInfo">Página 1</span>
+              <button class="secondary-button" id="transactionNextPage" type="button">Próxima</button>
             </div>
           </article>
         </section>
@@ -258,6 +306,11 @@
                 </thead>
                 <tbody id="attendantSalesDetailRows"></tbody>
               </table>
+            </div>
+            <div class="pagination-row">
+              <button class="secondary-button" id="attendantDetailPrevPage" type="button">Anterior</button>
+              <span id="attendantDetailPageInfo">Página 1</span>
+              <button class="secondary-button" id="attendantDetailNextPage" type="button">Próxima</button>
             </div>
           </article>
         </section>

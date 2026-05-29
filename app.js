@@ -3,15 +3,23 @@ const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: CONFIG
 const NUMBER = new Intl.NumberFormat('pt-BR');
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
-const CACHE_PREFIX = 'homestudio.bi.snapshot.v6';
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v8';
 const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
+const TRANSACTIONS_PAGE_SIZE = 50;
 
 const state = {
   period: CONFIG.defaultPeriod || 'today',
   view: 'dashboard',
   payload: null,
   attendants: [],
-  transactions: []
+  transactions: [],
+  transactionPage: 1,
+  attendantDetailPage: 1,
+  attendantDetails: [],
+  insightsStart: '',
+  insightsEnd: '',
+  hourlyStart: '',
+  hourlyEnd: ''
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -31,9 +39,15 @@ const els = {
   weeklyRows: $('#weeklyRows'),
   transactionRows: $('#transactionRows'),
   transactionSearch: $('#transactionSearch'),
+  transactionPrevPage: $('#transactionPrevPage'),
+  transactionNextPage: $('#transactionNextPage'),
+  transactionPageInfo: $('#transactionPageInfo'),
   attendantSalesPeriod: $('#attendantSalesPeriod'),
   attendantSalesRows: $('#attendantSalesRows'),
   attendantSalesDetailRows: $('#attendantSalesDetailRows'),
+  attendantDetailPrevPage: $('#attendantDetailPrevPage'),
+  attendantDetailNextPage: $('#attendantDetailNextPage'),
+  attendantDetailPageInfo: $('#attendantDetailPageInfo'),
   attendantAnalyticsPeriod: $('#attendantAnalyticsPeriod'),
   salesMixChart: $('#salesMixChart'),
   salesMixLegend: $('#salesMixLegend'),
@@ -47,6 +61,18 @@ const els = {
   insightsPeriodLabel: $('#insightsPeriodLabel'),
   conversionChart: $('#conversionChart'),
   insightsRows: $('#insightsRows'),
+  hourlyPeriodLabel: $('#hourlyPeriodLabel'),
+  hourlyChart: $('#hourlyChart'),
+  hourlyPrevDay: $('#hourlyPrevDay'),
+  hourlyNextDay: $('#hourlyNextDay'),
+  hourlyStartDate: $('#hourlyStartDate'),
+  hourlyEndDate: $('#hourlyEndDate'),
+  insightsPrevWeek: $('#insightsPrevWeek'),
+  insightsNextWeek: $('#insightsNextWeek'),
+  insightsStartDate: $('#insightsStartDate'),
+  insightsEndDate: $('#insightsEndDate'),
+  clicksPerSale: $('#clicksPerSaleValue'),
+  conversationsPerSale: $('#conversationsPerSaleValue'),
   attendantEditor: $('#attendantEditor'),
   addAttendant: $('#addAttendantButton'),
   saveAttendants: $('#saveAttendantsButton'),
@@ -70,6 +96,8 @@ function init() {
   weekAgo.setDate(weekAgo.getDate() - 6);
   els.startDate.value = toInputDate(weekAgo);
   els.endDate.value = toInputDate(today);
+  setInsightsRange(currentWeekRange(today), { render: false });
+  setHourlyRange({ start: today, end: today }, { render: false });
 
   $$('.period-button').forEach((button) => {
     button.addEventListener('click', () => {
@@ -91,7 +119,58 @@ function init() {
     localStorage.setItem('homestudio.attendant', els.attendantSelect.value);
     renderCachedDashboard();
   });
-  els.transactionSearch.addEventListener('input', () => renderTransactions(state.transactions));
+  els.transactionSearch.addEventListener('input', () => {
+    state.transactionPage = 1;
+    renderTransactions(state.transactions);
+  });
+  if (els.transactionPrevPage) {
+    els.transactionPrevPage.addEventListener('click', () => {
+      state.transactionPage = Math.max(1, state.transactionPage - 1);
+      renderTransactions(state.transactions);
+    });
+  }
+  if (els.transactionNextPage) {
+    els.transactionNextPage.addEventListener('click', () => {
+      state.transactionPage += 1;
+      renderTransactions(state.transactions);
+    });
+  }
+  if (els.attendantDetailPrevPage) {
+    els.attendantDetailPrevPage.addEventListener('click', () => {
+      state.attendantDetailPage = Math.max(1, state.attendantDetailPage - 1);
+      renderAttendantSalesDetails(state.attendantDetails);
+    });
+  }
+  if (els.attendantDetailNextPage) {
+    els.attendantDetailNextPage.addEventListener('click', () => {
+      state.attendantDetailPage += 1;
+      renderAttendantSalesDetails(state.attendantDetails);
+    });
+  }
+  if (els.insightsPrevWeek) {
+    els.insightsPrevWeek.addEventListener('click', () => shiftInsightsWeek(-7));
+  }
+  if (els.insightsNextWeek) {
+    els.insightsNextWeek.addEventListener('click', () => shiftInsightsWeek(7));
+  }
+  [els.insightsStartDate, els.insightsEndDate].filter(Boolean).forEach((input) => {
+    input.addEventListener('change', () => {
+      setInsightsRangeFromInputs();
+      renderCurrentInsights();
+    });
+  });
+  if (els.hourlyPrevDay) {
+    els.hourlyPrevDay.addEventListener('click', () => shiftHourlyPeriod(-1));
+  }
+  if (els.hourlyNextDay) {
+    els.hourlyNextDay.addEventListener('click', () => shiftHourlyPeriod(1));
+  }
+  [els.hourlyStartDate, els.hourlyEndDate].filter(Boolean).forEach((input) => {
+    input.addEventListener('change', () => {
+      setHourlyRangeFromInputs();
+      renderCurrentHourly();
+    });
+  });
   els.addAttendant.addEventListener('click', () => {
     state.attendants.push({ name: '', cents: '', note: '' });
     renderAttendantEditor(state.attendants);
@@ -122,6 +201,72 @@ function updatePeriodButtons() {
   els.customRange.hidden = state.period !== 'custom';
 }
 
+function setInsightsRange(range, options = {}) {
+  state.insightsStart = toInputDate(range.start);
+  state.insightsEnd = toInputDate(range.end);
+  if (els.insightsStartDate) els.insightsStartDate.value = state.insightsStart;
+  if (els.insightsEndDate) els.insightsEndDate.value = state.insightsEnd;
+  if (options.render !== false) renderCurrentInsights();
+}
+
+function setInsightsRangeFromInputs() {
+  const start = parseInputDate(els.insightsStartDate?.value) || parseInputDate(state.insightsStart) || currentWeekRange(new Date()).start;
+  let end = parseInputDate(els.insightsEndDate?.value) || parseInputDate(state.insightsEnd) || currentWeekRange(new Date()).end;
+  const maxEnd = new Date(start);
+  maxEnd.setDate(maxEnd.getDate() + 6);
+  if (end < start) end = new Date(start);
+  if (end > maxEnd) end = maxEnd;
+  setInsightsRange({ start, end }, { render: false });
+}
+
+function shiftInsightsWeek(days) {
+  const start = parseInputDate(state.insightsStart) || currentWeekRange(new Date()).start;
+  const end = parseInputDate(state.insightsEnd) || currentWeekRange(new Date()).end;
+  start.setDate(start.getDate() + days);
+  end.setDate(end.getDate() + days);
+  setInsightsRange({ start, end });
+}
+
+function setHourlyRange(range, options = {}) {
+  state.hourlyStart = toInputDate(range.start);
+  state.hourlyEnd = toInputDate(range.end);
+  if (els.hourlyStartDate) els.hourlyStartDate.value = state.hourlyStart;
+  if (els.hourlyEndDate) els.hourlyEndDate.value = state.hourlyEnd;
+  if (options.render !== false) renderCurrentHourly();
+}
+
+function setHourlyRangeFromInputs() {
+  const today = new Date();
+  let start = parseInputDate(els.hourlyStartDate?.value) || parseInputDate(state.hourlyStart) || today;
+  let end = parseInputDate(els.hourlyEndDate?.value) || parseInputDate(state.hourlyEnd) || start;
+  if (end < start) {
+    const temp = start;
+    start = end;
+    end = temp;
+  }
+  const maxEnd = new Date(start);
+  maxEnd.setDate(maxEnd.getDate() + 30);
+  if (end > maxEnd) end = maxEnd;
+  setHourlyRange({ start, end }, { render: false });
+}
+
+function shiftHourlyPeriod(days) {
+  const start = parseInputDate(state.hourlyStart) || new Date();
+  const end = parseInputDate(state.hourlyEnd) || start;
+  start.setDate(start.getDate() + days);
+  end.setDate(end.getDate() + days);
+  setHourlyRange({ start, end });
+}
+
+function currentWeekRange(reference) {
+  const start = new Date(reference);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return { start, end };
+}
+
 function currentAttendantName() {
   return els.attendantSelect.value ||
     localStorage.getItem('homestudio.attendant') ||
@@ -139,9 +284,41 @@ function snapshotKey(options = {}) {
   return `${CACHE_PREFIX}:${apiPart}:${period}:${attendant}:${start}:${end}`;
 }
 
+function insightsKey(options = {}) {
+  const start = options.start || state.insightsStart || '';
+  const end = options.end || state.insightsEnd || '';
+  const apiPart = String(CONFIG.apiUrl || 'demo').replace(/[^\w.-]/g, '_').slice(-96);
+  return `${CACHE_PREFIX}:insights:${apiPart}:${start}:${end}`;
+}
+
+function hourlyKey(options = {}) {
+  const start = options.start || state.hourlyStart || '';
+  const end = options.end || state.hourlyEnd || '';
+  const apiPart = String(CONFIG.apiUrl || 'demo').replace(/[^\w.-]/g, '_').slice(-96);
+  return `${CACHE_PREFIX}:hourly:${apiPart}:${start}:${end}`;
+}
+
 function readSnapshot(options = {}) {
   try {
     const raw = localStorage.getItem(snapshotKey(options));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readHourlySnapshot(options = {}) {
+  try {
+    const raw = localStorage.getItem(hourlyKey(options));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readInsightsSnapshot(options = {}) {
+  try {
+    const raw = localStorage.getItem(insightsKey(options));
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -154,6 +331,32 @@ function storeSnapshot(payload, options = {}) {
     payload
   };
   localStorage.setItem(snapshotKey(options), JSON.stringify(record));
+  storeInsightsSnapshot(payload && payload.insights);
+  storeHourlySnapshot(payload && payload.hourly);
+}
+
+function storeInsightsSnapshot(insights) {
+  if (!insights || !insights.period || !insights.period.start || !insights.period.end) return;
+  const record = {
+    cachedAt: Date.now(),
+    insights
+  };
+  localStorage.setItem(insightsKey({
+    start: insights.period.start,
+    end: insights.period.end
+  }), JSON.stringify(record));
+}
+
+function storeHourlySnapshot(hourly) {
+  if (!hourly || !hourly.period || !hourly.period.start || !hourly.period.end) return;
+  const record = {
+    cachedAt: Date.now(),
+    hourly
+  };
+  localStorage.setItem(hourlyKey({
+    start: hourly.period.start,
+    end: hourly.period.end
+  }), JSON.stringify(record));
 }
 
 function cacheAttendants(attendants) {
@@ -251,6 +454,10 @@ async function fetchBatchPayload({ periods, attendant }) {
   url.searchParams.set('periods', periods.join(','));
   url.searchParams.set('_', String(Date.now()));
   if (attendant) url.searchParams.set('attendant', attendant);
+  url.searchParams.set('insightsStart', state.insightsStart);
+  url.searchParams.set('insightsEnd', state.insightsEnd);
+  url.searchParams.set('hourlyStart', state.hourlyStart);
+  url.searchParams.set('hourlyEnd', state.hourlyEnd);
   if (periods.includes('custom')) {
     url.searchParams.set('start', els.startDate.value);
     url.searchParams.set('end', els.endDate.value);
@@ -284,6 +491,10 @@ async function fetchPayload(options = {}) {
   url.searchParams.set('period', period);
   url.searchParams.set('_', String(Date.now()));
   if (options.attendant) url.searchParams.set('attendant', options.attendant);
+  url.searchParams.set('insightsStart', state.insightsStart);
+  url.searchParams.set('insightsEnd', state.insightsEnd);
+  url.searchParams.set('hourlyStart', state.hourlyStart);
+  url.searchParams.set('hourlyEnd', state.hourlyEnd);
   if (period === 'custom') {
     url.searchParams.set('start', options.start || els.startDate.value);
     url.searchParams.set('end', options.end || els.endDate.value);
@@ -346,11 +557,11 @@ function render(payload) {
   els.roas.textContent = formatDecimal(metrics.roas);
   els.periodLabel.textContent = payload.period.label;
   els.metaSpendValue.title = {
-    api: 'Gasto Meta vindo automaticamente da API da Meta.',
-    sheet: 'Gasto Meta vindo da planilha.',
+    api: 'Valor gasto vindo automaticamente da API da Meta.',
+    sheet: 'Valor gasto vindo da planilha.',
     not_configured: 'Meta Ads ainda nao configurado no Apps Script.',
-    api_error: metrics.metaSpendError || 'Nao foi possivel ler o gasto da Meta.'
-  }[metrics.metaSpendSource] || 'Gasto Meta';
+    api_error: metrics.metaSpendError || 'Nao foi possivel ler o valor gasto da Meta.'
+  }[metrics.metaSpendSource] || 'Valor gasto';
 
   const toneValue = metrics.profit;
   setTone(els.profit.closest('.metric-card'), toneValue);
@@ -360,7 +571,8 @@ function render(payload) {
   renderTable(payload.weekly);
   renderChart(payload.weekly);
   renderTransactions(state.transactions);
-  renderInsights(payload.insights || buildEmptyInsights(payload.weekly || []));
+  renderHourly(resolveHourly(payload));
+  renderInsights(resolveInsights(payload));
   renderAttendantSales(attendantSales, payload.period);
   renderAttendantAnalytics(attendantSales, metrics, payload.period);
   renderAttendantEditor(state.attendants);
@@ -406,39 +618,55 @@ function renderTable(days) {
 
 function renderTransactions(transactions) {
   const query = normalizeText(els.transactionSearch.value);
-  const rows = transactions
+  const filteredRows = transactions
     .filter((tx) => {
       const haystack = normalizeText(`${tx.date} ${tx.payer} ${tx.currency} ${tx.amount} ${tx.description}`);
       return !query || haystack.includes(query);
-    })
-    .slice(0, 250);
+    });
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / TRANSACTIONS_PAGE_SIZE));
+  state.transactionPage = Math.min(Math.max(1, state.transactionPage), totalPages);
+  const start = (state.transactionPage - 1) * TRANSACTIONS_PAGE_SIZE;
+  const rows = filteredRows.slice(start, start + TRANSACTIONS_PAGE_SIZE);
 
   els.transactionRows.innerHTML = '';
   if (!rows.length) {
     els.transactionRows.innerHTML = '<tr><td colspan="5">Nenhuma transação encontrada.</td></tr>';
+    updateTransactionPagination(0, 1);
     return;
   }
   rows.forEach((tx) => {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${formatDateDisplay(tx.date)}</td>
+      <td>${escapeHtml(tx.time || '')}</td>
       <td>${escapeHtml(tx.payer || '')}</td>
       <td>${escapeHtml(tx.currency || '')}</td>
       <td>${BRL.format(Number(tx.amount) || 0)}</td>
-      <td>${escapeHtml(tx.description || '')}</td>
     `;
     els.transactionRows.appendChild(row);
   });
+  updateTransactionPagination(filteredRows.length, totalPages);
+}
+
+function updateTransactionPagination(totalRows, totalPages) {
+  if (!els.transactionPageInfo) return;
+  const first = totalRows ? ((state.transactionPage - 1) * TRANSACTIONS_PAGE_SIZE) + 1 : 0;
+  const last = Math.min(totalRows, state.transactionPage * TRANSACTIONS_PAGE_SIZE);
+  els.transactionPageInfo.textContent = totalRows
+    ? `Página ${state.transactionPage} de ${totalPages} · ${first}-${last} de ${totalRows}`
+    : 'Página 1 de 1';
+  if (els.transactionPrevPage) els.transactionPrevPage.disabled = state.transactionPage <= 1;
+  if (els.transactionNextPage) els.transactionNextPage.disabled = state.transactionPage >= totalPages;
 }
 
 function renderAttendantSales(attendantSales, period) {
   els.attendantSalesPeriod.textContent = period?.label || 'Período atual';
   els.attendantSalesRows.innerHTML = '';
-  els.attendantSalesDetailRows.innerHTML = '';
 
   if (!attendantSales.length) {
     els.attendantSalesRows.innerHTML = '<tr><td colspan="5">Nenhuma venda atribuída no período.</td></tr>';
-    els.attendantSalesDetailRows.innerHTML = '<tr><td colspan="4">Nenhuma venda atribuída no período.</td></tr>';
+    state.attendantDetails = [];
+    renderAttendantSalesDetails([]);
     return;
   }
 
@@ -456,15 +684,26 @@ function renderAttendantSales(attendantSales, period) {
 
   const details = attendantSales
     .flatMap((item) => (item.transactions || []).map((tx) => ({ ...tx, attendant: item.name })))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-    .slice(0, 500);
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  state.attendantDetails = details;
+  state.attendantDetailPage = Math.min(state.attendantDetailPage, Math.max(1, Math.ceil(details.length / TRANSACTIONS_PAGE_SIZE)));
+  renderAttendantSalesDetails(details);
+}
 
+function renderAttendantSalesDetails(details) {
+  els.attendantSalesDetailRows.innerHTML = '';
   if (!details.length) {
     els.attendantSalesDetailRows.innerHTML = '<tr><td colspan="4">Nenhuma venda atribuída no período.</td></tr>';
+    updateAttendantDetailPagination(0, 1);
     return;
   }
 
-  details.forEach((tx) => {
+  const totalPages = Math.max(1, Math.ceil(details.length / TRANSACTIONS_PAGE_SIZE));
+  state.attendantDetailPage = Math.min(Math.max(1, state.attendantDetailPage), totalPages);
+  const start = (state.attendantDetailPage - 1) * TRANSACTIONS_PAGE_SIZE;
+  const rows = details.slice(start, start + TRANSACTIONS_PAGE_SIZE);
+
+  rows.forEach((tx) => {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${escapeHtml(tx.attendant || '')}</td>
@@ -474,6 +713,18 @@ function renderAttendantSales(attendantSales, period) {
     `;
     els.attendantSalesDetailRows.appendChild(row);
   });
+  updateAttendantDetailPagination(details.length, totalPages);
+}
+
+function updateAttendantDetailPagination(totalRows, totalPages) {
+  if (!els.attendantDetailPageInfo) return;
+  const first = totalRows ? ((state.attendantDetailPage - 1) * TRANSACTIONS_PAGE_SIZE) + 1 : 0;
+  const last = Math.min(totalRows, state.attendantDetailPage * TRANSACTIONS_PAGE_SIZE);
+  els.attendantDetailPageInfo.textContent = totalRows
+    ? `Página ${state.attendantDetailPage} de ${totalPages} · ${first}-${last} de ${totalRows}`
+    : 'Página 1 de 1';
+  if (els.attendantDetailPrevPage) els.attendantDetailPrevPage.disabled = state.attendantDetailPage <= 1;
+  if (els.attendantDetailNextPage) els.attendantDetailNextPage.disabled = state.attendantDetailPage >= totalPages;
 }
 
 function renderAttendantAnalytics(attendantSales, metrics, period) {
@@ -501,9 +752,101 @@ function renderAttendantAnalytics(attendantSales, metrics, period) {
   renderDonutChart(els.revenueMixChart, els.revenueMixLegend, [
     { label: 'Automático', value: automaticRevenue, color: '#566151' },
     { label: 'Atendentes', value: attendantRevenueTotal, color: '#9FE870' }
-  ], (value) => BRL.format(value));
+  ], (value) => compactMoney(value));
 
   renderAttendantBarChart(rows);
+}
+
+function renderCurrentInsights() {
+  renderInsights(resolveInsights(state.payload || emptyPayload()));
+}
+
+function renderCurrentHourly() {
+  renderHourly(resolveHourly(state.payload || emptyPayload()));
+}
+
+function resolveHourly(payload) {
+  const cached = readHourlySnapshot();
+  if (cached && cached.hourly) return cached.hourly;
+  const payloadHourly = payload && payload.hourly;
+  if (
+    payloadHourly &&
+    payloadHourly.period &&
+    payloadHourly.period.start === state.hourlyStart &&
+    payloadHourly.period.end === state.hourlyEnd
+  ) {
+    return payloadHourly;
+  }
+  return buildEmptyHourlyForRange();
+}
+
+function renderHourly(hourly) {
+  if (!els.hourlyChart) return;
+  const hours = Array.isArray(hourly.hours) ? hourly.hours : [];
+  if (els.hourlyPeriodLabel) {
+    els.hourlyPeriodLabel.textContent = hourly.period?.label || formatHourlyPeriodLabel();
+  }
+  renderHourlyChart(hours);
+}
+
+function resolveInsights(payload) {
+  const cached = readInsightsSnapshot();
+  if (cached && cached.insights) return cached.insights;
+  const payloadInsights = payload && payload.insights;
+  if (
+    payloadInsights &&
+    payloadInsights.period &&
+    payloadInsights.period.start === state.insightsStart &&
+    payloadInsights.period.end === state.insightsEnd
+  ) {
+    return payloadInsights;
+  }
+  return buildEmptyInsightsForRange();
+}
+
+function renderHourlyChart(hours) {
+  const width = 720;
+  const height = 280;
+  const left = 34;
+  const right = 16;
+  const top = 18;
+  const bottom = 42;
+  const innerW = width - left - right;
+  const innerH = height - top - bottom;
+  const maxSales = Math.max(1, ...hours.map((item) => Number(item.sales) || 0));
+  const barGap = 4;
+  const barW = Math.max(6, (innerW / 24) - barGap);
+
+  els.hourlyChart.innerHTML = '';
+  [0, 0.5, 1].forEach((ratio) => {
+    const y = top + innerH - (innerH * ratio);
+    els.hourlyChart.append(svg('line', { x1: left, x2: width - right, y1: y, y2: y, class: 'chart-grid' }));
+    els.hourlyChart.append(svg('text', { x: 4, y: y + 4, class: 'chart-label' }, NUMBER.format(Math.round(maxSales * ratio))));
+  });
+
+  hours.forEach((item, index) => {
+    const sales = Number(item.sales) || 0;
+    const revenue = Number(item.revenue) || 0;
+    const x = left + (innerW / 24) * index + (barGap / 2);
+    const barH = (sales / maxSales) * innerH;
+    const y = top + innerH - barH;
+    const bar = svg('rect', {
+      x,
+      y,
+      width: barW,
+      height: Math.max(1, barH),
+      rx: 4,
+      class: 'hourly-bar'
+    });
+    bindTooltip(bar, `${item.label}\nVendas: ${NUMBER.format(sales)}\nFaturamento: ${BRL.format(revenue)}`);
+    els.hourlyChart.append(bar);
+    els.hourlyChart.append(svg('text', {
+      x: x + (barW / 2),
+      y: height - 12,
+      'text-anchor': 'middle',
+      class: 'hourly-axis-label'
+    }, String(item.hour).padStart(2, '0')));
+  });
 }
 
 function renderInsights(insights) {
@@ -514,9 +857,17 @@ function renderInsights(insights) {
   els.insightCostPerConversation.textContent = BRL.format(Number(metrics.costPerConversation) || 0);
   els.insightCpm.textContent = BRL.format(Number(metrics.cpm) || 0);
   els.insightCtr.textContent = PERCENT.format(Number(metrics.ctr) || 0);
+  const periodLabel = insights.period?.label || formatInsightPeriodLabel();
   els.insightsPeriodLabel.textContent = insights.source === 'api'
-    ? 'Semana atual'
-    : (insights.error ? 'Meta indisponivel' : 'Meta nao configurada');
+    ? periodLabel
+    : (insights.error ? 'Meta indisponível' : periodLabel);
+  const totals = weekly.reduce((sum, day) => ({
+    clicks: sum.clicks + (Number(day.clicks) || 0),
+    conversations: sum.conversations + (Number(day.conversations) || 0),
+    sales: sum.sales + (Number(day.sales) || 0)
+  }), { clicks: 0, conversations: 0, sales: 0 });
+  if (els.clicksPerSale) els.clicksPerSale.textContent = formatRatio(totals.sales ? totals.clicks / totals.sales : 0);
+  if (els.conversationsPerSale) els.conversationsPerSale.textContent = formatRatio(totals.sales ? totals.conversations / totals.sales : 0);
 
   renderConversionChart(weekly);
   renderInsightsTable(weekly);
@@ -579,6 +930,11 @@ function buildEmptyInsights(weekly) {
   return {
     source: 'cache_empty',
     error: '',
+    period: {
+      start: state.insightsStart,
+      end: state.insightsEnd,
+      label: formatInsightPeriodLabel()
+    },
     metrics: {
       conversations: 0,
       costPerConversation: 0,
@@ -596,6 +952,115 @@ function buildEmptyInsights(weekly) {
       salesClickRate: 0
     }))
   };
+}
+
+function buildEmptyInsightsForRange() {
+  return buildEmptyInsights(buildInsightDaysForRange().map((day) => ({
+    ...day,
+    sales: 0
+  })));
+}
+
+function buildEmptyHourlyForRange() {
+  return {
+    period: {
+      start: state.hourlyStart,
+      end: state.hourlyEnd,
+      label: formatHourlyPeriodLabel()
+    },
+    hours: buildHourlyRows([])
+  };
+}
+
+function buildDemoHourly(transactions) {
+  return {
+    period: {
+      start: state.hourlyStart,
+      end: state.hourlyEnd,
+      label: formatHourlyPeriodLabel()
+    },
+    hours: buildHourlyRows(transactions)
+  };
+}
+
+function buildHourlyRows(transactions) {
+  const start = parseInputDate(state.hourlyStart);
+  const end = parseInputDate(state.hourlyEnd);
+  const rows = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    label: `${String(hour).padStart(2, '0')}h`,
+    sales: 0,
+    revenue: 0
+  }));
+  (transactions || []).forEach((tx) => {
+    const date = parseInputDate(tx.date);
+    if (!date || (start && date < start) || (end && date > end) || Number(tx.amount) <= 0) return;
+    const hour = parseHour(tx.time);
+    rows[hour].sales += 1;
+    rows[hour].revenue = roundMoney(rows[hour].revenue + (Number(tx.amount) || 0));
+  });
+  return rows;
+}
+
+function buildDemoInsights(transactions) {
+  const days = buildInsightDaysForRange().map((day, index) => {
+    const sales = transactions.filter((tx) => tx.date === day.date && Number(tx.amount) > 0).length;
+    const clicks = 80 + (index * 17);
+    const conversations = Math.max(0, Math.round(clicks * (0.32 + (index % 3) * 0.04)));
+    return {
+      ...day,
+      clicks,
+      conversations,
+      sales,
+      spend: 0,
+      impressions: clicks * 9,
+      conversionRate: conversations ? sales / conversations : 0,
+      conversationClickRate: clicks ? conversations / clicks : 0,
+      salesClickRate: clicks ? sales / clicks : 0
+    };
+  });
+  const totals = days.reduce((sum, day) => ({
+    clicks: sum.clicks + day.clicks,
+    conversations: sum.conversations + day.conversations,
+    impressions: sum.impressions + day.impressions
+  }), { clicks: 0, conversations: 0, impressions: 0 });
+  return {
+    source: 'demo',
+    error: '',
+    period: {
+      start: state.insightsStart,
+      end: state.insightsEnd,
+      label: formatInsightPeriodLabel()
+    },
+    metrics: {
+      conversations: totals.conversations,
+      costPerConversation: 0,
+      cpm: 0,
+      ctr: totals.impressions ? totals.clicks / totals.impressions : 0
+    },
+    weekly: days
+  };
+}
+
+function buildInsightDaysForRange() {
+  const start = parseInputDate(state.insightsStart) || currentWeekRange(new Date()).start;
+  const end = parseInputDate(state.insightsEnd) || currentWeekRange(new Date()).end;
+  const days = [];
+  const cursor = new Date(start);
+  while (cursor <= end && days.length < 7) {
+    days.push({
+      label: `${weekdayShort(cursor)} (${cursor.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})`,
+      date: toInputDate(cursor),
+      clicks: 0,
+      conversations: 0,
+      sales: 0,
+      conversionRate: 0,
+      conversationClickRate: 0,
+      salesClickRate: 0
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
 }
 
 function completeAttendantSales(attendantSales) {
@@ -688,7 +1153,7 @@ function renderAttendantBarChart(rows) {
       <rect class="bar-track" x="${left}" y="${y}" width="${innerW}" height="18" rx="6"></rect>
       <rect class="bar-fill" x="${left}" y="${y}" width="${barW}" height="18" rx="6"></rect>
       <text class="bar-value" x="${left + innerW + 14}" y="${y + 14}">${escapeHtml(BRL.format(revenue))}</text>
-      <text class="bar-sales" x="${left}" y="${y + 35}">${NUMBER.format(sales)} vendas - ticket ${escapeHtml(BRL.format(sales ? revenue / sales : 0))}</text>
+      <text class="bar-sales" x="${left}" y="${y + 35}">${NUMBER.format(sales)} vendas - ticket médio ${escapeHtml(BRL.format(sales ? revenue / sales : 0))}</text>
     `;
   }).join('');
 }
@@ -895,6 +1360,10 @@ function formatDecimal(value) {
   return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
 }
 
+function formatRatio(value) {
+  return NUMBER.format(Math.ceil(Number(value) || 0));
+}
+
 function compactMoney(value) {
   const number = Number(value) || 0;
   if (Math.abs(number) >= 1000) return `R$ ${(number / 1000).toFixed(1).replace('.', ',')}k`;
@@ -913,6 +1382,39 @@ function formatDateDisplay(value) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function parseInputDate(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseHour(value) {
+  const match = String(value || '').match(/^(\d{1,2})/);
+  const hour = match ? Number(match[1]) : 0;
+  return Math.max(0, Math.min(23, Number.isFinite(hour) ? hour : 0));
+}
+
+function weekdayShort(date) {
+  return ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'][date.getDay()];
+}
+
+function formatInsightPeriodLabel() {
+  const start = parseInputDate(state.insightsStart);
+  const end = parseInputDate(state.insightsEnd);
+  if (!start || !end) return 'Semana atual';
+  return `${start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} a ${end.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
+}
+
+function formatHourlyPeriodLabel() {
+  const start = parseInputDate(state.hourlyStart);
+  const end = parseInputDate(state.hourlyEnd);
+  if (!start || !end) return 'Hoje';
+  if (state.hourlyStart === state.hourlyEnd) {
+    return start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+  return `${start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} a ${end.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
 }
 
 function normalizeText(value) {
@@ -994,7 +1496,9 @@ function demoPayload() {
       transactions: demoTransactions.filter((tx) => amountMatchesCents(tx.amount, 97))
     }],
     lastSync: null,
-    currencies: [{ currency: 'BRL', revenue: displayedRevenue, sales: displayedSales }]
+    currencies: [{ currency: 'BRL', revenue: displayedRevenue, sales: displayedSales }],
+    hourly: buildDemoHourly(demoTransactions),
+    insights: buildDemoInsights(demoTransactions)
   };
 }
 
@@ -1048,7 +1552,9 @@ function emptyPayload() {
     transactions: [],
     attendantSales: [],
     lastSync: null,
-    currencies: []
+    currencies: [],
+    hourly: buildEmptyHourlyForRange(),
+    insights: buildEmptyInsightsForRange()
   };
 }
 
@@ -1132,6 +1638,7 @@ function buildDemoTransactions(days, multiplier) {
       payer: index % 5 === 0 ? `Cliente Sheila ${index + 1}` : `Cliente ${index + 1}`,
       currency: 'BRL',
       amount: index % 5 === 0 ? 12.97 : (index % 3 === 0 ? 24.9 : 12.9),
+      time: `${String((8 + index) % 24).padStart(2, '0')}:${String((index * 7) % 60).padStart(2, '0')}`,
       description: 'Transferencia Wise'
     }));
   });

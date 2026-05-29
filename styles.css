@@ -158,6 +158,32 @@ button {
   box-shadow: var(--shadow);
 }
 
+.insights-range-controls {
+  display: grid;
+  grid-template-columns: auto minmax(128px, 1fr) minmax(128px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.insights-range-controls label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.insights-range-controls input {
+  min-width: 0;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111710;
+  color: var(--text);
+  padding: 0 12px;
+  outline: none;
+}
+
 .period-group {
   min-width: 0;
   display: flex;
@@ -329,6 +355,23 @@ button {
   margin-top: 18px;
 }
 
+.hourly-panel {
+  margin-top: 18px;
+}
+
+.funnel-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  align-items: stretch;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.funnel-summary .metric-card {
+  grid-column: auto;
+  min-height: 108px;
+}
+
 .panel {
   min-width: 0;
   padding: 18px;
@@ -480,6 +523,13 @@ button {
   min-height: 260px;
 }
 
+.bar-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 250px;
+}
+
 .chart-axis {
   stroke: var(--line);
   stroke-width: 1;
@@ -530,6 +580,15 @@ button {
   fill: var(--blue);
   stroke: var(--bg);
   stroke-width: 3;
+}
+
+.hourly-bar {
+  fill: var(--green);
+}
+
+.hourly-axis-label {
+  fill: var(--muted);
+  font-size: 10px;
 }
 
 .table-scroll {
@@ -640,22 +699,40 @@ td {
 
 .transactions-table th:nth-child(1),
 .transactions-table td:nth-child(1) {
-  width: 92px;
+  width: 78px;
 }
 
-.transactions-table th:nth-child(2),
-.transactions-table td:nth-child(2),
-.transactions-table th:nth-child(5),
-.transactions-table td:nth-child(5) {
+.transactions-table th:nth-child(3),
+.transactions-table td:nth-child(3) {
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
-.transactions-table th:nth-child(3),
-.transactions-table td:nth-child(3),
+.transactions-table th:nth-child(2),
+.transactions-table td:nth-child(2),
 .transactions-table th:nth-child(4),
 .transactions-table td:nth-child(4) {
-  width: 92px;
+  width: 72px;
+}
+
+.transactions-table th:nth-child(5),
+.transactions-table td:nth-child(5) {
+  width: 94px;
+}
+
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pagination-row .secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .attendant-sales-table th:nth-child(2),
@@ -794,8 +871,17 @@ td {
   .analysis-grid,
   .insights-metrics-grid,
   .insights-grid,
+  .funnel-summary,
   .attendant-analytics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .insights-range-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .insights-range-controls .secondary-button {
+    width: 100%;
   }
 
   .metric-card,
@@ -933,6 +1019,31 @@ td {
     font-size: 11px;
   }
 
+  .transactions-table th:nth-child(1),
+  .transactions-table td:nth-child(1) {
+    width: 58px;
+  }
+
+  .transactions-table th:nth-child(2),
+  .transactions-table td:nth-child(2),
+  .transactions-table th:nth-child(4),
+  .transactions-table td:nth-child(4) {
+    width: 52px;
+  }
+
+  .transactions-table th:nth-child(5),
+  .transactions-table td:nth-child(5) {
+    width: 88px;
+  }
+
+  .transactions-table th:nth-child(3),
+  .transactions-table td:nth-child(3) {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+
   .weekly-table th,
   .weekly-table td {
     font-size: 11px;
@@ -955,5 +1066,9 @@ td {
   .save-row {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .pagination-row {
+    justify-content: space-between;
   }
 }
