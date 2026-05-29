@@ -1,11 +1,12 @@
-const CACHE_NAME = 'homestudio-bi-v12';
+const CACHE_NAME = 'homestudio-bi-v14';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=12',
-  './app.js?v=12',
-  './config.js?v=12',
-  './manifest.webmanifest?v=12',
+  './styles.css?v=14',
+  './app.js?v=14',
+  './site-patch.js?v=14',
+  './config.js?v=14',
+  './manifest.webmanifest?v=14',
   './assets/icon.svg',
   './assets/icon-192.png',
   './assets/icon-512.png'
@@ -14,6 +15,17 @@ const APP_SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
   self.skipWaiting();
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const openClient = clients.find((client) => client.url.includes(self.location.origin));
+      if (openClient) return openClient.focus();
+      return self.clients.openWindow('./');
+    })
+  );
 });
 
 self.addEventListener('activate', (event) => {

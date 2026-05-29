@@ -3,3 +3,11 @@ window.HOMESTUDIO_BI_CONFIG = {
   defaultPeriod: 'today',
   currency: 'BRL'
 };
+
+if (!window.HOMESTUDIO_BI_SITE_PATCH_REQUESTED) {
+  window.HOMESTUDIO_BI_SITE_PATCH_REQUESTED = true;
+  const patch = document.createElement('script');
+  patch.src = 'site-patch.js?v=14';
+  patch.defer = true;
+  document.head.appendChild(patch);
+}

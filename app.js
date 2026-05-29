@@ -4,10 +4,12 @@ const NUMBER = new Intl.NumberFormat('pt-BR');
 const DECIMAL = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
-const CACHE_PREFIX = 'homestudio.bi.snapshot.v12';
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v14';
 const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
+const NOTIFICATIONS_CACHE_KEY = 'homestudio.bi.notifications.v1';
 const TRANSACTIONS_PAGE_SIZE = 50;
 const AUTO_REFRESH_MS = 15 * 60 * 1000;
+const NOTIFICATION_TIMES = ['08:00', '12:00', '18:00', '23:00'];
 
 const state = {
   period: CONFIG.defaultPeriod || 'today',
@@ -23,7 +25,10 @@ const state = {
   hourlyStart: '',
   hourlyEnd: '',
   isRefreshing: false,
-  lastAutoRefreshAt: 0
+  lastAutoRefreshAt: 0,
+  notificationSettings: {},
+  notificationTimer: null,
+  notificationLastSent: {}
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -84,6 +89,9 @@ const els = {
   addAttendant: $('#addAttendantButton'),
   saveAttendants: $('#saveAttendantsButton'),
   adminKey: $('#adminKey'),
+  notifyAll: $('#notifyAllToggle'),
+  notificationStatus: $('#notificationStatus'),
+  testNotification: $('#testNotificationButton'),
   revenue: $('#revenueValue'),
   sales: $('#salesValue'),
   attendantRevenue: $('#attendantRevenueValue'),
@@ -186,6 +194,7 @@ function init() {
     renderAttendantEditor(state.attendants);
   });
   els.saveAttendants.addEventListener('click', saveAttendants);
+  bindNotificationControls();
   els.refresh.addEventListener('click', () => refreshDashboardSnapshots());
   if (els.refreshSide) els.refreshSide.addEventListener('click', () => refreshDashboardSnapshots());
 
@@ -193,9 +202,10 @@ function init() {
   setView('dashboard');
   renderCachedDashboard();
   startAutoRefresh();
+  startNotificationScheduler();
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=12')
+    navigator.serviceWorker.register('sw.js?v=14')
       .then((registration) => registration.update())
       .catch(() => {});
   }
@@ -385,6 +395,9 @@ async function loadDashboard() {
 
 function startAutoRefresh() {
   if (!CONFIG.apiUrl) return;
+  window.HOMESTUDIO_BI_NATIVE_AUTO_REFRESH = true;
+  window.setTimeout(() => refreshDashboardSnapshots({ silent: true, reason: 'startup' }), 250);
+
   window.setInterval(() => {
     if (!document.hidden) refreshDashboardSnapshots({ silent: true, reason: 'timer' });
   }, AUTO_REFRESH_MS);
@@ -394,6 +407,141 @@ function startAutoRefresh() {
     const age = Date.now() - state.lastAutoRefreshAt;
     if (age >= AUTO_REFRESH_MS) refreshDashboardSnapshots({ silent: true, reason: 'resume' });
   });
+}
+
+function bindNotificationControls() {
+  window.HOMESTUDIO_BI_NATIVE_NOTIFICATIONS = true;
+  state.notificationSettings = readNotificationSettings();
+  $$('[data-notification-time]').forEach((input) => {
+    input.checked = Boolean(state.notificationSettings[input.dataset.notificationTime]);
+    input.addEventListener('change', async () => {
+      const allowed = await ensureNotificationPermission();
+      if (!allowed) input.checked = false;
+      state.notificationSettings[input.dataset.notificationTime] = input.checked;
+      saveNotificationSettings();
+      updateNotificationControls();
+    });
+  });
+
+  if (els.notifyAll) {
+    els.notifyAll.addEventListener('change', async () => {
+      const enabled = els.notifyAll.checked;
+      const allowed = enabled ? await ensureNotificationPermission() : true;
+      NOTIFICATION_TIMES.forEach((time) => {
+        state.notificationSettings[time] = allowed ? enabled : false;
+      });
+      saveNotificationSettings();
+      updateNotificationControls();
+    });
+  }
+
+  if (els.testNotification) {
+    els.testNotification.addEventListener('click', async () => {
+      if (await ensureNotificationPermission()) sendCampaignNotification();
+      updateNotificationControls();
+    });
+  }
+
+  updateNotificationControls();
+}
+
+function readNotificationSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(NOTIFICATIONS_CACHE_KEY) || '{}');
+    return NOTIFICATION_TIMES.reduce((settings, time) => {
+      settings[time] = Boolean(saved[time]);
+      return settings;
+    }, {});
+  } catch {
+    return NOTIFICATION_TIMES.reduce((settings, time) => ({ ...settings, [time]: false }), {});
+  }
+}
+
+function saveNotificationSettings() {
+  localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(state.notificationSettings));
+}
+
+function updateNotificationControls() {
+  $$('[data-notification-time]').forEach((input) => {
+    input.checked = Boolean(state.notificationSettings[input.dataset.notificationTime]);
+  });
+  const enabledCount = NOTIFICATION_TIMES.filter((time) => state.notificationSettings[time]).length;
+  if (els.notifyAll) els.notifyAll.checked = enabledCount === NOTIFICATION_TIMES.length;
+  if (els.notificationStatus) {
+    const permission = notificationPermission();
+    if (!enabledCount) {
+      els.notificationStatus.textContent = 'Desativadas';
+    } else if (permission === 'denied') {
+      els.notificationStatus.textContent = 'Bloqueadas';
+    } else {
+      els.notificationStatus.textContent = `${enabledCount} ativas`;
+    }
+  }
+}
+
+function startNotificationScheduler() {
+  if (!('Notification' in window)) {
+    updateNotificationControls();
+    return;
+  }
+  window.clearInterval(state.notificationTimer);
+  state.notificationTimer = window.setInterval(checkScheduledNotifications, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkScheduledNotifications();
+  });
+  checkScheduledNotifications();
+}
+
+function checkScheduledNotifications() {
+  if (document.hidden || notificationPermission() !== 'granted') return;
+  const now = new Date();
+  const currentTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  if (!state.notificationSettings[currentTime]) return;
+  const dayKey = `${toInputDate(now)}:${currentTime}`;
+  if (state.notificationLastSent[dayKey]) return;
+  state.notificationLastSent[dayKey] = true;
+  sendCampaignNotification();
+}
+
+async function ensureNotificationPermission() {
+  if (!('Notification' in window)) {
+    alert('Este navegador ainda nao liberou notificacoes para este tipo de app.');
+    return false;
+  }
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') {
+    alert('As notificacoes estao bloqueadas no navegador. Libere nas configuracoes do site/app.');
+    return false;
+  }
+  const permission = await Notification.requestPermission();
+  return permission === 'granted';
+}
+
+function notificationPermission() {
+  return 'Notification' in window ? Notification.permission : 'unsupported';
+}
+
+function sendCampaignNotification() {
+  const payload = normalizeFinancialMetrics(state.payload || emptyPayload());
+  const metrics = payload.metrics || {};
+  const body = `Seu investimento está em ${BRL.format(metrics.metaSpend)}, com faturamento em ${BRL.format(metrics.revenue)}, com um CPA de ${BRL.format(metrics.cpa)} e um ROI de ${formatDecimal(metrics.roas)}.`;
+  try {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((registration) => registration.showNotification('Resumo das Campanhas!', {
+          body,
+          icon: 'assets/icon-192.png',
+          badge: 'assets/icon-192.png',
+          tag: 'homestudio-bi-summary',
+          renotify: true
+        }))
+        .catch(() => new Notification('Resumo das Campanhas!', { body, icon: 'assets/icon-192.png' }));
+      return;
+    }
+    new Notification('Resumo das Campanhas!', { body, icon: 'assets/icon-192.png' });
+  } catch {
+    alert(body);
+  }
 }
 
 function renderCachedDashboard() {

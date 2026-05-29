@@ -807,6 +807,95 @@ td {
   margin-top: 16px;
 }
 
+.notifications-panel {
+  max-width: 720px;
+}
+
+.notification-master {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.notification-master div {
+  display: grid;
+  gap: 6px;
+}
+
+.notification-master strong {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: var(--font-medium);
+}
+
+.notification-master span,
+.toggle-row span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.notification-list {
+  display: grid;
+  gap: 4px;
+}
+
+.toggle-row {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.toggle-row input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+}
+
+.toggle-row i {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: #344030;
+  border: 1px solid var(--line);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.toggle-row i::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 4px;
+  top: 3px;
+  border-radius: 999px;
+  background: var(--soft);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.toggle-row input:checked + i {
+  background: #0f6eea;
+  border-color: #0f6eea;
+}
+
+.toggle-row input:checked + i::after {
+  transform: translateX(20px);
+  background: #ffffff;
+}
+
+.compact-toggle {
+  min-height: 34px;
+}
+
+.notification-test {
+  margin-top: 16px;
+}
+
 .chart-tooltip {
   position: fixed;
   z-index: 10;
@@ -927,7 +1016,7 @@ td {
     bottom: 0;
     z-index: 20;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 0;
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #263223;
@@ -945,12 +1034,12 @@ td {
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .mobile-tab svg {
-    width: 23px;
-    height: 23px;
+    width: 21px;
+    height: 21px;
     fill: currentColor;
   }
 
@@ -1003,11 +1092,12 @@ td {
   }
 
   .status-pill {
-    max-width: 116px;
+    max-width: 108px;
+    min-height: 30px;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding: 0 10px;
-    font-size: 12px;
+    padding: 0 8px;
+    font-size: 10px;
   }
 
   .controls {
@@ -1186,9 +1276,14 @@ td {
   }
 
   .attendant-row,
-  .save-row {
+  .save-row,
+  .notification-master {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .toggle-row {
+    min-height: 48px;
   }
 
   .pagination-row {

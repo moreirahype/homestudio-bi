@@ -8,12 +8,13 @@
     <meta name="apple-mobile-web-app-title" content="HOMESTUDIO BI">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>HOMESTUDIO BI</title>
-    <link rel="manifest" href="manifest.webmanifest?v=12">
+    <link rel="manifest" href="manifest.webmanifest?v=14">
     <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=12">
-    <script src="config.js?v=12"></script>
-    <script src="app.js?v=12" defer></script>
+    <link rel="stylesheet" href="styles.css?v=14">
+    <script src="config.js?v=14"></script>
+    <script src="app.js?v=14" defer></script>
+    <script src="site-patch.js?v=14" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -28,6 +29,7 @@
           <button class="nav-item" type="button" data-view="transactions">Transações</button>
           <button class="nav-item" type="button" data-view="attendant-sales">Vendas atendentes</button>
           <button class="nav-item" type="button" data-view="attendants">Atendentes</button>
+          <button class="nav-item" type="button" data-view="notifications">Notificações</button>
         </nav>
       </aside>
 
@@ -358,6 +360,49 @@
             </div>
           </article>
         </section>
+
+        <section class="view" id="notificationsView" data-view-panel="notifications">
+          <article class="panel page-panel notifications-panel">
+            <div class="panel-header">
+              <h1>Notificações</h1>
+              <span id="notificationStatus">Desativadas</span>
+            </div>
+            <div class="notification-master">
+              <div>
+                <strong>Horários</strong>
+                <span>Receba um resumo das campanhas nos horários selecionados.</span>
+              </div>
+              <label class="toggle-row compact-toggle">
+                <span>Ativar todos</span>
+                <input id="notifyAllToggle" type="checkbox">
+                <i aria-hidden="true"></i>
+              </label>
+            </div>
+            <div class="notification-list" id="notificationList">
+              <label class="toggle-row">
+                <span>Notificação das 08:00</span>
+                <input type="checkbox" data-notification-time="08:00">
+                <i aria-hidden="true"></i>
+              </label>
+              <label class="toggle-row">
+                <span>Notificação das 12:00</span>
+                <input type="checkbox" data-notification-time="12:00">
+                <i aria-hidden="true"></i>
+              </label>
+              <label class="toggle-row">
+                <span>Notificação das 18:00</span>
+                <input type="checkbox" data-notification-time="18:00">
+                <i aria-hidden="true"></i>
+              </label>
+              <label class="toggle-row">
+                <span>Notificação das 23:00</span>
+                <input type="checkbox" data-notification-time="23:00">
+                <i aria-hidden="true"></i>
+              </label>
+            </div>
+            <button class="secondary-button notification-test" id="testNotificationButton" type="button">Enviar teste</button>
+          </article>
+        </section>
       </main>
     </div>
     <nav class="mobile-tabbar" aria-label="Navegação mobile">
@@ -380,6 +425,10 @@
       <button class="mobile-tab" type="button" data-view="attendants" aria-label="Atendentes">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-7 8a7 7 0 0 1 14 0H5Z"/></svg>
         <span>Atendentes</span>
+      </button>
+      <button class="mobile-tab" type="button" data-view="notifications" aria-label="Notificações">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.7V3a2 2 0 1 0-4 0v1.3A7 7 0 0 0 5 11v5l-2 2v1h18v-1l-2-2Z"/></svg>
+        <span>Alertas</span>
       </button>
     </nav>
     <div class="chart-tooltip" id="chartTooltip" hidden></div>
