@@ -8,12 +8,12 @@
     <meta name="apple-mobile-web-app-title" content="HOMESTUDIO BI">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>HOMESTUDIO BI</title>
-    <link rel="manifest" href="manifest.webmanifest?v=11">
+    <link rel="manifest" href="manifest.webmanifest?v=12">
     <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=11">
-    <script src="config.js?v=11"></script>
-    <script src="app.js?v=11" defer></script>
+    <link rel="stylesheet" href="styles.css?v=12">
+    <script src="config.js?v=12"></script>
+    <script src="app.js?v=12" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -170,16 +170,19 @@
           <article class="panel hourly-panel">
             <div class="panel-header">
               <h1>Vendas por horário</h1>
-              <span id="hourlyPeriodLabel">Hoje</span>
+              <div class="panel-header-meta">
+                <span id="hourlyPeriodLabel">Hoje</span>
+                <strong id="hourlyAverageLabel">0 vendas/hora</strong>
+              </div>
             </div>
             <div class="insights-range-controls" aria-label="Período de vendas por horário">
               <button class="secondary-button" id="hourlyPrevDay" type="button">Dia anterior</button>
-              <button class="secondary-button" id="hourlyToday" type="button">Dia atual</button>
+              <button class="secondary-button" id="hourlyNextDay" type="button">Próximo dia</button>
               <label>
                 <span>Data</span>
                 <input id="hourlyDate" type="date">
               </label>
-              <button class="secondary-button" id="hourlyNextDay" type="button">Próximo dia</button>
+              <button class="secondary-button" id="hourlyToday" type="button">Dia atual</button>
             </div>
             <svg class="bar-chart hourly-chart" id="hourlyChart" viewBox="0 0 720 280" role="img" aria-label="Vendas por horario"></svg>
           </article>
@@ -188,11 +191,14 @@
             <article class="panel chart-panel">
               <div class="panel-header">
                 <h1>Conversão semanal</h1>
-                <span id="insightsPeriodLabel">Semana atual</span>
+                <div class="panel-header-meta">
+                  <span id="insightsPeriodLabel">Semana atual</span>
+                  <strong id="insightsConversionAverage">0,0% de conv.</strong>
+                </div>
               </div>
               <div class="insights-range-controls" aria-label="Semana dos insights">
                 <button class="secondary-button" id="insightsPrevWeek" type="button">Semana anterior</button>
-                <button class="secondary-button" id="insightsCurrentWeek" type="button">Semana atual</button>
+                <button class="secondary-button" id="insightsNextWeek" type="button">Próxima semana</button>
                 <label>
                   <span>Início</span>
                   <input id="insightsStartDate" type="date">
@@ -201,7 +207,7 @@
                   <span>Fim</span>
                   <input id="insightsEndDate" type="date">
                 </label>
-                <button class="secondary-button" id="insightsNextWeek" type="button">Próxima semana</button>
+                <button class="secondary-button" id="insightsCurrentWeek" type="button">Semana atual</button>
               </div>
               <svg class="line-chart conversion-chart" id="conversionChart" viewBox="0 0 720 280" role="img" aria-label="Taxa de conversao semanal"></svg>
             </article>

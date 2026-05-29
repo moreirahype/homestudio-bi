@@ -405,6 +405,20 @@ button {
   white-space: nowrap;
 }
 
+.panel-header-meta {
+  min-width: 0;
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+}
+
+.panel-header-meta strong {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: var(--font-regular);
+  white-space: nowrap;
+}
+
 .attendant-analytics-grid {
   display: grid;
   grid-template-columns: minmax(220px, 0.7fr) minmax(220px, 0.7fr) minmax(360px, 1.4fr);
@@ -810,7 +824,7 @@ td {
 
 @media (max-width: 1100px) {
   body {
-    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(102px + env(safe-area-inset-bottom, 0px));
   }
 
   .app-shell {
@@ -822,7 +836,7 @@ td {
   }
 
   .main-panel {
-    padding: calc(26px + env(safe-area-inset-top, 0px)) 16px 16px;
+    padding: calc(26px + env(safe-area-inset-top, 0px)) 16px calc(112px + env(safe-area-inset-bottom, 0px));
   }
 
   .mobile-brand {
@@ -851,6 +865,7 @@ td {
     width: 100%;
     min-width: 0;
     padding: 0 8px;
+    font-size: 15px;
     white-space: normal;
     line-height: 1.15;
   }
@@ -914,7 +929,7 @@ td {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 0;
-    padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid #263223;
     background: rgba(18, 22, 17, 0.96);
     backdrop-filter: blur(16px);
@@ -923,7 +938,7 @@ td {
 
   .mobile-tab {
     min-width: 0;
-    min-height: 58px;
+    min-height: 54px;
     display: grid;
     place-items: center;
     gap: 4px;
@@ -971,7 +986,7 @@ td {
 
 @media (max-width: 480px) {
   .main-panel {
-    padding: calc(34px + env(safe-area-inset-top, 0px)) 12px 12px;
+    padding: calc(34px + env(safe-area-inset-top, 0px)) 12px calc(112px + env(safe-area-inset-bottom, 0px));
   }
 
   .topbar {
@@ -993,6 +1008,43 @@ td {
     text-overflow: ellipsis;
     padding: 0 10px;
     font-size: 12px;
+  }
+
+  .controls {
+    padding: 12px;
+  }
+
+  .period-button {
+    min-height: 42px;
+    padding: 0 6px;
+    font-size: 15px;
+  }
+
+  .insights-range-controls {
+    gap: 8px;
+  }
+
+  .insights-range-controls .secondary-button,
+  .insights-range-controls input {
+    height: 38px;
+    font-size: 13px;
+  }
+
+  .panel-header {
+    align-items: flex-start;
+  }
+
+  .panel-header h1,
+  .panel-header h2 {
+    font-size: 20px;
+  }
+
+  .panel-header span {
+    font-size: 12px;
+  }
+
+  .panel-header-meta strong {
+    font-size: 11px;
   }
 
   .metric-value {
@@ -1029,6 +1081,12 @@ td {
     font-size: 11px;
   }
 
+  th {
+    line-height: 1.12;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
   .transactions-table th:nth-child(1),
   .transactions-table td:nth-child(1) {
     width: 58px;
@@ -1057,6 +1115,61 @@ td {
   .weekly-table th,
   .weekly-table td {
     font-size: 11px;
+  }
+
+  .attendant-sales-table th,
+  .attendant-sales-table td {
+    padding: 10px 2px;
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  .attendant-sales-table th:nth-child(1),
+  .attendant-sales-table td:nth-child(1) {
+    width: 27%;
+  }
+
+  .attendant-sales-table th:nth-child(2),
+  .attendant-sales-table td:nth-child(2) {
+    width: 14%;
+  }
+
+  .attendant-sales-table th:nth-child(3),
+  .attendant-sales-table td:nth-child(3) {
+    width: 16%;
+  }
+
+  .attendant-sales-table th:nth-child(4),
+  .attendant-sales-table td:nth-child(4) {
+    width: 23%;
+  }
+
+  .attendant-sales-table th:nth-child(5),
+  .attendant-sales-table td:nth-child(5) {
+    width: 20%;
+  }
+
+  .attendant-sales-detail-table th:nth-child(1),
+  .attendant-sales-detail-table td:nth-child(1) {
+    width: 80px;
+  }
+
+  .attendant-sales-detail-table th:nth-child(2),
+  .attendant-sales-detail-table td:nth-child(2) {
+    width: 50px;
+  }
+
+  .attendant-sales-detail-table th:nth-child(4),
+  .attendant-sales-detail-table td:nth-child(4) {
+    width: 80px;
+  }
+
+  .attendant-sales-detail-table th:nth-child(3),
+  .attendant-sales-detail-table td:nth-child(3) {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.22;
   }
 
   .analytics-panel {

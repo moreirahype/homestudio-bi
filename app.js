@@ -1,11 +1,13 @@
 const CONFIG = window.HOMESTUDIO_BI_CONFIG || {};
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: CONFIG.currency || 'BRL' });
 const NUMBER = new Intl.NumberFormat('pt-BR');
+const DECIMAL = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
-const CACHE_PREFIX = 'homestudio.bi.snapshot.v11';
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v12';
 const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
 const TRANSACTIONS_PAGE_SIZE = 50;
+const AUTO_REFRESH_MS = 15 * 60 * 1000;
 
 const state = {
   period: CONFIG.defaultPeriod || 'today',
@@ -19,7 +21,9 @@ const state = {
   insightsStart: '',
   insightsEnd: '',
   hourlyStart: '',
-  hourlyEnd: ''
+  hourlyEnd: '',
+  isRefreshing: false,
+  lastAutoRefreshAt: 0
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -62,6 +66,7 @@ const els = {
   conversionChart: $('#conversionChart'),
   insightsRows: $('#insightsRows'),
   hourlyPeriodLabel: $('#hourlyPeriodLabel'),
+  hourlyAverage: $('#hourlyAverageLabel'),
   hourlyChart: $('#hourlyChart'),
   hourlyPrevDay: $('#hourlyPrevDay'),
   hourlyToday: $('#hourlyToday'),
@@ -72,6 +77,7 @@ const els = {
   insightsNextWeek: $('#insightsNextWeek'),
   insightsStartDate: $('#insightsStartDate'),
   insightsEndDate: $('#insightsEndDate'),
+  insightsConversionAverage: $('#insightsConversionAverage'),
   clicksPerSale: $('#clicksPerSaleValue'),
   conversationsPerSale: $('#conversationsPerSaleValue'),
   attendantEditor: $('#attendantEditor'),
@@ -180,15 +186,16 @@ function init() {
     renderAttendantEditor(state.attendants);
   });
   els.saveAttendants.addEventListener('click', saveAttendants);
-  els.refresh.addEventListener('click', refreshDashboardSnapshots);
-  if (els.refreshSide) els.refreshSide.addEventListener('click', refreshDashboardSnapshots);
+  els.refresh.addEventListener('click', () => refreshDashboardSnapshots());
+  if (els.refreshSide) els.refreshSide.addEventListener('click', () => refreshDashboardSnapshots());
 
   updatePeriodButtons();
   setView('dashboard');
   renderCachedDashboard();
+  startAutoRefresh();
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=11')
+    navigator.serviceWorker.register('sw.js?v=12')
       .then((registration) => registration.update())
       .catch(() => {});
   }
@@ -376,6 +383,19 @@ async function loadDashboard() {
   return refreshDashboardSnapshots();
 }
 
+function startAutoRefresh() {
+  if (!CONFIG.apiUrl) return;
+  window.setInterval(() => {
+    if (!document.hidden) refreshDashboardSnapshots({ silent: true, reason: 'timer' });
+  }, AUTO_REFRESH_MS);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    const age = Date.now() - state.lastAutoRefreshAt;
+    if (age >= AUTO_REFRESH_MS) refreshDashboardSnapshots({ silent: true, reason: 'resume' });
+  });
+}
+
 function renderCachedDashboard() {
   const record = readSnapshot();
   if (record && record.payload) {
@@ -399,8 +419,10 @@ function renderCachedDashboard() {
   setStatus('Clique em Atualizar');
 }
 
-async function refreshDashboardSnapshots() {
-  setStatus('Atualizando');
+async function refreshDashboardSnapshots(options = {}) {
+  if (state.isRefreshing) return;
+  state.isRefreshing = true;
+  if (!options.silent) setStatus('Atualizando');
   const attendant = currentAttendantName();
 
   try {
@@ -438,12 +460,15 @@ async function refreshDashboardSnapshots() {
     });
 
     if (!successCount) throw new Error('Nenhum periodo foi atualizado.');
+    state.lastAutoRefreshAt = Date.now();
     renderCachedDashboard();
     setStatus(`Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
   } catch (error) {
     console.error(error);
     renderCachedDashboard();
-    setStatus('Erro ao atualizar');
+    if (!options.silent) setStatus('Erro ao atualizar');
+  } finally {
+    state.isRefreshing = false;
   }
 }
 
@@ -571,6 +596,7 @@ function render(payload) {
   renderChart(payload.weekly);
   renderTransactions(state.transactions);
   renderHourly(resolveHourly(payload));
+  renderInsightMetrics(resolvePeriodInsights(payload));
   renderInsights(resolveInsights(payload));
   renderAttendantSales(attendantSales, payload.period);
   renderAttendantAnalytics(attendantSales, metrics, payload.period);
@@ -787,7 +813,25 @@ function renderHourly(hourly) {
   if (els.hourlyPeriodLabel) {
     els.hourlyPeriodLabel.textContent = hourly.period?.label || formatHourlyPeriodLabel();
   }
+  if (els.hourlyAverage) {
+    const totalSales = hours.reduce((total, item) => total + (Number(item.sales) || 0), 0);
+    const average = totalSales / Math.max(hours.length || 24, 1);
+    els.hourlyAverage.textContent = `${DECIMAL.format(average)} vendas/hora`;
+  }
   renderHourlyChart(hours);
+}
+
+function resolvePeriodInsights(payload) {
+  return (payload && (payload.periodInsights || payload.insights)) || buildEmptyInsightMetrics();
+}
+
+function renderInsightMetrics(insights) {
+  if (!els.insightConversations) return;
+  const metrics = insights?.metrics || {};
+  els.insightConversations.textContent = NUMBER.format(Number(metrics.conversations) || 0);
+  els.insightCostPerConversation.textContent = BRL.format(Number(metrics.costPerConversation) || 0);
+  els.insightCpm.textContent = BRL.format(Number(metrics.cpm) || 0);
+  els.insightCtr.textContent = PERCENT.format(Number(metrics.ctr) || 0);
 }
 
 function resolveInsights(payload) {
@@ -887,11 +931,6 @@ function renderHourlyChart(hours) {
 function renderInsights(insights) {
   if (!els.insightConversations || !els.conversionChart || !els.insightsRows) return;
   const weekly = Array.isArray(insights.weekly) ? insights.weekly : [];
-  const metrics = insights.metrics || {};
-  els.insightConversations.textContent = NUMBER.format(Number(metrics.conversations) || 0);
-  els.insightCostPerConversation.textContent = BRL.format(Number(metrics.costPerConversation) || 0);
-  els.insightCpm.textContent = BRL.format(Number(metrics.cpm) || 0);
-  els.insightCtr.textContent = PERCENT.format(Number(metrics.ctr) || 0);
   const periodLabel = insights.period?.label || formatInsightPeriodLabel();
   els.insightsPeriodLabel.textContent = insights.source === 'api'
     ? periodLabel
@@ -903,6 +942,10 @@ function renderInsights(insights) {
   }), { clicks: 0, conversations: 0, sales: 0 });
   if (els.clicksPerSale) els.clicksPerSale.textContent = formatRatio(totals.sales ? totals.clicks / totals.sales : 0);
   if (els.conversationsPerSale) els.conversationsPerSale.textContent = formatRatio(totals.sales ? totals.conversations / totals.sales : 0);
+  if (els.insightsConversionAverage) {
+    const conversion = totals.conversations ? totals.sales / totals.conversations : 0;
+    els.insightsConversionAverage.textContent = `${PERCENT.format(conversion)} de conv.`;
+  }
 
   renderConversionChart(weekly);
   renderInsightsTable(weekly);
@@ -986,6 +1029,19 @@ function buildEmptyInsights(weekly) {
       conversationClickRate: 0,
       salesClickRate: 0
     }))
+  };
+}
+
+function buildEmptyInsightMetrics() {
+  return {
+    source: 'cache_empty',
+    error: '',
+    metrics: {
+      conversations: 0,
+      costPerConversation: 0,
+      cpm: 0,
+      ctr: 0
+    }
   };
 }
 
@@ -1533,6 +1589,7 @@ function demoPayload() {
     lastSync: null,
     currencies: [{ currency: 'BRL', revenue: displayedRevenue, sales: displayedSales }],
     hourly: buildDemoHourly(demoTransactions),
+    periodInsights: buildDemoInsights(demoTransactions),
     insights: buildDemoInsights(demoTransactions)
   };
 }
@@ -1589,6 +1646,7 @@ function emptyPayload() {
     lastSync: null,
     currencies: [],
     hourly: buildEmptyHourlyForRange(),
+    periodInsights: buildEmptyInsightMetrics(),
     insights: buildEmptyInsightsForRange()
   };
 }
