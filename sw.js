@@ -1,11 +1,11 @@
-const CACHE_NAME = 'homestudio-bi-v9';
+const CACHE_NAME = 'homestudio-bi-v10';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css',
-  './app.js',
-  './config.js',
-  './manifest.webmanifest',
+  './styles.css?v=10',
+  './app.js?v=10',
+  './config.js?v=10',
+  './manifest.webmanifest?v=10',
   './assets/icon.svg',
   './assets/icon-192.png',
   './assets/icon-512.png'

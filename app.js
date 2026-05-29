@@ -3,7 +3,7 @@ const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: CONFIG
 const NUMBER = new Intl.NumberFormat('pt-BR');
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
-const CACHE_PREFIX = 'homestudio.bi.snapshot.v9';
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v10';
 const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
 const TRANSACTIONS_PAGE_SIZE = 50;
 
@@ -184,7 +184,9 @@ function init() {
   renderCachedDashboard();
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js?v=10')
+      .then((registration) => registration.update())
+      .catch(() => {});
   }
 }
 
