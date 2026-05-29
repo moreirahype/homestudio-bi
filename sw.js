@@ -1,4 +1,4 @@
-const CACHE_NAME = 'homestudio-bi-v8';
+const CACHE_NAME = 'homestudio-bi-v9';
 const APP_SHELL = [
   './',
   './index.html',
