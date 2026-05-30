@@ -4,7 +4,7 @@ const NUMBER = new Intl.NumberFormat('pt-BR');
 const DECIMAL = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
-const CACHE_PREFIX = 'homestudio.bi.snapshot.v15';
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v16';
 const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
 const NOTIFICATIONS_CACHE_KEY = 'homestudio.bi.notifications.v1';
 const TRANSACTIONS_PAGE_SIZE = 50;
@@ -120,6 +120,7 @@ function init() {
       state.period = button.dataset.period;
       updatePeriodButtons();
       renderCachedDashboard();
+      ensureCurrentSnapshot();
     });
   });
 
@@ -134,6 +135,7 @@ function init() {
   els.attendantSelect.addEventListener('change', () => {
     localStorage.setItem('homestudio.attendant', els.attendantSelect.value);
     renderCachedDashboard();
+    ensureCurrentSnapshot();
   });
   els.transactionSearch.addEventListener('input', () => {
     state.transactionPage = 1;
@@ -206,7 +208,7 @@ function init() {
   startNotificationScheduler();
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=15')
+    navigator.serviceWorker.register('sw.js?v=16')
       .then((registration) => registration.update())
       .catch(() => {});
   }
@@ -634,6 +636,11 @@ function renderCachedDashboard() {
   setStatus('Carregando');
 }
 
+function ensureCurrentSnapshot() {
+  if (!CONFIG.apiUrl || state.isRefreshing || readSnapshot()?.payload) return;
+  refreshDashboardSnapshots({ silent: true, reason: 'cache-miss' });
+}
+
 async function refreshDashboardSnapshots(options = {}) {
   if (state.isRefreshing) return;
   state.isRefreshing = true;
@@ -1039,7 +1046,22 @@ function renderHourly(hourly) {
 }
 
 function resolvePeriodInsights(payload) {
-  return (payload && (payload.periodInsights || payload.insights)) || buildEmptyInsightMetrics();
+  const candidate = payload && (payload.periodInsights || payload.insights);
+  if (candidate && candidate.metrics) {
+    return {
+      ...candidate,
+      metrics: {
+        ...buildInsightMetricsFallback(payload),
+        ...candidate.metrics
+      }
+    };
+  }
+  return {
+    source: 'local_cache',
+    error: '',
+    period: payload?.period || buildLocalPeriod(),
+    metrics: buildInsightMetricsFallback(payload)
+  };
 }
 
 function renderInsightMetrics(insights) {
@@ -1049,6 +1071,36 @@ function renderInsightMetrics(insights) {
   els.insightCostPerConversation.textContent = BRL.format(Number(metrics.costPerConversation) || 0);
   els.insightCpm.textContent = BRL.format(Number(metrics.cpm) || 0);
   els.insightCtr.textContent = PERCENT.format(Number(metrics.ctr) || 0);
+}
+
+function buildInsightMetricsFallback(payload) {
+  const period = payload?.period || buildLocalPeriod();
+  const transactions = getTransactionsForPeriod(period);
+  const sales = transactions.length;
+  const weekly = payload?.insights?.weekly || [];
+  const totals = weekly.reduce((sum, day) => ({
+    clicks: sum.clicks + (Number(day.clicks) || 0),
+    conversations: sum.conversations + (Number(day.conversations) || 0),
+    spend: sum.spend + (Number(day.spend) || 0),
+    impressions: sum.impressions + (Number(day.impressions) || 0)
+  }), { clicks: 0, conversations: 0, spend: 0, impressions: 0 });
+  return {
+    conversations: totals.conversations,
+    costPerConversation: totals.conversations ? roundMoney(totals.spend / totals.conversations) : 0,
+    cpm: totals.impressions ? roundMoney((totals.spend / totals.impressions) * 1000) : 0,
+    ctr: totals.impressions ? totals.clicks / totals.impressions : 0,
+    conversionRate: totals.conversations ? sales / totals.conversations : 0
+  };
+}
+
+function getTransactionsForPeriod(period) {
+  const start = parseInputDate(period?.start);
+  const end = parseInputDate(period?.end);
+  const rows = readCachedTransactions().length ? readCachedTransactions() : (state.transactions || []);
+  return rows.filter((tx) => {
+    const date = parseInputDate(tx.date);
+    return date && (!start || date >= start) && (!end || date <= end) && Number(tx.amount) > 0;
+  });
 }
 
 function resolveInsights(payload) {

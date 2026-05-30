@@ -338,6 +338,10 @@ body[data-current-view="notifications"] .controls {
   display: none;
 }
 
+body[data-current-view="notifications"] .status-pill {
+  display: none;
+}
+
 .analysis-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
@@ -723,20 +727,24 @@ td {
 
 .transactions-table th:nth-child(3),
 .transactions-table td:nth-child(3) {
+  text-align: left;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 .transactions-table th:nth-child(2),
-.transactions-table td:nth-child(2),
+.transactions-table td:nth-child(2) {
+  width: 82px;
+}
+
 .transactions-table th:nth-child(4),
 .transactions-table td:nth-child(4) {
-  width: 72px;
+  width: 82px;
 }
 
 .transactions-table th:nth-child(5),
 .transactions-table td:nth-child(5) {
-  width: 94px;
+  width: 108px;
 }
 
 .pagination-row {

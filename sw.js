@@ -1,12 +1,12 @@
-const CACHE_NAME = 'homestudio-bi-v15';
+const CACHE_NAME = 'homestudio-bi-v16';
 const APP_SHELL = [
   './',
   './index.html',
-  './styles.css?v=15',
-  './app.js?v=15',
-  './site-patch.js?v=15',
-  './config.js?v=15',
-  './manifest.webmanifest?v=15',
+  './styles.css?v=16',
+  './app.js?v=16',
+  './site-patch.js?v=16',
+  './config.js?v=16',
+  './manifest.webmanifest?v=16',
   './assets/icon.svg',
   './assets/icon-192.png',
   './assets/icon-512.png'
