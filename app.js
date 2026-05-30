@@ -4,7 +4,7 @@ const NUMBER = new Intl.NumberFormat('pt-BR');
 const DECIMAL = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
-const CACHE_PREFIX = 'homestudio.bi.snapshot.v14';
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v15';
 const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
 const NOTIFICATIONS_CACHE_KEY = 'homestudio.bi.notifications.v1';
 const TRANSACTIONS_PAGE_SIZE = 50;
@@ -26,6 +26,7 @@ const state = {
   hourlyEnd: '',
   isRefreshing: false,
   lastAutoRefreshAt: 0,
+  warmInsightsTimer: null,
   notificationSettings: {},
   notificationTimer: null,
   notificationLastSent: {}
@@ -205,7 +206,7 @@ function init() {
   startNotificationScheduler();
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=14')
+    navigator.serviceWorker.register('sw.js?v=15')
       .then((registration) => registration.update())
       .catch(() => {});
   }
@@ -213,8 +214,14 @@ function init() {
 
 function setView(view) {
   state.view = view;
+  document.body.dataset.currentView = view;
   $$('[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
   $$('[data-view-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.viewPanel === view));
+  if (view === 'insights') {
+    renderInsightMetrics(resolvePeriodInsights(state.payload || emptyPayload()));
+    renderCurrentHourly();
+    renderCurrentInsights();
+  }
 }
 
 function updatePeriodButtons() {
@@ -296,22 +303,27 @@ function snapshotKey(options = {}) {
   const attendant = normalizeText(options.attendant || currentAttendantName()) || 'geral';
   const start = period === 'custom' ? (options.start || els.startDate.value || '') : '';
   const end = period === 'custom' ? (options.end || els.endDate.value || '') : '';
-  const apiPart = String(CONFIG.apiUrl || 'demo').replace(/[^\w.-]/g, '_').slice(-96);
-  return `${CACHE_PREFIX}:${apiPart}:${period}:${attendant}:${start}:${end}`;
+  return `${CACHE_PREFIX}:${apiCachePart()}:${period}:${attendant}:${start}:${end}`;
 }
 
 function insightsKey(options = {}) {
   const start = options.start || state.insightsStart || '';
   const end = options.end || state.insightsEnd || '';
-  const apiPart = String(CONFIG.apiUrl || 'demo').replace(/[^\w.-]/g, '_').slice(-96);
-  return `${CACHE_PREFIX}:insights:${apiPart}:${start}:${end}`;
+  return `${CACHE_PREFIX}:insights:${apiCachePart()}:${start}:${end}`;
 }
 
 function hourlyKey(options = {}) {
   const start = options.start || state.hourlyStart || '';
   const end = options.end || state.hourlyEnd || '';
-  const apiPart = String(CONFIG.apiUrl || 'demo').replace(/[^\w.-]/g, '_').slice(-96);
-  return `${CACHE_PREFIX}:hourly:${apiPart}:${start}:${end}`;
+  return `${CACHE_PREFIX}:hourly:${apiCachePart()}:${start}:${end}`;
+}
+
+function apiCachePart() {
+  return String(CONFIG.apiUrl || 'demo').replace(/[^\w.-]/g, '_').slice(-96);
+}
+
+function scopedCacheKey(name) {
+  return `${CACHE_PREFIX}:${name}:${apiCachePart()}`;
 }
 
 function readSnapshot(options = {}) {
@@ -347,8 +359,63 @@ function storeSnapshot(payload, options = {}) {
     payload
   };
   localStorage.setItem(snapshotKey(options), JSON.stringify(record));
+  storeTransactionsFromPayload(payload);
   storeInsightsSnapshot(payload && payload.insights);
   storeHourlySnapshot(payload && payload.hourly);
+}
+
+function storeTransactionsFromPayload(payload) {
+  const incoming = Array.isArray(payload?.transactions) ? payload.transactions : [];
+  if (!incoming.length) return;
+  const merged = new Map(readCachedTransactions().map((tx) => [transactionIdentity(tx), tx]));
+  incoming.forEach((tx) => {
+    const normalized = normalizeCachedTransaction(tx);
+    if (normalized.date && transactionIdentity(normalized)) merged.set(transactionIdentity(normalized), normalized);
+  });
+  const rows = Array.from(merged.values())
+    .sort((a, b) => transactionSortValue(b) - transactionSortValue(a))
+    .slice(0, 5000);
+  try {
+    localStorage.setItem(scopedCacheKey('transactions'), JSON.stringify(rows));
+  } catch {
+    localStorage.setItem(scopedCacheKey('transactions'), JSON.stringify(rows.slice(0, 2500)));
+  }
+}
+
+function readCachedTransactions() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(scopedCacheKey('transactions')) || '[]');
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeCachedTransaction(tx) {
+  return {
+    date: String(tx.date || ''),
+    time: String(tx.time || ''),
+    weekday: tx.weekday || '',
+    currency: tx.currency || '',
+    amount: Number(tx.amount) || 0,
+    originalAmount: Number(tx.originalAmount) || Number(tx.amount) || 0,
+    fxRate: Number(tx.fxRate) || 1,
+    payer: tx.payer || '',
+    manualAttendant: tx.manualAttendant || '',
+    id: tx.id || '',
+    description: tx.description || ''
+  };
+}
+
+function transactionIdentity(tx) {
+  return String(tx.id || `${tx.date}|${tx.time}|${tx.payer}|${tx.currency}|${tx.amount}`);
+}
+
+function transactionSortValue(tx) {
+  const date = tx.date || '1970-01-01';
+  const time = tx.time || '00:00';
+  const parsed = new Date(`${date}T${time}:00`);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
 function storeInsightsSnapshot(insights) {
@@ -396,7 +463,7 @@ async function loadDashboard() {
 function startAutoRefresh() {
   if (!CONFIG.apiUrl) return;
   window.HOMESTUDIO_BI_NATIVE_AUTO_REFRESH = true;
-  window.setTimeout(() => refreshDashboardSnapshots({ silent: true, reason: 'startup' }), 250);
+  window.setTimeout(() => refreshDashboardSnapshots({ silent: false, reason: 'startup' }), 250);
 
   window.setInterval(() => {
     if (!document.hidden) refreshDashboardSnapshots({ silent: true, reason: 'timer' });
@@ -564,7 +631,7 @@ function renderCachedDashboard() {
   const payload = emptyPayload();
   state.payload = payload;
   render(normalizeFinancialMetrics(payload));
-  setStatus('Clique em Atualizar');
+  setStatus('Carregando');
 }
 
 async function refreshDashboardSnapshots(options = {}) {
@@ -610,6 +677,7 @@ async function refreshDashboardSnapshots(options = {}) {
     if (!successCount) throw new Error('Nenhum periodo foi atualizado.');
     state.lastAutoRefreshAt = Date.now();
     renderCachedDashboard();
+    warmNearbyInsightCaches();
     setStatus(`Atualizado ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
   } catch (error) {
     console.error(error);
@@ -663,10 +731,10 @@ async function fetchPayload(options = {}) {
   url.searchParams.set('period', period);
   url.searchParams.set('_', String(Date.now()));
   if (options.attendant) url.searchParams.set('attendant', options.attendant);
-  url.searchParams.set('insightsStart', state.insightsStart);
-  url.searchParams.set('insightsEnd', state.insightsEnd);
-  url.searchParams.set('hourlyStart', state.hourlyStart);
-  url.searchParams.set('hourlyEnd', state.hourlyEnd);
+  url.searchParams.set('insightsStart', options.insightsStart || state.insightsStart);
+  url.searchParams.set('insightsEnd', options.insightsEnd || state.insightsEnd);
+  url.searchParams.set('hourlyStart', options.hourlyStart || state.hourlyStart);
+  url.searchParams.set('hourlyEnd', options.hourlyEnd || state.hourlyEnd);
   if (period === 'custom') {
     url.searchParams.set('start', options.start || els.startDate.value);
     url.searchParams.set('end', options.end || els.endDate.value);
@@ -931,6 +999,7 @@ function renderAttendantAnalytics(attendantSales, metrics, period) {
 }
 
 function renderCurrentInsights() {
+  renderInsightMetrics(resolvePeriodInsights(state.payload || emptyPayload()));
   renderInsights(resolveInsights(state.payload || emptyPayload()));
   requestInsightsRefreshIfMissing();
 }
@@ -952,7 +1021,7 @@ function resolveHourly(payload) {
   ) {
     return payloadHourly;
   }
-  return buildEmptyHourlyForRange();
+  return buildHourlyFromTransactions(readCachedTransactions().length ? readCachedTransactions() : (state.transactions || []));
 }
 
 function renderHourly(hourly) {
@@ -1002,13 +1071,29 @@ function requestHourlyRefreshIfMissing() {
   if (readHourlySnapshot()?.hourly) return;
   const payloadHourly = state.payload && state.payload.hourly;
   if (payloadHourly?.period?.start === state.hourlyStart && payloadHourly?.period?.end === state.hourlyEnd) return;
-  fetchPayload({ period: state.period, attendant: currentAttendantName(), start: els.startDate.value, end: els.endDate.value })
+  const requestedStart = state.hourlyStart;
+  const requestedEnd = state.hourlyEnd;
+  fetchPayload({
+    period: state.period,
+    attendant: currentAttendantName(),
+    start: els.startDate.value,
+    end: els.endDate.value,
+    hourlyStart: requestedStart,
+    hourlyEnd: requestedEnd
+  })
     .then((payload) => {
       if (!payload || !payload.ok) return;
+      storeSnapshot(payload, {
+        period: payload.period?.key || state.period,
+        attendant: payload.attendant?.name || currentAttendantName(),
+        start: payload.period?.key === 'custom' ? payload.period.start : '',
+        end: payload.period?.key === 'custom' ? payload.period.end : ''
+      });
       storeHourlySnapshot(payload.hourly);
       if (state.payload && payload.period?.key === state.payload.period?.key) {
         state.payload.hourly = payload.hourly;
       }
+      if (state.hourlyStart !== requestedStart || state.hourlyEnd !== requestedEnd) return;
       renderHourly(resolveHourly(state.payload || payload));
     })
     .catch(() => {});
@@ -1019,14 +1104,65 @@ function requestInsightsRefreshIfMissing() {
   if (readInsightsSnapshot()?.insights) return;
   const payloadInsights = state.payload && state.payload.insights;
   if (payloadInsights?.period?.start === state.insightsStart && payloadInsights?.period?.end === state.insightsEnd) return;
-  fetchPayload({ period: state.period, attendant: currentAttendantName(), start: els.startDate.value, end: els.endDate.value })
+  const requestedStart = state.insightsStart;
+  const requestedEnd = state.insightsEnd;
+  fetchPayload({
+    period: state.period,
+    attendant: currentAttendantName(),
+    start: els.startDate.value,
+    end: els.endDate.value,
+    insightsStart: requestedStart,
+    insightsEnd: requestedEnd
+  })
     .then((payload) => {
       if (!payload || !payload.ok) return;
+      storeSnapshot(payload, {
+        period: payload.period?.key || state.period,
+        attendant: payload.attendant?.name || currentAttendantName(),
+        start: payload.period?.key === 'custom' ? payload.period.start : '',
+        end: payload.period?.key === 'custom' ? payload.period.end : ''
+      });
       storeInsightsSnapshot(payload.insights);
       if (state.payload && payload.period?.key === state.payload.period?.key) {
         state.payload.insights = payload.insights;
       }
+      if (state.insightsStart !== requestedStart || state.insightsEnd !== requestedEnd) return;
       renderInsights(resolveInsights(state.payload || payload));
+    })
+    .catch(() => {});
+}
+
+function warmNearbyInsightCaches() {
+  if (!CONFIG.apiUrl) return;
+  window.clearTimeout(state.warmInsightsTimer);
+  state.warmInsightsTimer = window.setTimeout(() => {
+    const start = parseInputDate(state.insightsStart);
+    const end = parseInputDate(state.insightsEnd);
+    if (!start || !end) return;
+    const previousStart = new Date(start);
+    const previousEnd = new Date(end);
+    previousStart.setDate(previousStart.getDate() - 7);
+    previousEnd.setDate(previousEnd.getDate() - 7);
+    warmInsightRange(previousStart, previousEnd);
+  }, 900);
+}
+
+function warmInsightRange(startDate, endDate) {
+  const start = toInputDate(startDate);
+  const end = toInputDate(endDate);
+  if (readInsightsSnapshot({ start, end })?.insights) return;
+  fetchPayload({
+    period: state.period,
+    attendant: currentAttendantName(),
+    start: els.startDate.value,
+    end: els.endDate.value,
+    insightsStart: start,
+    insightsEnd: end
+  })
+    .then((payload) => {
+      if (!payload || !payload.ok) return;
+      storeInsightsSnapshot(payload.insights);
+      storeTransactionsFromPayload(payload);
     })
     .catch(() => {});
 }
@@ -1194,9 +1330,10 @@ function buildEmptyInsightMetrics() {
 }
 
 function buildEmptyInsightsForRange() {
+  const cachedTransactions = readCachedTransactions();
   return buildEmptyInsights(buildInsightDaysForRange().map((day) => ({
     ...day,
-    sales: 0
+    sales: cachedTransactions.filter((tx) => tx.date === day.date && Number(tx.amount) > 0).length
   })));
 }
 
@@ -1208,6 +1345,17 @@ function buildEmptyHourlyForRange() {
       label: formatHourlyPeriodLabel()
     },
     hours: buildHourlyRows([])
+  };
+}
+
+function buildHourlyFromTransactions(transactions) {
+  return {
+    period: {
+      start: state.hourlyStart,
+      end: state.hourlyEnd,
+      label: formatHourlyPeriodLabel()
+    },
+    hours: buildHourlyRows(transactions || [])
   };
 }
 
