@@ -4,7 +4,7 @@ const NUMBER = new Intl.NumberFormat('pt-BR');
 const DECIMAL = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 const PERCENT = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const SNAPSHOT_PERIODS = ['today', 'yesterday', '7d', 'this_month', 'last_month'];
-const CACHE_PREFIX = 'homestudio.bi.snapshot.v16';
+const CACHE_PREFIX = 'homestudio.bi.snapshot.v18';
 const ATTENDANTS_CACHE_KEY = 'homestudio.bi.attendants.v1';
 const NOTIFICATIONS_CACHE_KEY = 'homestudio.bi.notifications.v1';
 const TRANSACTIONS_PAGE_SIZE = 50;
@@ -208,7 +208,7 @@ function init() {
   startNotificationScheduler();
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js?v=16')
+    navigator.serviceWorker.register('sw.js?v=18')
       .then((registration) => registration.update())
       .catch(() => {});
   }
@@ -1046,21 +1046,20 @@ function renderHourly(hourly) {
 }
 
 function resolvePeriodInsights(payload) {
-  const candidate = payload && (payload.periodInsights || payload.insights);
+  const candidate = payload && payload.periodInsights;
+  const fallback = buildInsightMetricsFallback(payload);
   if (candidate && candidate.metrics) {
     return {
       ...candidate,
-      metrics: {
-        ...buildInsightMetricsFallback(payload),
-        ...candidate.metrics
-      }
+      metrics: mergeInsightMetrics(candidate.metrics, fallback)
     };
   }
+  const weeklyFallback = payload?.insights?.metrics || {};
   return {
     source: 'local_cache',
     error: '',
     period: payload?.period || buildLocalPeriod(),
-    metrics: buildInsightMetricsFallback(payload)
+    metrics: mergeInsightMetrics(weeklyFallback, fallback)
   };
 }
 
@@ -1077,7 +1076,7 @@ function buildInsightMetricsFallback(payload) {
   const period = payload?.period || buildLocalPeriod();
   const transactions = getTransactionsForPeriod(period);
   const sales = transactions.length;
-  const weekly = payload?.insights?.weekly || [];
+  const weekly = getInsightRowsForPeriod(payload?.insights?.weekly || [], period);
   const totals = weekly.reduce((sum, day) => ({
     clicks: sum.clicks + (Number(day.clicks) || 0),
     conversations: sum.conversations + (Number(day.conversations) || 0),
@@ -1091,6 +1090,25 @@ function buildInsightMetricsFallback(payload) {
     ctr: totals.impressions ? totals.clicks / totals.impressions : 0,
     conversionRate: totals.conversations ? sales / totals.conversations : 0
   };
+}
+
+function mergeInsightMetrics(primary, fallback) {
+  const keys = ['conversations', 'costPerConversation', 'cpm', 'ctr', 'conversionRate'];
+  return keys.reduce((metrics, key) => {
+    const primaryValue = Number(primary && primary[key]) || 0;
+    const fallbackValue = Number(fallback && fallback[key]) || 0;
+    metrics[key] = primaryValue > 0 ? primaryValue : fallbackValue;
+    return metrics;
+  }, {});
+}
+
+function getInsightRowsForPeriod(rows, period) {
+  const start = parseInputDate(period?.start);
+  const end = parseInputDate(period?.end);
+  return (rows || []).filter((row) => {
+    const date = parseInputDate(row.date);
+    return date && (!start || date >= start) && (!end || date <= end);
+  });
 }
 
 function getTransactionsForPeriod(period) {
@@ -1115,7 +1133,7 @@ function resolveInsights(payload) {
   ) {
     return payloadInsights;
   }
-  return buildEmptyInsightsForRange();
+  return buildInsightsForRangeFromSources(payload);
 }
 
 function requestHourlyRefreshIfMissing() {
@@ -1358,12 +1376,14 @@ function buildEmptyInsights(weekly) {
     weekly: (weekly || []).map((day) => ({
       label: day.label,
       date: day.date,
-      clicks: 0,
-      conversations: 0,
+      clicks: Number(day.clicks) || 0,
+      conversations: Number(day.conversations) || 0,
+      spend: Number(day.spend) || 0,
+      impressions: Number(day.impressions) || 0,
       sales: Number(day.sales) || 0,
-      conversionRate: 0,
-      conversationClickRate: 0,
-      salesClickRate: 0
+      conversionRate: Number(day.conversionRate) || 0,
+      conversationClickRate: Number(day.conversationClickRate) || 0,
+      salesClickRate: Number(day.salesClickRate) || 0
     }))
   };
 }
@@ -1382,11 +1402,33 @@ function buildEmptyInsightMetrics() {
 }
 
 function buildEmptyInsightsForRange() {
+  return buildInsightsForRangeFromSources(state.payload || {});
+}
+
+function buildInsightsForRangeFromSources(payload) {
   const cachedTransactions = readCachedTransactions();
-  return buildEmptyInsights(buildInsightDaysForRange().map((day) => ({
-    ...day,
-    sales: cachedTransactions.filter((tx) => tx.date === day.date && Number(tx.amount) > 0).length
-  })));
+  const rowsByDate = new Map((payload?.insights?.weekly || []).map((row) => [row.date, row]));
+  return buildEmptyInsights(buildInsightDaysForRange().map((day) => {
+    const meta = rowsByDate.get(day.date) || {};
+    const clicks = Number(meta.clicks) || 0;
+    const conversations = Number(meta.conversations) || 0;
+    const impressions = Number(meta.impressions) || 0;
+    const spend = Number(meta.spend) || 0;
+    const sales = cachedTransactions.filter((tx) => tx.date === day.date && Number(tx.amount) > 0).length ||
+      Number(meta.sales) ||
+      0;
+    return {
+      ...day,
+      clicks,
+      conversations,
+      spend,
+      impressions,
+      sales,
+      conversionRate: conversations ? sales / conversations : 0,
+      conversationClickRate: clicks ? conversations / clicks : 0,
+      salesClickRate: clicks ? sales / clicks : 0
+    };
+  }));
 }
 
 function buildEmptyHourlyForRange() {
