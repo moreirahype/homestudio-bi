@@ -364,13 +364,13 @@ h2 {
 
 .chart-panel {
   min-height: 0;
-  padding-bottom: 16px;
+  padding-bottom: 18px;
 }
 
 .line-chart-wrap {
   position: relative;
-  height: clamp(270px, 17vw, 330px);
-  margin-top: 14px;
+  height: clamp(340px, 24vw, 430px);
+  margin-top: 6px;
   overflow: visible;
 }
 
@@ -484,12 +484,12 @@ th:last-child {
   display: grid;
   gap: 16px;
   margin-top: 28px;
-  max-width: none;
+  max-width: 980px;
 }
 
 .bar-row {
   display: grid;
-  grid-template-columns: minmax(100px, 160px) minmax(0, 1fr) minmax(180px, auto);
+  grid-template-columns: minmax(100px, 160px) minmax(0, 1fr) minmax(260px, auto);
   gap: 14px;
   align-items: center;
 }

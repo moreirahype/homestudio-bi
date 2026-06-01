@@ -127,7 +127,7 @@
 
     els.testNotification.addEventListener("click", async () => {
       const granted = await ensureNotificationPermission();
-      if (granted) sendNotification("Teste Home Studio BI", buildNotificationText());
+      if (granted) sendNotification("Resumo das Campanhas!", buildNotificationText());
     });
 
     window.addEventListener("resize", debounce(() => {
@@ -428,14 +428,15 @@
   function renderSalesChart() {
     const grouped = buildSeries();
     els.chart.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    const chartBox = els.chart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
     const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
-    const left = 58;
-    const right = 34;
-    const top = 30;
-    const bottom = 50;
+    const left = 34;
+    const right = 10;
+    const top = 12;
+    const bottom = 32;
     const canvasWidth = 980;
-    const canvasHeight = 330;
+    const canvasHeight = Math.max(300, Math.round(canvasWidth * (chartBox.height / Math.max(chartBox.width, 1))));
     els.chart.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
     const width = canvasWidth - left - right;
     const height = canvasHeight - top - bottom;
@@ -460,7 +461,7 @@
           <stop offset="100%" stop-color="#9fe870" stop-opacity="0"></stop>
         </linearGradient>
       </defs>
-      <rect x="${left}" y="${top}" width="${width}" height="${height}" rx="6" class="chart-plot-bg"></rect>
+      <rect x="${left}" y="${top}" width="${width}" height="${height}" rx="4" class="chart-plot-bg"></rect>
       <line x1="${left}" y1="${gridYTop}" x2="${canvasWidth - right}" y2="${gridYTop}" class="grid-line"></line>
       <line x1="${left}" y1="${gridYMid}" x2="${canvasWidth - right}" y2="${gridYMid}" class="grid-line is-soft"></line>
       <line x1="${left}" y1="${gridYBottom}" x2="${canvasWidth - right}" y2="${gridYBottom}" class="axis-line"></line>
@@ -680,9 +681,7 @@
   function renderNotificationSummary() {
     const summary = document.getElementById("notificationSummary");
     if (!summary) return;
-    summary.textContent =
-      `Seu investimento está em ${money(state.metrics.totalSpend || 0)}, com faturamento em ${money(state.metrics.revenue || 0)}, ` +
-      `com um CPA de ${state.metrics.cpa == null ? "N/A" : money(state.metrics.cpa)} e um ROI de ${state.metrics.roas == null ? "0,00" : decimal(state.metrics.roas)}.`;
+    summary.textContent = buildNotificationText();
   }
 
   function renderNotifications() {
@@ -738,7 +737,7 @@
     const key = `hsbi-sent-${toIsoDate(now)}-${current}`;
     if (localStorage.getItem(key)) return;
     localStorage.setItem(key, "1");
-    sendNotification(`Resumo das ${current}`, buildNotificationText());
+    sendNotification("Resumo das Campanhas!", buildNotificationText());
   }
 
   function sendNotification(title, body) {
@@ -754,7 +753,7 @@
   }
 
   function buildNotificationText() {
-    return `Faturamento: ${money(state.metrics.revenue || 0)} · Vendas: ${integer(state.metrics.sales || 0)} ·\nROAS: ${state.metrics.roas == null ? "N/A" : decimal(state.metrics.roas)}`;
+    return `Seu investimento está em ${money(state.metrics.totalSpend || 0)}, com faturamento em ${money(state.metrics.revenue || 0)}, com um CPA de ${state.metrics.cpa == null ? "N/A" : money(state.metrics.cpa)} e um ROI de ${state.metrics.roas == null ? "0,00" : decimal(state.metrics.roas)}.`;
   }
 
   function loadNotificationPrefs() {
@@ -771,7 +770,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js").catch(console.error);
+      navigator.serviceWorker.register("sw.js?v=7").then((registration) => registration.update()).catch(console.error);
     }
   }
 
