@@ -2,7 +2,7 @@
   "use strict";
 
   const config = Object.assign(
-    { apiUrl: "", metaTaxRate: 0.1383, rowsPerPage: 10, autoRefreshMinutes: 15, retentionDays: 180, currencyRates: { BRL: 1 } },
+    { apiUrl: "", metaTaxRate: 0.1383, rowsPerPage: 10, autoRefreshMinutes: 15, retentionDays: 730, currencyRates: { BRL: 1 } },
     window.HSBI_CONFIG || {}
   );
 
@@ -16,6 +16,7 @@
     customMeta: null,
     meta: { spend: 0, leads: 0 },
     filteredTransactions: [],
+    loadedTransactionRange: null,
     metrics: {},
     pageIndex: 1,
     lastUpdated: null,
@@ -81,7 +82,7 @@
       button.addEventListener("click", async () => {
         state.period = button.dataset.period;
         state.pageIndex = 1;
-        if (state.period === "custom") await loadCustomMeta();
+        if (state.period === "custom") await loadCustomPeriodData();
         render();
       });
     });
@@ -89,7 +90,7 @@
     [els.startDate, els.endDate].forEach((input) => {
       input.addEventListener("change", async () => {
         state.pageIndex = 1;
-        if (state.period === "custom") await loadCustomMeta();
+        if (state.period === "custom") await loadCustomPeriodData();
         render();
       });
     });
@@ -149,8 +150,9 @@
         standardPeriods.map(async (period) => [period, await fetchMetaPayload(getDateRange(period))])
       );
       state.transactions = payload.transactions.map(normalizeTransaction);
+      state.loadedTransactionRange = range;
       state.metaByPeriod = Object.fromEntries(metaEntries);
-      if (state.period === "custom") await loadCustomMeta();
+      if (state.period === "custom") await loadCustomPeriodData();
       state.lastUpdated = new Date();
       render();
       setSyncText(`Atualizado ${formatTime(state.lastUpdated)}`);
@@ -158,6 +160,7 @@
       console.error(error);
       const fallback = buildDemoPayload();
       state.transactions = fallback.transactions.map(normalizeTransaction);
+      state.loadedTransactionRange = getPreloadRange();
       state.metaByPeriod = Object.fromEntries(standardPeriods.map((period) => [period, fallback.meta]));
       state.lastUpdated = new Date();
       render();
@@ -197,14 +200,32 @@
     }
   }
 
-  async function loadCustomMeta() {
+  async function loadCustomPeriodData() {
     if (state.period !== "custom") return;
+    const range = getDateRange("custom");
     try {
-      state.customMeta = await fetchMetaPayload(getDateRange("custom"));
+      let payload = null;
+      if (!isRangeLoaded(range)) {
+        payload = await fetchTransactionsPayload(range);
+        mergeTransactions(payload.transactions.map(normalizeTransaction));
+      }
+      state.customMeta = payload && payload.meta ? payload.meta : await fetchMetaPayload(range);
     } catch (error) {
       console.error(error);
       state.customMeta = { spend: 0, leads: 0 };
     }
+  }
+
+  function isRangeLoaded(range) {
+    if (!state.loadedTransactionRange) return false;
+    return startOfDay(range.start) >= startOfDay(state.loadedTransactionRange.start) &&
+      endOfDay(range.end) <= endOfDay(state.loadedTransactionRange.end);
+  }
+
+  function mergeTransactions(transactions) {
+    const map = new Map(state.transactions.map((item) => [item.id, item]));
+    transactions.forEach((item) => map.set(item.id, item));
+    state.transactions = Array.from(map.values());
   }
 
   function fetchJsonp(url) {
@@ -407,15 +428,14 @@
   function renderSalesChart() {
     const grouped = buildSeries();
     els.chart.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    const chartBox = els.chart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
     const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
     const left = 58;
     const right = 34;
     const top = 30;
     const bottom = 50;
-    const canvasWidth = 1000;
-    const canvasHeight = Math.max(240, Math.round(canvasWidth * (chartBox.height / Math.max(chartBox.width, 1))));
+    const canvasWidth = 980;
+    const canvasHeight = 330;
     els.chart.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
     const width = canvasWidth - left - right;
     const height = canvasHeight - top - bottom;
@@ -452,7 +472,7 @@
       ${points
         .map(
           (point) => `
-            <g class="chart-point" data-index="${point.index}" tabindex="0">
+            <g class="chart-point" data-index="${point.index}">
               <circle class="point-hit" cx="${point.x}" cy="${point.y}" r="13"></circle>
               <circle class="point-dot" cx="${point.x}" cy="${point.y}" r="${point.sales || point.revenue ? 4.8 : 3.8}"></circle>
               <text x="${point.x}" y="${canvasHeight - 12}" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
@@ -468,7 +488,7 @@
       .grid-line.is-soft{stroke:rgba(159,232,112,.1)}
       .sales-area{fill:url(#salesAreaGradient)}
       .sales-line{fill:none;stroke:#9fe870;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px rgba(159,232,112,.16))}
-      .chart-point,.chart-point *{pointer-events:all;cursor:pointer}
+      .chart-point,.chart-point *{pointer-events:all;cursor:pointer;outline:none}
       .point-hit{fill:transparent;stroke:transparent}
       .point-dot{fill:#1b241a;stroke:#9fe870;stroke-width:2.5}
       .chart-point:hover .point-dot,.chart-point:focus .point-dot{fill:#9fe870;stroke:#071009;stroke-width:2.2}
@@ -483,8 +503,6 @@
       node.addEventListener("mouseenter", (event) => showTooltip(event, point));
       node.addEventListener("mousemove", (event) => showTooltip(event, point));
       node.addEventListener("mouseleave", hideTooltip);
-      node.addEventListener("focus", (event) => showTooltip(event, point));
-      node.addEventListener("blur", hideTooltip);
     });
   }
 
@@ -528,11 +546,13 @@
     const rect = event.currentTarget.ownerSVGElement.getBoundingClientRect();
     const wrap = els.chart.parentElement.getBoundingClientRect();
     const viewBox = event.currentTarget.ownerSVGElement.viewBox.baseVal;
-    const x = ((point.x / 1000) * rect.width) + rect.left - wrap.left;
-    const y = ((point.y / viewBox.height) * rect.height) + rect.top - wrap.top - 12;
+    const pointX = ((point.x / viewBox.width) * rect.width) + rect.left - wrap.left;
+    const pointY = ((point.y / viewBox.height) * rect.height) + rect.top - wrap.top;
+    const x = event.clientX ? event.clientX - wrap.left : pointX;
+    const y = event.clientY ? event.clientY - wrap.top : pointY;
     els.tooltip.hidden = false;
     els.tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
-    els.tooltip.style.top = `${Math.max(52, y)}px`;
+    els.tooltip.style.top = `${Math.max(52, y - 8)}px`;
     els.tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}`;
   }
 
@@ -544,6 +564,8 @@
     const rows = getAttendantRows();
     const tbody = document.getElementById("attendantsBody");
     const empty = document.getElementById("attendantsEmpty");
+    const totalSales = sum(rows.map((row) => row.sales));
+    const totalRevenue = sum(rows.map((row) => row.revenue));
     tbody.innerHTML = "";
     rows.forEach((row) => {
       const tr = document.createElement("tr");
@@ -555,6 +577,17 @@
       `;
       tbody.append(tr);
     });
+    if (rows.length) {
+      const totalRow = document.createElement("tr");
+      totalRow.className = "attendants-total-row";
+      totalRow.innerHTML = `
+        <td>Total</td>
+        <td>${integer(totalSales)}</td>
+        <td>${money(totalRevenue)}</td>
+        <td>${totalSales ? money(totalRevenue / totalSales) : "N/A"}</td>
+      `;
+      tbody.append(totalRow);
+    }
     empty.classList.toggle("is-visible", rows.length === 0);
     renderAttendantChart(rows);
   }
@@ -578,16 +611,25 @@
   function renderAttendantChart(rows) {
     const chart = document.getElementById("attendantsChart");
     const max = Math.max(1, ...rows.map((row) => row.revenue));
+    const totalRevenue = sum(rows.map((row) => row.revenue));
     chart.innerHTML = rows
       .map(
-        (row) => `
+        (row) => {
+          const revenueShare = totalRevenue > 0 ? row.revenue / totalRevenue : 0;
+          return `
           <div class="bar-row">
             <strong>${escapeHtml(row.name)}</strong>
             <div class="bar-track"><div class="bar-fill" style="--bar-width:${Math.max(4, (row.revenue / max) * 100)}%"></div></div>
             <span>${money(row.revenue)} · ${integer(row.sales)} vendas</span>
-          </div>`
+          </div>`;
+        }
       )
       .join("");
+    chart.querySelectorAll(".bar-row").forEach((node, index) => {
+      const row = rows[index];
+      const revenueShare = totalRevenue > 0 ? row.revenue / totalRevenue : 0;
+      node.querySelector("span").textContent = `${percent(revenueShare)} da receita · ${money(row.revenue)} · ${integer(row.sales)} vendas`;
+    });
   }
 
   function renderTransactions() {
@@ -712,7 +754,7 @@
   }
 
   function buildNotificationText() {
-    return `Faturamento: ${money(state.metrics.revenue || 0)} · Vendas: ${integer(state.metrics.sales || 0)} · ROAS: ${state.metrics.roas == null ? "N/A" : decimal(state.metrics.roas)}`;
+    return `Faturamento: ${money(state.metrics.revenue || 0)} · Vendas: ${integer(state.metrics.sales || 0)} ·\nROAS: ${state.metrics.roas == null ? "N/A" : decimal(state.metrics.roas)}`;
   }
 
   function loadNotificationPrefs() {
@@ -740,7 +782,7 @@
 
   function getPreloadRange() {
     const today = new Date();
-    return { start: addDays(today, -Number(config.retentionDays || 180)), end: today };
+    return { start: new Date(today.getFullYear(), today.getMonth() - 1, 1), end: today };
   }
 
   function getDateRange(periodName) {

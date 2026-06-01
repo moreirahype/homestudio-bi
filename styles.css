@@ -29,6 +29,7 @@
   --text-metric: clamp(26px, 1.7vw, 32px);
   --text-mobile-metric: 30px;
   --weight-medium: 500;
+  --weight-semibold: 600;
   --weight-bold: 700;
   --weight-extra: 800;
   font-family: var(--font-ui);
@@ -295,6 +296,7 @@ select:focus {
   display: block;
   color: var(--text);
   font-size: var(--text-metric);
+  font-weight: var(--weight-semibold);
   line-height: 1.15;
   letter-spacing: 0;
 }
@@ -367,12 +369,13 @@ h2 {
 
 .line-chart-wrap {
   position: relative;
-  height: clamp(210px, 19vw, 250px);
+  height: clamp(270px, 17vw, 330px);
   margin-top: 14px;
   overflow: visible;
 }
 
 .line-chart {
+  display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
@@ -481,14 +484,23 @@ th:last-child {
   display: grid;
   gap: 16px;
   margin-top: 28px;
-  max-width: 980px;
+  max-width: none;
 }
 
 .bar-row {
   display: grid;
-  grid-template-columns: minmax(100px, 160px) 1fr minmax(108px, auto);
+  grid-template-columns: minmax(100px, 160px) minmax(0, 1fr) minmax(180px, auto);
   gap: 14px;
   align-items: center;
+}
+
+.bar-row strong {
+  font-weight: var(--weight-bold);
+}
+
+.bar-row span {
+  color: var(--text);
+  font-size: var(--text-md);
 }
 
 .bar-track {
@@ -503,6 +515,11 @@ th:last-child {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #9eed6d, #d4ff90);
+}
+
+.attendants-total-row td {
+  color: var(--text);
+  font-weight: var(--weight-bold);
 }
 
 .notifications-panel {
@@ -774,7 +791,7 @@ th:last-child {
   }
 
   .line-chart-wrap {
-    height: 198px;
+    height: 220px;
     margin-top: 12px;
   }
 

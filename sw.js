@@ -1,4 +1,4 @@
-const CACHE_NAME = "home-studio-bi-v3";
+const CACHE_NAME = "home-studio-bi-v5";
 const ASSETS = [
   "./",
   "./index.html",

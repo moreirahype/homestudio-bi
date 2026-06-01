@@ -87,9 +87,11 @@ function readTransactions_(from, to) {
   const sheet = getTransactionsSheet_();
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  const values = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
   const start = from ? new Date(from + 'T00:00:00') : new Date('2000-01-01T00:00:00');
   const end = to ? new Date(to + 'T23:59:59') : new Date('2100-01-01T23:59:59');
+  const rowWindow = findTransactionRowsByDate_(sheet, start, end);
+  if (!rowWindow) return [];
+  const values = sheet.getRange(rowWindow.startRow, 1, rowWindow.rowCount, HEADERS.length).getValues();
 
   return values
     .map((row) => rowToObject_(row))
@@ -97,6 +99,27 @@ function readTransactions_(from, to) {
       const stamp = item.data ? new Date(item.data + 'T12:00:00') : new Date(item.timestamp);
       return stamp >= start && stamp <= end;
     });
+}
+
+function findTransactionRowsByDate_(sheet, start, end) {
+  const lastRow = sheet.getLastRow();
+  const rowCount = lastRow - 1;
+  if (rowCount <= 0) return null;
+  const dates = sheet.getRange(2, 3, rowCount, 1).getValues();
+  let firstIndex = -1;
+  let lastIndex = -1;
+  for (let i = 0; i < dates.length; i++) {
+    const dateValue = dates[i][0] instanceof Date ? dates[i][0] : new Date(String(dates[i][0]) + 'T00:00:00');
+    if (dateValue >= start && dateValue <= end) {
+      if (firstIndex === -1) firstIndex = i;
+      lastIndex = i;
+    }
+  }
+  if (firstIndex === -1) return null;
+  return {
+    startRow: firstIndex + 2,
+    rowCount: lastIndex - firstIndex + 1
+  };
 }
 
 function rowToObject_(row) {
@@ -190,7 +213,7 @@ function getLeadActionMatchers_() {
 
 function pruneOldRows_(sheet) {
   const properties = PropertiesService.getScriptProperties();
-  const retentionDays = Number(properties.getProperty('RETENTION_DAYS') || 180);
+  const retentionDays = Number(properties.getProperty('RETENTION_DAYS') || 730);
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retentionDays);
   cutoff.setHours(0, 0, 0, 0);
@@ -207,7 +230,7 @@ function pruneOldRows_(sheet) {
     if (oldRows > 0) sheet.deleteRows(2, oldRows);
   }
 
-  const maxRows = Number(properties.getProperty('MAX_TRANSACTION_ROWS') || 60000);
+  const maxRows = Number(properties.getProperty('MAX_TRANSACTION_ROWS') || 500000);
   const overflow = sheet.getLastRow() - 1 - maxRows;
   if (overflow > 0) sheet.deleteRows(2, overflow);
 }
