@@ -1,4 +1,4 @@
-const CACHE_NAME = "home-studio-bi-v1";
+const CACHE_NAME = "home-studio-bi-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,7 +7,9 @@ const ASSETS = [
   "./config.js",
   "./manifest.webmanifest",
   "./assets/icon.svg",
+  "./assets/icon-192.png",
   "./assets/icon-192.svg",
+  "./assets/icon-512.png",
   "./assets/icon-512.svg"
 ];
 

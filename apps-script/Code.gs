@@ -9,6 +9,9 @@ function doGet(e) {
       meta: readMetaInsights_(params.from, params.to)
     }, params.callback);
   }
+  if (params.action === 'meta') {
+    return outputJson_(readMetaInsights_(params.from, params.to), params.callback);
+  }
   if (params.action === 'metaActions') {
     return outputJson_(readMetaInsights_(params.from, params.to, true), params.callback);
   }
@@ -91,16 +94,36 @@ function readTransactions_(from, to) {
   return values
     .map((row) => rowToObject_(row))
     .filter((item) => {
-      const stamp = new Date(item.timestamp);
+      const stamp = item.data ? new Date(item.data + 'T12:00:00') : new Date(item.timestamp);
       return stamp >= start && stamp <= end;
     });
 }
 
 function rowToObject_(row) {
   return HEADERS.reduce((object, header, index) => {
-    object[header] = row[index];
+    object[header] = normalizeCell_(header, row[index]);
     return object;
   }, {});
+}
+
+function normalizeCell_(header, value) {
+  if (value instanceof Date) {
+    if (header === 'timestamp') return value.toISOString();
+    if (header === 'data') return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    if (header === 'hora') return Utilities.formatDate(value, Session.getScriptTimeZone(), 'HH:mm');
+  }
+  if (header === 'data' && value) {
+    const text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  }
+  if (header === 'hora' && value) {
+    const match = String(value).match(/(\d{1,2}):(\d{2})/);
+    if (match) return String(match[1]).padStart(2, '0') + ':' + match[2];
+  }
+  if ((header === 'valor' || header === 'valor_original' || header === 'cotacao_brl') && value !== '') {
+    return parseNumber_(value);
+  }
+  return value;
 }
 
 function readMetaInsights_(from, to, includeActions) {
@@ -166,7 +189,25 @@ function getLeadActionMatchers_() {
 }
 
 function pruneOldRows_(sheet) {
-  const maxRows = Number(PropertiesService.getScriptProperties().getProperty('MAX_TRANSACTION_ROWS') || 40000);
+  const properties = PropertiesService.getScriptProperties();
+  const retentionDays = Number(properties.getProperty('RETENTION_DAYS') || 180);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+  cutoff.setHours(0, 0, 0, 0);
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    const dates = sheet.getRange(2, 3, lastRow - 1, 1).getValues();
+    let oldRows = 0;
+    for (let i = 0; i < dates.length; i++) {
+      const dateValue = dates[i][0] instanceof Date ? dates[i][0] : new Date(String(dates[i][0]) + 'T00:00:00');
+      if (dateValue < cutoff) oldRows += 1;
+      else break;
+    }
+    if (oldRows > 0) sheet.deleteRows(2, oldRows);
+  }
+
+  const maxRows = Number(properties.getProperty('MAX_TRANSACTION_ROWS') || 60000);
   const overflow = sheet.getLastRow() - 1 - maxRows;
   if (overflow > 0) sheet.deleteRows(2, overflow);
 }

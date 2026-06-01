@@ -3,6 +3,7 @@ window.HSBI_CONFIG = {
   metaTaxRate: 0.1383,
   rowsPerPage: 10,
   autoRefreshMinutes: 15,
+  retentionDays: 180,
   currencyRates: {
     BRL: 1
   }
