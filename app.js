@@ -35,8 +35,7 @@
     chart: document.getElementById("salesChart"),
     tooltip: document.getElementById("chartTooltip"),
     notificationList: document.getElementById("notificationList"),
-    enableAllNotifications: document.getElementById("enableAllNotifications"),
-    testNotification: document.getElementById("testNotification")
+    enableAllNotifications: document.getElementById("enableAllNotifications")
   };
 
   const metricIds = {
@@ -60,6 +59,7 @@
   function init() {
     setDefaultDates();
     bindEvents();
+    setPage(location.hash.replace("#", "") || "dashboard");
     renderNotifications();
     registerServiceWorker();
     refreshData();
@@ -105,18 +105,16 @@
     });
 
     els.enableAllNotifications.addEventListener("click", async () => {
-      const granted = await ensureNotificationPermission();
-      if (!granted) return;
+      const shouldEnable = !areAllNotificationsEnabled();
+      if (shouldEnable) {
+        const granted = await ensureNotificationPermission();
+        if (!granted) return;
+      }
       notificationTimes.forEach((time) => {
-        state.notifications[time] = true;
+        state.notifications[time] = shouldEnable;
       });
       saveNotificationPrefs();
       renderNotifications();
-    });
-
-    els.testNotification.addEventListener("click", async () => {
-      const granted = await ensureNotificationPermission();
-      if (granted) sendNotification("Teste Home Studio BI", buildNotificationText());
     });
 
     window.addEventListener("resize", debounce(() => {
@@ -275,7 +273,6 @@
     renderSalesChart();
     renderAttendants();
     renderTransactions();
-    renderNotificationSummary();
   }
 
   function renderPeriodControls() {
@@ -356,11 +353,12 @@
   function renderSalesChart() {
     const grouped = buildSeries();
     els.chart.setAttribute("preserveAspectRatio", window.innerWidth <= 720 ? "none" : "xMidYMid meet");
-    const maxSales = Math.max(1, ...grouped.map((point) => point.sales));
+    const highestSales = Math.max(1, ...grouped.map((point) => point.sales));
+    const maxSales = Math.max(1, Math.ceil(highestSales * 1.25));
     const left = 54;
     const right = 26;
-    const top = 34;
-    const bottom = 42;
+    const top = 44;
+    const bottom = 54;
     const width = 1000 - left - right;
     const height = 320 - top - bottom;
     const step = grouped.length > 1 ? width / (grouped.length - 1) : width;
@@ -386,7 +384,7 @@
           (point) => `
             <g class="chart-point" data-index="${point.index}" tabindex="0">
               <circle cx="${point.x}" cy="${point.y}" r="7"></circle>
-              <text x="${point.x}" y="306" class="x-label">${point.label}</text>
+              <text x="${point.x}" y="302" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
             </g>`
         )
         .join("")}
@@ -411,6 +409,11 @@
       node.addEventListener("focus", (event) => showTooltip(event, point));
       node.addEventListener("blur", hideTooltip);
     });
+  }
+
+  function shouldShowAxisLabel(index, total) {
+    if (window.innerWidth <= 720) return total <= 12 || index % 2 === 0;
+    return total <= 16 || index % 2 === 0;
   }
 
   function buildSeries() {
@@ -542,13 +545,8 @@
     return Math.max(1, Math.ceil(rows.length / config.rowsPerPage));
   }
 
-  function renderNotificationSummary() {
-    document.getElementById("notificationSummary").textContent =
-      `Seu investimento está em ${money(state.metrics.ads || 0)}, com faturamento em ${money(state.metrics.revenue || 0)}, ` +
-      `com um CPA de ${state.metrics.cpa == null ? "N/A" : money(state.metrics.cpa)} e um ROAS de ${state.metrics.roas == null ? "N/A" : decimal(state.metrics.roas)}.`;
-  }
-
   function renderNotifications() {
+    els.enableAllNotifications.textContent = areAllNotificationsEnabled() ? "Desativar todos" : "Ativar todos";
     els.notificationList.innerHTML = notificationTimes
       .map(
         (time) => `
@@ -570,8 +568,13 @@
         }
         state.notifications[input.dataset.time] = input.checked;
         saveNotificationPrefs();
+        renderNotifications();
       });
     });
+  }
+
+  function areAllNotificationsEnabled() {
+    return notificationTimes.every((time) => state.notifications[time]);
   }
 
   async function ensureNotificationPermission() {

@@ -9,6 +9,9 @@ function doGet(e) {
       meta: readMetaInsights_(params.from, params.to)
     }, params.callback);
   }
+  if (params.action === 'metaActions') {
+    return outputJson_(readMetaInsights_(params.from, params.to, true), params.callback);
+  }
   return outputJson_({ ok: true, app: 'Home Studio BI' }, params.callback);
 }
 
@@ -28,33 +31,36 @@ function doPost(e) {
 }
 
 function parsePayload_(e) {
-  if (!e || !e.postData || !e.postData.contents) return {};
+  const params = (e && e.parameter) ? e.parameter : {};
+  if (!e || !e.postData || !e.postData.contents) return params;
+  const contents = e.postData.contents;
   try {
-    return JSON.parse(e.postData.contents);
+    return mergeObjects_(params, flattenPayload_(JSON.parse(contents)));
   } catch (error) {
-    return e.parameter || {};
+    return mergeObjects_(params, parseFormPayload_(contents));
   }
 }
 
 function normalizeWebhook_(payload) {
   const now = new Date();
-  const timestamp = payload.timestamp ? new Date(payload.timestamp) : now;
-  const originalValue = parseNumber_(payload.valor || payload.value || payload.event_value || 0);
-  const originalCurrency = normalizeCurrency_(payload.moeda || payload.currency || 'BRL');
+  const timestampValue = pickValue_(payload, ['timestamp', 'dataHora', 'created_at', 'createdAt']);
+  const timestamp = timestampValue ? new Date(timestampValue) : now;
+  const originalValue = parseNumber_(pickValue_(payload, ['valor', 'value', 'event_value', 'eventValue', 'amount', 'preco', 'price']) || 0);
+  const originalCurrency = normalizeCurrency_(pickValue_(payload, ['moeda', 'currency', 'coin']) || 'BRL');
   const exchangeRate = getCurrencyRateToBrl_(originalCurrency);
   const valueInBrl = roundCurrency_(originalValue * exchangeRate);
-  const attendant = payload.atendente || payload.attendant || 'Sem atendente';
+  const attendant = pickValue_(payload, ['atendente', 'attendant', 'vendedor', 'seller', 'responsavel', 'responsible']) || 'Sem atendente';
   return [
     Utilities.getUuid(),
     timestamp.toISOString(),
     Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
     Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'HH:mm'),
-    payload.pagador || payload.payer || payload.contactName || 'Sem pagador',
-    payload.telefone || payload.phone || '',
+    pickValue_(payload, ['pagador', 'payer', 'contactName', 'contact_name', 'nome', 'name', 'customer_name', 'cliente']) || 'Sem pagador',
+    pickValue_(payload, ['telefone', 'phone', 'telephone', 'whatsapp', 'celular', 'mobile']) || '',
     'BRL',
     valueInBrl,
     attendant,
-    payload.origem || payload.source || 'Zapdata',
+    pickValue_(payload, ['origem', 'source']) || 'Zapdata',
     originalCurrency,
     originalValue,
     exchangeRate
@@ -97,7 +103,7 @@ function rowToObject_(row) {
   }, {});
 }
 
-function readMetaInsights_(from, to) {
+function readMetaInsights_(from, to, includeActions) {
   const properties = PropertiesService.getScriptProperties();
   const token = properties.getProperty('META_ACCESS_TOKEN');
   const account = properties.getProperty('META_AD_ACCOUNT_ID');
@@ -123,21 +129,40 @@ function readMetaInsights_(from, to) {
     const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     const data = JSON.parse(response.getContentText());
     const first = data.data && data.data[0] ? data.data[0] : {};
-    return {
+    const result = {
       spend: parseNumber_(first.spend || 0),
       leads: countLeads_(first.actions || [])
     };
+    if (includeActions) result.actions = first.actions || [];
+    return result;
   } catch (error) {
     return { spend: 0, leads: 0, error: String(error) };
   }
 }
 
 function countLeads_(actions) {
+  const matchers = getLeadActionMatchers_();
   return actions.reduce((total, action) => {
     const type = String(action.action_type || '').toLowerCase();
-    if (type.indexOf('lead') === -1) return total;
+    const shouldCount = matchers.some((matcher) => type === matcher);
+    if (!shouldCount) return total;
     return total + parseNumber_(action.value || 0);
   }, 0);
+}
+
+function getLeadActionMatchers_() {
+  const raw = PropertiesService.getScriptProperties().getProperty('LEAD_ACTION_TYPES_JSON');
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed.map((item) => String(item).toLowerCase().trim()).filter(Boolean);
+      }
+    } catch (error) {
+      return raw.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
+    }
+  }
+  return ['lead'];
 }
 
 function pruneOldRows_(sheet) {
@@ -213,6 +238,64 @@ function parseNumber_(value) {
   const normalized = text.indexOf(',') > -1 ? text.replace(/\./g, '').replace(',', '.') : text;
   const parsed = Number(normalized);
   return isNaN(parsed) ? 0 : parsed;
+}
+
+function parseFormPayload_(contents) {
+  const object = {};
+  String(contents || '').split('&').forEach((pair) => {
+    const parts = pair.split('=');
+    if (!parts[0]) return;
+    const key = decodeURIComponent(parts[0].replace(/\+/g, ' '));
+    const value = decodeURIComponent((parts.slice(1).join('=') || '').replace(/\+/g, ' '));
+    object[key] = value;
+  });
+  return flattenPayload_(object);
+}
+
+function flattenPayload_(payload) {
+  const flat = {};
+  flattenInto_(flat, payload, '');
+  return flat;
+}
+
+function flattenInto_(flat, value, prefix) {
+  if (value == null) return;
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => flattenInto_(flat, item, prefix ? prefix + '.' + index : String(index)));
+    return;
+  }
+  if (typeof value === 'object') {
+    Object.keys(value).forEach((key) => {
+      const nextPrefix = prefix ? prefix + '.' + key : key;
+      flattenInto_(flat, value[key], nextPrefix);
+      if (typeof value[key] !== 'object' || value[key] == null) flat[key] = value[key];
+    });
+    return;
+  }
+  flat[prefix] = value;
+}
+
+function pickValue_(object, keys) {
+  const normalized = {};
+  Object.keys(object || {}).forEach((key) => {
+    normalized[normalizeKey_(key)] = object[key];
+  });
+  for (let i = 0; i < keys.length; i++) {
+    const wanted = normalizeKey_(keys[i]);
+    if (normalized[wanted] !== undefined && normalized[wanted] !== '') return normalized[wanted];
+  }
+  return '';
+}
+
+function normalizeKey_(key) {
+  return String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function mergeObjects_(first, second) {
+  const merged = {};
+  Object.keys(first || {}).forEach((key) => merged[key] = first[key]);
+  Object.keys(second || {}).forEach((key) => merged[key] = second[key]);
+  return merged;
 }
 
 function outputJson_(payload, callback) {

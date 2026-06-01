@@ -168,8 +168,7 @@ button {
 
 .period-button,
 .pager button,
-.notification-actions button,
-.test-notification {
+.notification-actions button {
   min-height: 44px;
   border: 1px solid rgba(158, 237, 109, 0.22);
   border-radius: var(--radius);
@@ -403,6 +402,10 @@ th:last-child {
   text-align: right;
 }
 
+.payer-cell small {
+  display: none;
+}
+
 .transactions-head {
   margin-bottom: 18px;
 }
@@ -472,36 +475,27 @@ th:last-child {
   background: linear-gradient(90deg, #9eed6d, #d4ff90);
 }
 
-.summary-card {
-  margin-top: 16px;
-  padding: 18px 16px;
-  border: 1px solid rgba(158, 237, 109, 0.22);
-  border-radius: var(--radius);
-  background: var(--panel-soft);
-}
-
-.summary-card strong {
-  display: block;
-  margin-bottom: 8px;
-}
-
-.summary-card p {
-  color: #d7ead5;
-  line-height: 1.55;
-}
-
 .notifications-panel {
   max-width: 720px;
 }
 
 .notification-actions {
-  margin-top: 18px;
+  margin-top: 0;
 }
 
-.notification-actions button,
-.test-notification {
-  padding: 0 16px;
+.notification-actions button {
+  min-width: 136px;
+  padding: 0 18px;
   font-weight: 700;
+  background: #101a13;
+  color: var(--text);
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.notification-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #152417;
 }
 
 .notification-list {
@@ -531,9 +525,9 @@ th:last-child {
 
 .switch {
   position: relative;
-  width: 48px;
-  height: 29px;
-  flex: 0 0 48px;
+  width: 52px;
+  height: 30px;
+  flex: 0 0 52px;
 }
 
 .switch input {
@@ -545,35 +539,34 @@ th:last-child {
 .slider {
   position: absolute;
   inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 999px;
-  background: #2c3e2d;
-  transition: background 160ms ease;
+  background: #263528;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: background 180ms ease, border-color 180ms ease;
 }
 
 .slider::after {
   content: "";
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 21px;
-  height: 21px;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: #c7d2c2;
-  transition: transform 160ms ease;
+  background: #f4fff2;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.34);
+  transition: transform 180ms ease, background 180ms ease;
 }
 
 .switch input:checked + .slider {
   background: var(--accent);
+  border-color: var(--accent);
 }
 
 .switch input:checked + .slider::after {
-  transform: translateX(19px);
+  transform: translateX(22px);
   background: #071009;
-}
-
-.test-notification {
-  width: 100%;
-  margin-top: 24px;
 }
 
 .bottom-nav {
