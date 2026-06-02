@@ -1,5 +1,7 @@
 const SHEET_NAME = 'Transações';
-const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl'];
+const ATTENDANTS_SHEET_NAME = 'Atendentes';
+const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
+const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'meta_semanal_valor', 'meta_premio', 'meta_ativa', 'salario_fixo_mensal', 'meta_titulo'];
 
 function doGet(e) {
   const params = e.parameter || {};
@@ -14,6 +16,9 @@ function doGet(e) {
   }
   if (params.action === 'metaActions') {
     return outputJson_(readMetaInsights_(params.from, params.to, true), params.callback);
+  }
+  if (params.action === 'attendant') {
+    return outputJson_(readAttendantData_(params.slug, params.from, params.to), params.callback);
   }
   return outputJson_({ ok: true, app: 'Home Studio BI' }, params.callback);
 }
@@ -53,6 +58,8 @@ function normalizeWebhook_(payload) {
   const exchangeRate = getCurrencyRateToBrl_(originalCurrency);
   const valueInBrl = roundCurrency_(originalValue * exchangeRate);
   const attendant = pickValue_(payload, ['atendente', 'attendant', 'vendedor', 'seller', 'responsavel', 'responsible']) || 'Sem atendente';
+  const attendantConfig = getAttendantConfigByName_(attendant);
+  const commissionPercent = attendantConfig ? attendantConfig.comissao_percentual : '';
   return [
     Utilities.getUuid(),
     timestamp.toISOString(),
@@ -66,7 +73,8 @@ function normalizeWebhook_(payload) {
     pickValue_(payload, ['origem', 'source']) || 'Zapdata',
     originalCurrency,
     originalValue,
-    exchangeRate
+    exchangeRate,
+    commissionPercent
   ];
 }
 
@@ -81,6 +89,72 @@ function getTransactionsSheet_() {
     sheet.setFrozenRows(1);
   }
   return sheet;
+}
+
+function getAttendantsSheet_() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName(ATTENDANTS_SHEET_NAME);
+  if (!sheet) sheet = spreadsheet.insertSheet(ATTENDANTS_SHEET_NAME);
+  const current = sheet.getRange(1, 1, 1, ATTENDANT_HEADERS.length).getValues()[0];
+  const missingHeaders = ATTENDANT_HEADERS.some((header, index) => current[index] !== header);
+  if (missingHeaders) {
+    sheet.getRange(1, 1, 1, ATTENDANT_HEADERS.length).setValues([ATTENDANT_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  if (sheet.getLastRow() < 2) {
+    sheet.appendRow(['k9v2m7q4', 'Sheila', 10, 1000, 'Prêmio da semana', true, 1000, 'Meta semanal']);
+  }
+  return sheet;
+}
+
+function readAttendantConfigs_() {
+  const sheet = getAttendantsSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  return sheet.getRange(2, 1, lastRow - 1, ATTENDANT_HEADERS.length)
+    .getValues()
+    .map((row) => ATTENDANT_HEADERS.reduce((object, header, index) => {
+      object[header] = normalizeAttendantCell_(header, row[index]);
+      return object;
+    }, {}))
+    .filter((item) => item.slug && item.nome);
+}
+
+function normalizeAttendantCell_(header, value) {
+  if (header === 'comissao_percentual' || header === 'meta_semanal_valor' || header === 'salario_fixo_mensal') {
+    return parseNumber_(value);
+  }
+  if (header === 'meta_ativa') {
+    if (typeof value === 'boolean') return value;
+    return ['true', 'sim', 's', '1', 'ativo', 'ativa'].indexOf(String(value || '').toLowerCase().trim()) > -1;
+  }
+  return value;
+}
+
+function getAttendantConfigByName_(name) {
+  const normalizedName = normalizePersonName_(name);
+  return readAttendantConfigs_().find((item) => normalizePersonName_(item.nome) === normalizedName) || null;
+}
+
+function getAttendantConfigBySlug_(slug) {
+  const normalizedSlug = String(slug || '').trim();
+  return readAttendantConfigs_().find((item) => String(item.slug || '').trim() === normalizedSlug) || null;
+}
+
+function readAttendantData_(slug, from, to) {
+  const config = getAttendantConfigBySlug_(slug);
+  if (!config) return { ok: false, error: 'Atendente não encontrada.', attendant: null, transactions: [] };
+  const transactions = readTransactions_(from, to).filter((item) => normalizePersonName_(item.atendente) === normalizePersonName_(config.nome));
+  return {
+    ok: true,
+    attendant: config,
+    transactions: transactions,
+    serverTime: new Date().toISOString()
+  };
+}
+
+function normalizePersonName_(value) {
+  return String(value || '').trim().toLowerCase();
 }
 
 function readTransactions_(from, to) {
@@ -143,7 +217,7 @@ function normalizeCell_(header, value) {
     const match = String(value).match(/(\d{1,2}):(\d{2})/);
     if (match) return String(match[1]).padStart(2, '0') + ':' + match[2];
   }
-  if ((header === 'valor' || header === 'valor_original' || header === 'cotacao_brl') && value !== '') {
+  if ((header === 'valor' || header === 'valor_original' || header === 'cotacao_brl' || header === 'comissao_percentual') && value !== '') {
     return parseNumber_(value);
   }
   return value;
