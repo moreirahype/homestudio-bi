@@ -132,6 +132,10 @@
       if (granted) sendNotification("Resumo das Campanhas!", buildNotificationText());
     });
 
+    document.addEventListener("pointerdown", (event) => {
+      if (!els.tooltip.hidden && !event.target.closest(".chart-point")) hideTooltip();
+    });
+
     window.addEventListener("resize", debounce(() => {
       if (state.metrics) renderSalesChart();
     }, 120));
@@ -756,15 +760,16 @@
   }
 
   function sendNotification(title, body) {
+    const iconUrl = new URL("../assets/icon-192.png", location.href).href;
     if (navigator.serviceWorker && navigator.serviceWorker.ready) {
       navigator.serviceWorker.ready.then((registration) => registration.showNotification(title, {
         body,
-        icon: "assets/icon-192.png",
-        badge: "assets/icon-192.png"
+        icon: iconUrl,
+        badge: iconUrl
       }));
       return;
     }
-    new Notification(title, { body, icon: "assets/icon-192.png" });
+    new Notification(title, { body, icon: iconUrl });
   }
 
   function buildNotificationText() {
@@ -785,7 +790,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js?v=21").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=22").then((registration) => registration.update()).catch(console.error);
     }
   }
 
