@@ -1,0 +1,758 @@
+﻿(function () {
+  "use strict";
+
+  const baseConfig = Object.assign(
+    { apiUrl: "", rowsPerPage: 10, autoRefreshMinutes: 15 },
+    window.HSBI_CONFIG || {}
+  );
+  const pageConfig = Object.assign({ slug: "", name: "" }, window.HSBI_ATTENDANT_CONFIG || {});
+
+  const state = {
+    page: "dashboard",
+    period: "today",
+    appliedPeriod: "today",
+    customRange: null,
+    transactions: [],
+    displayTransactions: [],
+    filteredSales: [],
+    attendant: {
+      nome: pageConfig.name,
+      comissao_percentual: 0,
+      meta_semanal_valor: 0,
+      meta_premio: "",
+      meta_titulo: "Meta semanal",
+      meta_ativa: false,
+      salario_fixo_mensal: 1000
+    },
+    pageIndex: 1,
+    lastUpdated: null,
+    seenSaleIds: new Set(),
+    hasInitializedSales: false,
+    notificationsEnabled: loadNotificationPref()
+  };
+
+  const els = {
+    pages: document.querySelectorAll(".page"),
+    navItems: document.querySelectorAll(".nav-item, .bottom-item"),
+    periodButtons: document.querySelectorAll(".period-button"),
+    customFields: document.getElementById("customFields"),
+    startDate: document.getElementById("startDate"),
+    endDate: document.getElementById("endDate"),
+    refreshButton: document.getElementById("refreshButton"),
+    syncStatus: document.getElementById("syncStatus"),
+    desktopSyncStatus: document.getElementById("desktopSyncStatus"),
+    search: document.getElementById("transactionSearch"),
+    prevPage: document.getElementById("prevPage"),
+    nextPage: document.getElementById("nextPage"),
+    pageInfo: document.getElementById("pageInfo"),
+    chart: document.getElementById("salesChart"),
+    tooltip: document.getElementById("chartTooltip"),
+    saleNotifications: document.getElementById("saleNotifications"),
+    testNotification: document.getElementById("testNotification")
+  };
+
+  document.addEventListener("DOMContentLoaded", init);
+
+  function init() {
+    setDefaultDates();
+    bindEvents();
+    setPage(location.hash.replace("#", "") || "dashboard");
+    els.saleNotifications.checked = state.notificationsEnabled;
+    registerServiceWorker();
+    refreshData();
+    window.setInterval(() => refreshData(), baseConfig.autoRefreshMinutes * 60 * 1000);
+    window.setInterval(pollSalesNotifications, 60 * 1000);
+  }
+
+  function bindEvents() {
+    els.navItems.forEach((button) => button.addEventListener("click", () => setPage(button.dataset.page)));
+    els.periodButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        state.period = button.dataset.period;
+        state.pageIndex = 1;
+        if (state.period !== "custom") state.appliedPeriod = state.period;
+        render();
+      });
+    });
+    [els.startDate, els.endDate].forEach((input) => {
+      input.addEventListener("change", () => {
+        state.pageIndex = 1;
+        render();
+      });
+    });
+    els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true }));
+    els.search.addEventListener("input", () => {
+      state.pageIndex = 1;
+      renderTransactions();
+    });
+    els.prevPage.addEventListener("click", () => {
+      state.pageIndex = Math.max(1, state.pageIndex - 1);
+      renderTransactions();
+    });
+    els.nextPage.addEventListener("click", () => {
+      state.pageIndex = Math.min(getTotalPages(), state.pageIndex + 1);
+      renderTransactions();
+    });
+    els.saleNotifications.addEventListener("change", async () => {
+      if (els.saleNotifications.checked) {
+        const granted = await ensureNotificationPermission();
+        if (!granted) {
+          els.saleNotifications.checked = false;
+          return;
+        }
+      }
+      state.notificationsEnabled = els.saleNotifications.checked;
+      saveNotificationPref();
+    });
+    els.testNotification.addEventListener("click", async () => {
+      const granted = await ensureNotificationPermission();
+      if (granted) sendNotification();
+    });
+    window.addEventListener("resize", debounce(() => renderSalesChart(), 120));
+    window.addEventListener("hashchange", () => setPage(location.hash.replace("#", "") || "dashboard"));
+  }
+
+  async function refreshData(options = {}) {
+    if (options.applySelection) {
+      state.pageIndex = 1;
+      state.appliedPeriod = state.period;
+      if (state.period === "custom") state.customRange = readCustomInputRange();
+    }
+    setSyncText("Atualizando");
+    els.refreshButton.disabled = true;
+    try {
+      const payload = await fetchAttendantPayload(getPreloadRange());
+      applyPayload(payload, true);
+      if (state.appliedPeriod === "custom") await ensurePeriodData();
+      state.lastUpdated = new Date();
+      render();
+      setSyncText(`Atualizado ${formatTime(state.lastUpdated)}`);
+    } catch (error) {
+      console.error(error);
+      applyPayload(buildDemoPayload(), true);
+      state.lastUpdated = new Date();
+      render();
+      setSyncText("Dados locais");
+    } finally {
+      els.refreshButton.disabled = false;
+    }
+  }
+
+  async function ensurePeriodData() {
+    if (state.appliedPeriod !== "custom") return;
+    const payload = await fetchAttendantPayload(state.customRange || readCustomInputRange());
+    applyPayload(payload, false);
+  }
+
+  function applyPayload(payload, replace) {
+    if (payload.attendant) state.attendant = Object.assign({}, state.attendant, payload.attendant);
+    const sales = (payload.transactions || []).map(normalizeSale);
+    if (replace) {
+      state.transactions = sales;
+    } else {
+      const map = new Map(state.transactions.map((item) => [item.id, item]));
+      sales.forEach((item) => map.set(item.id, item));
+      state.transactions = Array.from(map.values());
+    }
+    trackNewSales(sales);
+  }
+
+  async function fetchAttendantPayload(range) {
+    if (!baseConfig.apiUrl) return buildDemoPayload();
+    const url = new URL(baseConfig.apiUrl);
+    url.searchParams.set("action", "attendant");
+    url.searchParams.set("slug", pageConfig.slug);
+    url.searchParams.set("from", toIsoDate(range.start));
+    url.searchParams.set("to", toIsoDate(range.end));
+    try {
+      const response = await fetch(url.toString(), { cache: "no-store" });
+      if (!response.ok) throw new Error(`API respondeu ${response.status}`);
+      return response.json();
+    } catch (error) {
+      return fetchJsonp(url);
+    }
+  }
+
+  function fetchJsonp(url) {
+    return new Promise((resolve, reject) => {
+      const callback = `hsbiAttendantJsonp${Date.now()}${Math.floor(Math.random() * 1000)}`;
+      const script = document.createElement("script");
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new Error("Tempo esgotado ao buscar dados"));
+      }, 15000);
+      function cleanup() {
+        window.clearTimeout(timeout);
+        script.remove();
+        delete window[callback];
+      }
+      window[callback] = (payload) => {
+        cleanup();
+        resolve(payload);
+      };
+      url.searchParams.set("callback", callback);
+      script.onerror = () => {
+        cleanup();
+        reject(new Error("Falha ao carregar dados"));
+      };
+      script.src = url.toString();
+      document.head.append(script);
+    });
+  }
+
+  async function pollSalesNotifications() {
+    if (!state.notificationsEnabled) return;
+    try {
+      const payload = await fetchAttendantPayload(getDateRange("today"));
+      applyPayload(payload, false);
+      render();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function trackNewSales(sales) {
+    if (!state.hasInitializedSales) {
+      sales.forEach((sale) => state.seenSaleIds.add(sale.id));
+      state.hasInitializedSales = true;
+      return;
+    }
+    sales.forEach((sale) => {
+      if (!state.seenSaleIds.has(sale.id)) {
+        state.seenSaleIds.add(sale.id);
+        if (state.notificationsEnabled) sendNotification();
+      }
+    });
+  }
+
+  function normalizeSale(item) {
+    const data = normalizeDateValue(item.data);
+    const hora = normalizeTimeValue(item.hora);
+    const timestamp = parseLocalDateTime(data, hora) || parseDate(item.timestamp || "");
+    const gross = parseMoneyValue(item.valor || 0);
+    const commissionRate = parseMoneyValue(item.comissao_percentual || state.attendant.comissao_percentual || 0);
+    return {
+      id: item.id || `${timestamp.getTime()}-${item.pagador || ""}-${gross}`,
+      type: "sale",
+      timestamp,
+      data: data || toIsoDate(timestamp),
+      hora: hora || formatTime(timestamp),
+      origem: "Venda",
+      descricao: item.pagador || "Sem pagador",
+      gross,
+      commissionRate,
+      value: gross * (commissionRate / 100)
+    };
+  }
+
+  function render() {
+    renderPeriodControls();
+    state.filteredSales = getFilteredSales();
+    state.displayTransactions = buildDisplayTransactions();
+    renderGoal();
+    renderMetrics();
+    renderSalesChart();
+    renderTransactions();
+  }
+
+  function renderPeriodControls() {
+    els.periodButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.period === state.period));
+    els.customFields.classList.toggle("is-visible", state.period === "custom");
+    document.getElementById("salesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
+  }
+
+  function renderGoal() {
+    const panel = document.getElementById("goalPanel");
+    const target = Number(state.attendant.meta_semanal_valor || 0);
+    const active = Boolean(state.attendant.meta_ativa) && target > 0;
+    panel.classList.toggle("is-hidden", !active);
+    if (!active) return;
+    const week = getWeekRange(new Date());
+    const current = state.transactions
+      .filter((item) => item.timestamp >= startOfDay(week.start) && item.timestamp <= endOfDay(week.end))
+      .reduce((total, item) => total + item.value, 0);
+    const progress = target > 0 ? current / target : 0;
+    const remaining = Math.max(0, target - current);
+    panel.style.setProperty("--goal-progress", `${Math.min(100, progress * 100)}%`);
+    document.getElementById("goalFill").style.setProperty("--goal-progress", `${Math.min(100, progress * 100)}%`);
+    document.getElementById("goalTitle").textContent = state.attendant.meta_titulo || "Meta semanal";
+    document.getElementById("goalPrize").textContent = state.attendant.meta_premio || "Prêmio da semana";
+    document.getElementById("goalPercent").textContent = percent(progress);
+    document.getElementById("goalCurrent").textContent = money(current);
+    document.getElementById("goalTarget").textContent = money(target);
+    document.getElementById("goalRemaining").textContent = progress >= 1
+      ? "Meta batida! Avise no grupo para receber o prêmio."
+      : `Faltam ${money(remaining)} para bater a meta.`;
+    panel.classList.toggle("is-complete", progress >= 1);
+  }
+
+  function renderMetrics() {
+    const sales = state.filteredSales;
+    const fixed = buildFixedCredits(getDateRange()).reduce((total, item) => total + item.value, 0);
+    const commission = sales.reduce((total, item) => total + item.value, 0);
+    setText("metricTotalIncome", money(commission + fixed));
+    setText("metricCommission", money(commission));
+    setText("metricFixed", money(fixed));
+    setText("metricSales", integer(sales.length));
+    setText("metricRate", percent(Number(state.attendant.comissao_percentual || 0) / 100));
+  }
+
+  function renderSalesChart() {
+    const grouped = buildSeries();
+    const chartBox = els.chart.parentElement.getBoundingClientRect();
+    const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
+    const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
+    const left = 34;
+    const right = 10;
+    const top = 12;
+    const bottom = 32;
+    const canvasWidth = 980;
+    const canvasHeight = Math.max(300, Math.round(canvasWidth * (chartBox.height / Math.max(chartBox.width, 1))));
+    els.chart.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
+    const width = canvasWidth - left - right;
+    const height = canvasHeight - top - bottom;
+    const step = grouped.length > 1 ? width / (grouped.length - 1) : width;
+    const points = grouped.map((point, index) => {
+      const x = left + index * step;
+      const y = top + height - (point.sales / maxSales) * height;
+      return Object.assign({ x, y }, point);
+    });
+    const path = makeSmoothPath(points);
+    const areaPath = `${path} L ${points[points.length - 1].x},${top + height} L ${points[0].x},${top + height} Z`;
+    const gridYTop = top;
+    const gridYMid = top + height / 2;
+    const gridYBottom = top + height;
+    document.getElementById("salesChartTitle").textContent = state.period === "today" || state.period === "yesterday" ? "Vendas por horário" : "Vendas por dia";
+    els.chart.innerHTML = `
+      <defs>
+        <linearGradient id="salesAreaGradientAttendant" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#9fe870" stop-opacity="0.16"></stop>
+          <stop offset="100%" stop-color="#9fe870" stop-opacity="0"></stop>
+        </linearGradient>
+      </defs>
+      <rect x="${left}" y="${top}" width="${width}" height="${height}" rx="4" class="chart-plot-bg"></rect>
+      <line x1="${left}" y1="${gridYTop}" x2="${canvasWidth - right}" y2="${gridYTop}" class="grid-line"></line>
+      <line x1="${left}" y1="${gridYMid}" x2="${canvasWidth - right}" y2="${gridYMid}" class="grid-line is-soft"></line>
+      <line x1="${left}" y1="${gridYBottom}" x2="${canvasWidth - right}" y2="${gridYBottom}" class="axis-line"></line>
+      <text x="${left - 18}" y="${gridYTop + 5}" class="axis-text">${maxSales}</text>
+      <text x="${left - 18}" y="${gridYMid + 5}" class="axis-text">${Math.round(maxSales / 2)}</text>
+      <text x="${left - 18}" y="${gridYBottom + 5}" class="axis-text">0</text>
+      <path d="${areaPath}" class="sales-area"></path>
+      <path d="${path}" class="sales-line"></path>
+      ${points.map((point) => `
+        <g class="chart-point" data-index="${point.index}">
+          <circle class="point-hit" cx="${point.x}" cy="${point.y}" r="13"></circle>
+          <circle class="point-dot" cx="${point.x}" cy="${point.y}" r="${point.sales || point.revenue ? 4.8 : 3.8}"></circle>
+          <text x="${point.x}" y="${canvasHeight - 12}" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
+        </g>`).join("")}
+    `;
+    const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    style.textContent = `
+      .chart-plot-bg{fill:rgba(255,255,255,.012)}
+      .grid-line,.axis-line{stroke:rgba(159,232,112,.18);stroke-width:1}
+      .grid-line.is-soft{stroke:rgba(159,232,112,.1)}
+      .sales-area{fill:url(#salesAreaGradientAttendant)}
+      .sales-line{fill:none;stroke:#9fe870;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px rgba(159,232,112,.16))}
+      .chart-point,.chart-point *{pointer-events:all;cursor:pointer;outline:none}
+      .point-hit{fill:transparent;stroke:transparent}
+      .point-dot{fill:#1b241a;stroke:#9fe870;stroke-width:2.5}
+      .chart-point:hover .point-dot{fill:#9fe870;stroke:#071009;stroke-width:2.2}
+      .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
+      .axis-text{text-anchor:end}
+      .x-label{text-anchor:middle}
+    `;
+    els.chart.prepend(style);
+    els.chart.querySelectorAll(".chart-point").forEach((node) => {
+      const point = points[Number(node.dataset.index)];
+      node.addEventListener("mouseenter", (event) => showTooltip(event, point));
+      node.addEventListener("mousemove", (event) => showTooltip(event, point));
+      node.addEventListener("mouseleave", hideTooltip);
+    });
+  }
+
+  function renderTransactions() {
+    const query = els.search.value.trim().toLowerCase();
+    const rows = state.displayTransactions
+      .filter((item) => `${item.origem} ${item.descricao} ${item.value} ${money(item.value)}`.toLowerCase().includes(query))
+      .sort((a, b) => b.timestamp - a.timestamp);
+    const tbody = document.getElementById("transactionsBody");
+    const totalPages = Math.max(1, Math.ceil(rows.length / baseConfig.rowsPerPage));
+    state.pageIndex = Math.min(state.pageIndex, totalPages);
+    const visible = rows.slice((state.pageIndex - 1) * baseConfig.rowsPerPage, state.pageIndex * baseConfig.rowsPerPage);
+    tbody.innerHTML = "";
+    if (!visible.length) {
+      tbody.innerHTML = `<tr><td colspan="5">Nenhuma transação encontrada.</td></tr>`;
+    } else {
+      visible.forEach((item) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${formatIsoDateBr(item.data)}</td>
+          <td>${escapeHtml(item.hora)}</td>
+          <td>${escapeHtml(item.origem)}</td>
+          <td>${escapeHtml(item.descricao)}</td>
+          <td>${money(item.value)}</td>
+        `;
+        tbody.append(tr);
+      });
+    }
+    els.pageInfo.textContent = `Página ${state.pageIndex} de ${totalPages}`;
+    els.prevPage.disabled = state.pageIndex <= 1;
+    els.nextPage.disabled = state.pageIndex >= totalPages;
+  }
+
+  function buildDisplayTransactions() {
+    return state.filteredSales.concat(buildFixedCredits(getDateRange()));
+  }
+
+  function buildFixedCredits(range) {
+    const salary = Number(state.attendant.salario_fixo_mensal || 1000);
+    const daily = Math.round((salary / 30) * 100) / 100;
+    const today = endOfDay(new Date());
+    const end = endOfDay(range.end) > today ? today : endOfDay(range.end);
+    const credits = [];
+    for (let cursor = startOfDay(range.start); cursor <= end; cursor = addDays(cursor, 1)) {
+      const timestamp = new Date(cursor);
+      timestamp.setHours(0, 0, 0, 0);
+      credits.push({
+        id: `fixed-${toIsoDate(timestamp)}`,
+        type: "fixed",
+        timestamp,
+        data: toIsoDate(timestamp),
+        hora: "00:00",
+        origem: "Fixo",
+        descricao: "Lucas Moreira",
+        value: daily,
+        gross: 0,
+        commissionRate: 0
+      });
+    }
+    return credits;
+  }
+
+  function getFilteredSales() {
+    const range = getDateRange();
+    return state.transactions
+      .filter((item) => item.timestamp >= startOfDay(range.start) && item.timestamp <= endOfDay(range.end))
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  function buildSeries() {
+    const range = getDateRange();
+    const byHour = state.period === "today" || state.period === "yesterday";
+    const labels = byHour ? buildHourLabels() : buildDayLabels(range.start, range.end);
+    return labels.map((label, index) => {
+      const sales = state.filteredSales.filter((item) => {
+        if (byHour) return item.timestamp.getHours() === index;
+        return toIsoDate(item.timestamp) === label.key;
+      });
+      return {
+        index,
+        label: label.short,
+        fullLabel: label.full,
+        sales: sales.length,
+        revenue: sum(sales.map((item) => item.value))
+      };
+    });
+  }
+
+  function setPage(page) {
+    if (!["dashboard", "transactions", "notifications"].includes(page)) return;
+    state.page = page;
+    els.pages.forEach((section) => section.classList.toggle("is-active", section.dataset.page === page));
+    els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.page === page));
+    document.body.dataset.currentPage = page;
+    if (location.hash !== `#${page}`) history.replaceState(null, "", `#${page}`);
+    if (page === "dashboard") requestAnimationFrame(renderSalesChart);
+  }
+
+  function getTotalPages() {
+    return Math.max(1, Math.ceil(state.displayTransactions.length / baseConfig.rowsPerPage));
+  }
+
+  function sendNotification() {
+    const title = "Venda Realizada! 💰";
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready.then((registration) => registration.showNotification(title, {
+        icon: "../assets/icon-192.png",
+        badge: "../assets/icon-192.png"
+      }));
+      return;
+    }
+    new Notification(title, { icon: "../assets/icon-192.png" });
+  }
+
+  async function ensureNotificationPermission() {
+    if (!("Notification" in window)) {
+      alert("Este navegador não suporta notificações.");
+      return false;
+    }
+    if (Notification.permission === "granted") return true;
+    if (Notification.permission === "denied") {
+      alert("As notificações estão bloqueadas nas configurações do navegador.");
+      return false;
+    }
+    return (await Notification.requestPermission()) === "granted";
+  }
+
+  function registerServiceWorker() {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("../sw.js?v=11").then((registration) => registration.update()).catch(console.error);
+    }
+  }
+
+  function buildDemoPayload() {
+    const now = new Date();
+    const yesterday = addDays(now, -1);
+    return {
+      ok: true,
+      attendant: {
+        slug: pageConfig.slug,
+        nome: "Sheila",
+        comissao_percentual: 10,
+        meta_semanal_valor: 1000,
+        meta_premio: "Jantar especial",
+        meta_titulo: "Meta semanal",
+        meta_ativa: true,
+        salario_fixo_mensal: 1000
+      },
+      transactions: [
+        makeDemoSale(now, "Elaine", 497),
+        makeDemoSale(now, "Fran Santos", 197),
+        makeDemoSale(yesterday, "Mariana", 297)
+      ]
+    };
+  }
+
+  function makeDemoSale(date, payer, value) {
+    const copy = new Date(date);
+    copy.setHours(Math.max(8, copy.getHours() - 2), 30, 0, 0);
+    return {
+      id: `demo-${copy.getTime()}-${payer}`,
+      timestamp: copy.toISOString(),
+      data: toIsoDate(copy),
+      hora: formatTime(copy),
+      pagador: payer,
+      valor: value,
+      atendente: "Sheila",
+      comissao_percentual: 10
+    };
+  }
+
+  function getPreloadRange() {
+    const today = new Date();
+    return { start: new Date(today.getFullYear(), today.getMonth() - 1, 1), end: today };
+  }
+
+  function getDateRange(periodName) {
+    const period = periodName || state.appliedPeriod;
+    const today = new Date();
+    if (period === "yesterday") {
+      const y = addDays(today, -1);
+      return { start: y, end: y };
+    }
+    if (period === "last7") return { start: addDays(today, -7), end: addDays(today, -1) };
+    if (period === "month") return { start: new Date(today.getFullYear(), today.getMonth(), 1), end: today };
+    if (period === "lastMonth") return { start: new Date(today.getFullYear(), today.getMonth() - 1, 1), end: new Date(today.getFullYear(), today.getMonth(), 0) };
+    if (period === "custom") return periodName ? readCustomInputRange() : state.customRange || readCustomInputRange();
+    return { start: today, end: today };
+  }
+
+  function getWeekRange(date) {
+    const start = startOfDay(date);
+    const day = start.getDay() || 7;
+    start.setDate(start.getDate() - day + 1);
+    return { start, end: addDays(start, 6) };
+  }
+
+  function readCustomInputRange() {
+    return { start: parseLocalDate(els.startDate.value), end: parseLocalDate(els.endDate.value) };
+  }
+
+  function getPeriodName(periodName) {
+    return { today: "Hoje", yesterday: "Ontem", last7: "Últimos 7 dias", month: "Este mês", lastMonth: "Mês passado", custom: "Personalizado" }[periodName || state.appliedPeriod];
+  }
+
+  function setDefaultDates() {
+    const today = new Date();
+    els.endDate.value = toIsoDate(today);
+    els.startDate.value = toIsoDate(addDays(today, -6));
+  }
+
+  function buildHourLabels() {
+    return Array.from({ length: 24 }, (_, hour) => ({ key: String(hour), short: String(hour).padStart(2, "0"), full: `${String(hour).padStart(2, "0")}h` }));
+  }
+
+  function buildDayLabels(start, end) {
+    const labels = [];
+    for (let cursor = startOfDay(start); cursor <= endOfDay(end); cursor = addDays(cursor, 1)) {
+      labels.push({
+        key: toIsoDate(cursor),
+        short: `${String(cursor.getDate()).padStart(2, "0")}/${String(cursor.getMonth() + 1).padStart(2, "0")}`,
+        full: cursor.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).replace(".", "").toUpperCase()
+      });
+    }
+    return labels;
+  }
+
+  function makeSmoothPath(points) {
+    if (points.length < 2) return points.map((point) => `M${point.x},${point.y}`).join(" ");
+    const commands = [`M${points[0].x},${points[0].y}`];
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1];
+      const current = points[index];
+      const controlDistance = (current.x - previous.x) * 0.42;
+      commands.push(`C${previous.x + controlDistance},${previous.y} ${current.x - controlDistance},${current.y} ${current.x},${current.y}`);
+    }
+    return commands.join(" ");
+  }
+
+  function shouldShowAxisLabel(index, total) {
+    if (window.innerWidth <= 720) return total <= 12 || index % 2 === 0;
+    return total <= 16 || index % 2 === 0;
+  }
+
+  function showTooltip(event, point) {
+    const rect = event.currentTarget.ownerSVGElement.getBoundingClientRect();
+    const wrap = els.chart.parentElement.getBoundingClientRect();
+    const viewBox = event.currentTarget.ownerSVGElement.viewBox.baseVal;
+    const pointX = ((point.x / viewBox.width) * rect.width) + rect.left - wrap.left;
+    const pointY = ((point.y / viewBox.height) * rect.height) + rect.top - wrap.top;
+    const x = event.clientX ? event.clientX - wrap.left : pointX;
+    const y = event.clientY ? event.clientY - wrap.top : pointY;
+    els.tooltip.hidden = false;
+    els.tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
+    els.tooltip.style.top = `${Math.max(52, y - 8)}px`;
+    els.tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Comissão: ${money(point.revenue)}`;
+  }
+
+  function hideTooltip() {
+    els.tooltip.hidden = true;
+  }
+
+  function parseDate(value) {
+    if (value instanceof Date) return value;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+
+  function parseLocalDateTime(dateValue, timeValue) {
+    if (!dateValue) return null;
+    const [year, month, day] = String(dateValue).slice(0, 10).split("-").map(Number);
+    if (!year || !month || !day) return null;
+    const [hour, minute] = String(timeValue || "00:00").split(":").map(Number);
+    return new Date(year, month - 1, day, hour || 0, minute || 0, 0, 0);
+  }
+
+  function parseLocalDate(value) {
+    if (!value) return new Date();
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  function normalizeDateValue(value) {
+    if (!value) return "";
+    if (value instanceof Date) return toIsoDate(value);
+    const text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? "" : toIsoDate(parsed);
+  }
+
+  function normalizeTimeValue(value) {
+    if (!value) return "";
+    if (value instanceof Date) return formatTime(value);
+    const match = String(value).trim().match(/(\d{1,2}):(\d{2})/);
+    return match ? `${String(match[1]).padStart(2, "0")}:${match[2]}` : "";
+  }
+
+  function parseMoneyValue(value) {
+    if (typeof value === "number") return value;
+    const text = String(value || "0").trim().replace(/[^\d,.-]/g, "");
+    const lastComma = text.lastIndexOf(",");
+    const lastDot = text.lastIndexOf(".");
+    let normalized = text;
+    if (lastComma > -1 && lastDot > -1) normalized = lastComma > lastDot ? text.replace(/\./g, "").replace(",", ".") : text.replace(/,/g, "");
+    else if (lastComma > -1) normalized = text.replace(/\./g, "").replace(",", ".");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function startOfDay(date) {
+    const copy = new Date(date);
+    copy.setHours(0, 0, 0, 0);
+    return copy;
+  }
+
+  function endOfDay(date) {
+    const copy = new Date(date);
+    copy.setHours(23, 59, 59, 999);
+    return copy;
+  }
+
+  function addDays(date, amount) {
+    const copy = new Date(date);
+    copy.setDate(copy.getDate() + amount);
+    return copy;
+  }
+
+  function toIsoDate(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function formatIsoDateBr(value) {
+    const normalized = normalizeDateValue(value);
+    if (!normalized) return "";
+    const [year, month, day] = normalized.split("-");
+    return `${day}/${month}/${year}`;
+  }
+
+  function formatTime(date) {
+    return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function money(value) {
+    return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  function integer(value) {
+    return Number(value || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  }
+
+  function percent(value) {
+    return Number(value || 0).toLocaleString("pt-BR", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  }
+
+  function sum(values) {
+    return values.reduce((total, value) => total + Number(value || 0), 0);
+  }
+
+  function setText(id, value) {
+    document.getElementById(id).textContent = value;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
+  }
+
+  function debounce(callback, wait) {
+    let timeout;
+    return (...args) => {
+      window.clearTimeout(timeout);
+      timeout = window.setTimeout(() => callback(...args), wait);
+    };
+  }
+
+  function setSyncText(text) {
+    els.syncStatus.textContent = text;
+    els.desktopSyncStatus.textContent = text;
+  }
+
+  function loadNotificationPref() {
+    return localStorage.getItem(`hsbi-sale-notifications-${pageConfig.slug}`) === "1";
+  }
+
+  function saveNotificationPref() {
+    localStorage.setItem(`hsbi-sale-notifications-${pageConfig.slug}`, state.notificationsEnabled ? "1" : "0");
+  }
+})();
+

@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   const config = Object.assign(
@@ -11,6 +11,8 @@
   const state = {
     page: "dashboard",
     period: "today",
+    appliedPeriod: "today",
+    customRange: null,
     transactions: [],
     metaByPeriod: {},
     customMeta: null,
@@ -69,7 +71,7 @@
     renderNotifications();
     registerServiceWorker();
     refreshData();
-    window.setInterval(refreshData, config.autoRefreshMinutes * 60 * 1000);
+    window.setInterval(() => refreshData(), config.autoRefreshMinutes * 60 * 1000);
     window.setInterval(checkScheduledNotifications, 60 * 1000);
   }
 
@@ -79,23 +81,22 @@
     });
 
     els.periodButtons.forEach((button) => {
-      button.addEventListener("click", async () => {
+      button.addEventListener("click", () => {
         state.period = button.dataset.period;
         state.pageIndex = 1;
-        if (state.period === "custom") await loadCustomPeriodData();
+        if (state.period !== "custom") state.appliedPeriod = state.period;
         render();
       });
     });
 
     [els.startDate, els.endDate].forEach((input) => {
-      input.addEventListener("change", async () => {
+      input.addEventListener("change", () => {
         state.pageIndex = 1;
-        if (state.period === "custom") await loadCustomPeriodData();
         render();
       });
     });
 
-    els.refreshButton.addEventListener("click", refreshData);
+    els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true }));
     els.transactionSearch.addEventListener("input", () => {
       state.pageIndex = 1;
       renderTransactions();
@@ -140,7 +141,12 @@
     });
   }
 
-  async function refreshData() {
+  async function refreshData(options = {}) {
+    if (options.applySelection) {
+      state.pageIndex = 1;
+      state.appliedPeriod = state.period;
+      if (state.period === "custom") state.customRange = readCustomInputRange();
+    }
     setSyncText("Atualizando");
     els.refreshButton.disabled = true;
     try {
@@ -152,7 +158,7 @@
       state.transactions = payload.transactions.map(normalizeTransaction);
       state.loadedTransactionRange = range;
       state.metaByPeriod = Object.fromEntries(metaEntries);
-      if (state.period === "custom") await loadCustomPeriodData();
+      if (state.appliedPeriod === "custom") await loadCustomPeriodData();
       state.lastUpdated = new Date();
       render();
       setSyncText(`Atualizado ${formatTime(state.lastUpdated)}`);
@@ -201,8 +207,8 @@
   }
 
   async function loadCustomPeriodData() {
-    if (state.period !== "custom") return;
-    const range = getDateRange("custom");
+    if (state.appliedPeriod !== "custom") return;
+    const range = state.customRange || readCustomInputRange();
     try {
       let payload = null;
       if (!isRangeLoaded(range)) {
@@ -353,8 +359,8 @@
       button.classList.toggle("is-active", button.dataset.period === state.period);
     });
     els.customFields.classList.toggle("is-visible", state.period === "custom");
-    document.getElementById("salesChartPeriod").textContent = getPeriodName();
-    document.getElementById("attendantsPeriod").textContent = getPeriodName();
+    document.getElementById("salesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
+    document.getElementById("attendantsPeriod").textContent = getPeriodName(state.appliedPeriod);
   }
 
   function setPage(page) {
@@ -770,13 +776,13 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js?v=7").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("sw.js?v=10").then((registration) => registration.update()).catch(console.error);
     }
   }
 
   function getMetaForCurrentPeriod() {
-    if (state.period === "custom") return Object.assign({ spend: 0, leads: 0 }, state.customMeta || {});
-    return Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[state.period] || {});
+    if (state.appliedPeriod === "custom") return Object.assign({ spend: 0, leads: 0 }, state.customMeta || {});
+    return Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[state.appliedPeriod] || {});
   }
 
   function getPreloadRange() {
@@ -785,7 +791,7 @@
   }
 
   function getDateRange(periodName) {
-    const period = periodName || state.period;
+    const period = periodName || state.appliedPeriod;
     const today = new Date();
     if (period === "yesterday") {
       const y = addDays(today, -1);
@@ -800,12 +806,16 @@
       };
     }
     if (period === "custom") {
-      return { start: parseLocalDate(els.startDate.value), end: parseLocalDate(els.endDate.value) };
+      return periodName ? readCustomInputRange() : state.customRange || readCustomInputRange();
     }
     return { start: today, end: today };
   }
 
-  function getPeriodName() {
+  function readCustomInputRange() {
+    return { start: parseLocalDate(els.startDate.value), end: parseLocalDate(els.endDate.value) };
+  }
+
+  function getPeriodName(periodName) {
     return {
       today: "Hoje",
       yesterday: "Ontem",
@@ -813,7 +823,7 @@
       month: "Este mês",
       lastMonth: "Mês passado",
       custom: "Personalizado"
-    }[state.period];
+    }[periodName || state.appliedPeriod];
   }
 
   function setDefaultDates() {
@@ -969,3 +979,4 @@
     els.desktopSyncStatus.textContent = text;
   }
 })();
+

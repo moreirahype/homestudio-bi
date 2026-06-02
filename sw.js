@@ -1,12 +1,17 @@
-const CACHE_NAME = "home-studio-bi-v7";
+const CACHE_NAME = "home-studio-bi-v11";
 const ASSETS = [
-  "./",
-  "./index.html",
   "./styles.css",
   "./app.js",
+  "./attendant.css",
+  "./attendant.js",
   "./config.js",
   "./manifest.webmanifest",
+  "./x7p4r9m2/",
+  "./x7p4r9m2/index.html",
+  "./k9v2m7q4/",
+  "./k9v2m7q4/index.html",
   "./assets/icon.svg",
+  "./assets/apple-touch-icon.png",
   "./assets/icon-192.png",
   "./assets/icon-192.svg",
   "./assets/icon-512.png",
@@ -38,6 +43,6 @@ self.addEventListener("fetch", (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
+      .catch(() => caches.match(event.request))
   );
 });

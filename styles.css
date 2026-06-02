@@ -688,7 +688,7 @@ th:last-child {
 
   .main {
     margin-left: 0;
-    padding: 20px 10px 88px;
+    padding: calc(42px + env(safe-area-inset-top)) 12px calc(134px + env(safe-area-inset-bottom));
   }
 
   .mobile-header {
@@ -696,11 +696,12 @@ th:last-child {
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    margin-bottom: 14px;
+    margin-bottom: 28px;
+    padding-top: 2px;
   }
 
   .mobile-header .brand {
-    font-size: var(--text-mobile-brand);
+    font-size: clamp(18px, 5.2vw, var(--text-mobile-brand));
   }
 
   .mobile-header .brand-mark {
@@ -723,8 +724,8 @@ th:last-child {
 
   .control-panel {
     grid-template-columns: 1fr;
-    gap: 12px;
-    padding: 18px;
+    gap: 16px;
+    padding: 20px;
   }
 
   .period-grid {
@@ -739,21 +740,23 @@ th:last-child {
   }
 
   .custom-fields.is-visible {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     grid-column: auto;
     max-width: none;
     width: 100%;
+    gap: 14px;
   }
 
   .custom-fields input {
     min-width: 0;
-    padding: 0 10px;
+    padding: 0 14px;
     font-size: var(--text-md);
   }
 
   .refresh-button {
     grid-column: auto;
     grid-row: auto;
+    min-height: 52px;
   }
 
   .metrics-grid {
@@ -862,7 +865,7 @@ th:last-child {
     inset: auto 0 0 0;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    padding: 12px 8px calc(24px + env(safe-area-inset-bottom));
     border-top: 1px solid rgba(158, 237, 109, 0.16);
     background: #071009;
   }
@@ -871,7 +874,7 @@ th:last-child {
     display: grid;
     gap: 4px;
     place-items: center;
-    min-height: 54px;
+    min-height: 64px;
     border: 0;
     background: transparent;
     color: #c9d5c5;
