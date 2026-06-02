@@ -754,6 +754,24 @@ th:last-child {
     gap: 8px;
   }
 
+  .custom-fields label:has(input[type="date"]) {
+    position: relative;
+  }
+
+  .custom-fields label:has(input[type="date"])::after {
+    content: attr(data-display);
+    display: grid;
+    min-height: 52px;
+    place-items: center;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font-size: var(--text-md);
+    pointer-events: none;
+  }
+
   .custom-fields input {
     width: 100%;
     min-width: 0;
@@ -761,6 +779,14 @@ th:last-child {
     padding: 0 14px;
     font-size: var(--text-md);
     text-align: center;
+  }
+
+  .custom-fields input[type="date"] {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 52px;
+    max-width: 100%;
+    opacity: 0;
   }
 
   .refresh-button {

@@ -74,6 +74,7 @@
     [els.startDate, els.endDate].forEach((input) => {
       input.addEventListener("change", () => {
         state.pageIndex = 1;
+        updateDateDisplays();
         render();
       });
     });
@@ -268,6 +269,14 @@
     els.periodButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.period === state.period));
     els.customFields.classList.toggle("is-visible", state.period === "custom");
     document.getElementById("salesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
+    updateDateDisplays();
+  }
+
+  function updateDateDisplays() {
+    [els.startDate, els.endDate].forEach((input) => {
+      const label = input.closest("label");
+      if (label) label.dataset.display = formatDateInputValue(input.value);
+    });
   }
 
   function renderGoals() {
@@ -532,7 +541,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=20").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=21").then((registration) => registration.update()).catch(console.error);
     }
   }
 
@@ -626,6 +635,12 @@
     const today = new Date();
     els.endDate.value = toIsoDate(today);
     els.startDate.value = toIsoDate(addDays(today, -6));
+    updateDateDisplays();
+  }
+
+  function formatDateInputValue(value) {
+    const date = parseLocalDate(value);
+    return date.toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
   }
 
   function buildHourLabels() {
