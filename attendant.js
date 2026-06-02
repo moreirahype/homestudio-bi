@@ -18,9 +18,9 @@
     attendant: {
       nome: pageConfig.name,
       comissao_percentual: 0,
-      meta_semanal_valor: 0,
       meta_premio: "",
       meta_titulo: "Meta semanal",
+      meta_valor: 0,
       meta_ativa: false,
       salario_fixo_mensal: 1000
     },
@@ -263,7 +263,7 @@
 
   function renderGoal() {
     const panel = document.getElementById("goalPanel");
-    const target = Number(state.attendant.meta_semanal_valor || 0);
+    const target = Number(state.attendant.meta_valor || 0);
     const active = Boolean(state.attendant.meta_ativa) && target > 0;
     panel.classList.toggle("is-hidden", !active);
     if (!active) return;
@@ -496,7 +496,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=11").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=13").then((registration) => registration.update()).catch(console.error);
     }
   }
 
@@ -509,9 +509,9 @@
         slug: pageConfig.slug,
         nome: "Sheila",
         comissao_percentual: 10,
-        meta_semanal_valor: 1000,
         meta_premio: "Jantar especial",
         meta_titulo: "Meta semanal",
+        meta_valor: 1000,
         meta_ativa: true,
         salario_fixo_mensal: 1000
       },

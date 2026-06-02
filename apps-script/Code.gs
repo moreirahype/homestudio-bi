@@ -1,7 +1,7 @@
 const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
-const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'meta_semanal_valor', 'meta_premio', 'meta_ativa', 'salario_fixo_mensal', 'meta_titulo'];
+const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa', 'salario_fixo_mensal'];
 
 function doGet(e) {
   const params = e.parameter || {};
@@ -95,16 +95,34 @@ function getAttendantsSheet_() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(ATTENDANTS_SHEET_NAME);
   if (!sheet) sheet = spreadsheet.insertSheet(ATTENDANTS_SHEET_NAME);
-  const current = sheet.getRange(1, 1, 1, ATTENDANT_HEADERS.length).getValues()[0];
+  const currentWidth = Math.max(sheet.getLastColumn(), ATTENDANT_HEADERS.length);
+  const current = sheet.getRange(1, 1, 1, currentWidth).getValues()[0];
   const missingHeaders = ATTENDANT_HEADERS.some((header, index) => current[index] !== header);
   if (missingHeaders) {
-    sheet.getRange(1, 1, 1, ATTENDANT_HEADERS.length).setValues([ATTENDANT_HEADERS]);
+    migrateAttendantsSheet_(sheet, current);
     sheet.setFrozenRows(1);
   }
   if (sheet.getLastRow() < 2) {
-    sheet.appendRow(['k9v2m7q4', 'Sheila', 10, 1000, 'Prêmio da semana', true, 1000, 'Meta semanal']);
+    sheet.appendRow(['k9v2m7q4', 'Sheila', 10, 'Meta semanal', 1000, 'Prêmio da semana', true, 1000]);
   }
   return sheet;
+}
+
+function migrateAttendantsSheet_(sheet, currentHeaders) {
+  const lastRow = sheet.getLastRow();
+  const currentWidth = Math.max(sheet.getLastColumn(), currentHeaders.length);
+  const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, currentWidth).getValues() : [];
+  const headerIndex = {};
+  currentHeaders.forEach((header, index) => {
+    if (header) headerIndex[String(header).trim()] = index;
+  });
+  const remapped = rows.map((row) => ATTENDANT_HEADERS.map((header) => {
+    const legacyHeader = header === 'meta_valor' ? 'meta_semanal_valor' : header;
+    const index = headerIndex[header] != null ? headerIndex[header] : headerIndex[legacyHeader];
+    return index == null ? '' : row[index];
+  }));
+  sheet.getRange(1, 1, 1, ATTENDANT_HEADERS.length).setValues([ATTENDANT_HEADERS]);
+  if (remapped.length) sheet.getRange(2, 1, remapped.length, ATTENDANT_HEADERS.length).setValues(remapped);
 }
 
 function readAttendantConfigs_() {
@@ -121,7 +139,7 @@ function readAttendantConfigs_() {
 }
 
 function normalizeAttendantCell_(header, value) {
-  if (header === 'comissao_percentual' || header === 'meta_semanal_valor' || header === 'salario_fixo_mensal') {
+  if (header === 'comissao_percentual' || header === 'meta_valor' || header === 'salario_fixo_mensal') {
     return parseNumber_(value);
   }
   if (header === 'meta_ativa') {
