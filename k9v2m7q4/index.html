@@ -8,15 +8,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Home Studio BI">
     <title>Home Studio BI - Sheila</title>
-    <link rel="manifest" href="../manifest.webmanifest?v=13">
+    <link rel="manifest" href="../manifest.webmanifest?v=15">
     <link rel="apple-touch-icon" href="../assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png">
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png">
     <link rel="icon" href="../assets/icon-192.png" type="image/png">
     <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="../styles.css?v=13">
-    <link rel="stylesheet" href="../attendant.css?v=13">
+    <link rel="stylesheet" href="../styles.css?v=15">
+    <link rel="stylesheet" href="../attendant.css?v=15">
   </head>
   <body>
     <div class="app-shell">
@@ -68,22 +68,7 @@
         </section>
 
         <section class="page is-active" id="page-dashboard" data-page="dashboard">
-          <article class="panel goal-panel" id="goalPanel">
-            <div class="goal-head">
-              <div>
-                <h1 id="goalTitle">Meta semanal</h1>
-                <p id="goalPrize">Prêmio da semana</p>
-              </div>
-              <span class="period-label" id="goalPercent">0,0%</span>
-            </div>
-            <div class="goal-track"><div class="goal-fill" id="goalFill" style="--goal-progress:0%"></div></div>
-            <div class="goal-meta">
-              <span id="goalCurrent">R$ 0,00</span>
-              <span id="goalTarget">R$ 0,00</span>
-            </div>
-            <div class="goal-remaining" id="goalRemaining">Faltam R$ 0,00 para bater a meta.</div>
-            <div class="goal-complete">Parabéns! Meta batida. Avise no grupo para receber o prêmio.</div>
-          </article>
+          <div class="goals-grid" id="goalsList"></div>
 
           <div class="metrics-grid">
             <article class="metric attendant-total-income">
@@ -180,11 +165,11 @@
         </button>
       </nav>
     </div>
-    <script src="../config.js?v=13"></script>
+    <script src="../config.js?v=15"></script>
     <script>
       window.HSBI_ATTENDANT_CONFIG = { slug: "k9v2m7q4", name: "Sheila" };
     </script>
-    <script src="../attendant.js?v=13"></script>
+    <script src="../attendant.js?v=15"></script>
   </body>
 </html>
 

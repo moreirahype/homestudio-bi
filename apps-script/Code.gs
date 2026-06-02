@@ -1,7 +1,9 @@
 const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
+const GOALS_SHEET_NAME = 'Metas';
 const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa', 'salario_fixo_mensal'];
+const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa', 'inicio', 'fim'];
 
 function doGet(e) {
   const params = e.parameter || {};
@@ -149,6 +151,57 @@ function normalizeAttendantCell_(header, value) {
   return value;
 }
 
+function getGoalsSheet_() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName(GOALS_SHEET_NAME);
+  if (!sheet) sheet = spreadsheet.insertSheet(GOALS_SHEET_NAME);
+  const current = sheet.getRange(1, 1, 1, GOAL_HEADERS.length).getValues()[0];
+  const missingHeaders = GOAL_HEADERS.some((header, index) => current[index] !== header);
+  if (missingHeaders) {
+    sheet.getRange(1, 1, 1, GOAL_HEADERS.length).setValues([GOAL_HEADERS]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function readGoalsForSlug_(slug, fallbackConfig) {
+  const sheet = getGoalsSheet_();
+  const lastRow = sheet.getLastRow();
+  const goals = lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, GOAL_HEADERS.length)
+    .getValues()
+    .map((row) => GOAL_HEADERS.reduce((object, header, index) => {
+      object[header] = normalizeGoalCell_(header, row[index]);
+      return object;
+    }, {}))
+    .filter((item) => String(item.slug || '').trim() === String(slug || '').trim())
+    .filter((item) => item.meta_ativa && Number(item.meta_valor || 0) > 0);
+  if (goals.length) return goals;
+  if (fallbackConfig && fallbackConfig.meta_ativa && Number(fallbackConfig.meta_valor || 0) > 0) {
+    return [{
+      slug: fallbackConfig.slug,
+      meta_titulo: fallbackConfig.meta_titulo || 'Meta',
+      meta_valor: fallbackConfig.meta_valor,
+      meta_premio: fallbackConfig.meta_premio || '',
+      meta_ativa: true,
+      inicio: '',
+      fim: ''
+    }];
+  }
+  return [];
+}
+
+function normalizeGoalCell_(header, value) {
+  if (header === 'meta_valor') return parseNumber_(value);
+  if (header === 'meta_ativa') {
+    if (typeof value === 'boolean') return value;
+    return ['true', 'sim', 's', '1', 'ativo', 'ativa'].indexOf(String(value || '').toLowerCase().trim()) > -1;
+  }
+  if ((header === 'inicio' || header === 'fim') && value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return value;
+}
+
 function getAttendantConfigByName_(name) {
   const normalizedName = normalizePersonName_(name);
   return readAttendantConfigs_().find((item) => normalizePersonName_(item.nome) === normalizedName) || null;
@@ -166,6 +219,7 @@ function readAttendantData_(slug, from, to) {
   return {
     ok: true,
     attendant: config,
+    goals: readGoalsForSlug_(slug, config),
     transactions: transactions,
     serverTime: new Date().toISOString()
   };

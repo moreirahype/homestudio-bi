@@ -776,7 +776,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js?v=13").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("sw.js?v=14").then((registration) => registration.update()).catch(console.error);
     }
   }
 

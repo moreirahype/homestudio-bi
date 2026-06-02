@@ -6,10 +6,19 @@
   grid-column: span 2;
 }
 
-.goal-panel {
+.goals-grid {
   display: grid;
   gap: 14px;
   margin-bottom: 18px;
+}
+
+.goals-grid.is-hidden {
+  display: none;
+}
+
+.goal-panel {
+  display: grid;
+  gap: 14px;
 }
 
 .goal-head {

@@ -13,6 +13,7 @@
     appliedPeriod: "today",
     customRange: null,
     transactions: [],
+    goals: [],
     displayTransactions: [],
     filteredSales: [],
     attendant: {
@@ -146,6 +147,7 @@
 
   function applyPayload(payload, replace) {
     if (payload.attendant) state.attendant = Object.assign({}, state.attendant, payload.attendant);
+    if (Array.isArray(payload.goals)) state.goals = payload.goals.map(normalizeGoal);
     const sales = (payload.transactions || []).map(normalizeSale);
     if (replace) {
       state.transactions = sales;
@@ -245,11 +247,23 @@
     };
   }
 
+  function normalizeGoal(item) {
+    return {
+      slug: item.slug || pageConfig.slug,
+      meta_titulo: item.meta_titulo || "Meta",
+      meta_valor: parseMoneyValue(item.meta_valor || 0),
+      meta_premio: item.meta_premio || "",
+      meta_ativa: item.meta_ativa !== false && String(item.meta_ativa || "true").toLowerCase() !== "false",
+      inicio: normalizeDateValue(item.inicio),
+      fim: normalizeDateValue(item.fim)
+    };
+  }
+
   function render() {
     renderPeriodControls();
     state.filteredSales = getFilteredSales();
     state.displayTransactions = buildDisplayTransactions();
-    renderGoal();
+    renderGoals();
     renderMetrics();
     renderSalesChart();
     renderTransactions();
@@ -261,29 +275,68 @@
     document.getElementById("salesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
   }
 
-  function renderGoal() {
-    const panel = document.getElementById("goalPanel");
-    const target = Number(state.attendant.meta_valor || 0);
-    const active = Boolean(state.attendant.meta_ativa) && target > 0;
-    panel.classList.toggle("is-hidden", !active);
-    if (!active) return;
+  function renderGoals() {
+    const list = document.getElementById("goalsList");
+    const goals = getActiveGoals();
+    list.classList.toggle("is-hidden", !goals.length);
+    if (!goals.length) {
+      list.innerHTML = "";
+      return;
+    }
+    list.innerHTML = goals.map((goal) => {
+      const target = Number(goal.meta_valor || 0);
+      const range = getGoalRange(goal);
+      const current = state.transactions
+        .filter((item) => item.timestamp >= startOfDay(range.start) && item.timestamp <= endOfDay(range.end))
+        .reduce((total, item) => total + item.value, 0);
+      const progress = target > 0 ? current / target : 0;
+      const percentValue = Math.min(100, progress * 100);
+      const remaining = Math.max(0, target - current);
+      const complete = progress >= 1;
+      return `
+        <article class="panel goal-panel${complete ? " is-complete" : ""}" style="--goal-progress:${percentValue}%">
+          <div class="goal-head">
+            <div>
+              <h1>${escapeHtml(goal.meta_titulo || "Meta")}</h1>
+              <p>${escapeHtml(goal.meta_premio || "Prêmio")}</p>
+            </div>
+            <span class="period-label">${percent(progress)}</span>
+          </div>
+          <div class="goal-track"><div class="goal-fill" style="--goal-progress:${percentValue}%"></div></div>
+          <div class="goal-meta">
+            <span>${money(current)}</span>
+            <span>${money(target)}</span>
+          </div>
+          ${complete ? "" : `<div class="goal-remaining">Faltam ${money(remaining)} para bater a meta.</div>`}
+          <div class="goal-complete">Parabéns! Meta batida. Avise no grupo para receber o prêmio. 🎉</div>
+        </article>
+      `;
+    }).join("");
+  }
+
+  function getActiveGoals() {
+    const activeGoals = state.goals.filter((goal) => goal.meta_ativa && Number(goal.meta_valor || 0) > 0);
+    if (activeGoals.length) return activeGoals;
+    if (state.attendant.meta_ativa && Number(state.attendant.meta_valor || 0) > 0) {
+      return [normalizeGoal({
+        slug: pageConfig.slug,
+        meta_titulo: state.attendant.meta_titulo || "Meta",
+        meta_valor: state.attendant.meta_valor,
+        meta_premio: state.attendant.meta_premio || "",
+        meta_ativa: true,
+        inicio: "",
+        fim: ""
+      })];
+    }
+    return [];
+  }
+
+  function getGoalRange(goal) {
     const week = getWeekRange(new Date());
-    const current = state.transactions
-      .filter((item) => item.timestamp >= startOfDay(week.start) && item.timestamp <= endOfDay(week.end))
-      .reduce((total, item) => total + item.value, 0);
-    const progress = target > 0 ? current / target : 0;
-    const remaining = Math.max(0, target - current);
-    panel.style.setProperty("--goal-progress", `${Math.min(100, progress * 100)}%`);
-    document.getElementById("goalFill").style.setProperty("--goal-progress", `${Math.min(100, progress * 100)}%`);
-    document.getElementById("goalTitle").textContent = state.attendant.meta_titulo || "Meta semanal";
-    document.getElementById("goalPrize").textContent = state.attendant.meta_premio || "Prêmio da semana";
-    document.getElementById("goalPercent").textContent = percent(progress);
-    document.getElementById("goalCurrent").textContent = money(current);
-    document.getElementById("goalTarget").textContent = money(target);
-    document.getElementById("goalRemaining").textContent = progress >= 1
-      ? "Meta batida! Avise no grupo para receber o prêmio."
-      : `Faltam ${money(remaining)} para bater a meta.`;
-    panel.classList.toggle("is-complete", progress >= 1);
+    return {
+      start: goal.inicio ? parseLocalDate(goal.inicio) : week.start,
+      end: goal.fim ? parseLocalDate(goal.fim) : week.end
+    };
   }
 
   function renderMetrics() {
@@ -496,7 +549,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=13").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=15").then((registration) => registration.update()).catch(console.error);
     }
   }
 
@@ -519,6 +572,26 @@
         makeDemoSale(now, "Elaine", 497),
         makeDemoSale(now, "Fran Santos", 197),
         makeDemoSale(yesterday, "Mariana", 297)
+      ],
+      goals: [
+        {
+          slug: pageConfig.slug,
+          meta_titulo: "Meta semanal",
+          meta_valor: 1000,
+          meta_premio: "Jantar especial",
+          meta_ativa: true,
+          inicio: "",
+          fim: ""
+        },
+        {
+          slug: pageConfig.slug,
+          meta_titulo: "Meta extra",
+          meta_valor: 1500,
+          meta_premio: "Bônus surpresa",
+          meta_ativa: true,
+          inicio: "",
+          fim: ""
+        }
       ]
     };
   }
