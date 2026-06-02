@@ -8,27 +8,27 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Home Studio BI">
     <title>Home Studio BI - Sheila</title>
-    <link rel="manifest" href="../manifest.webmanifest?v=22">
+    <link rel="manifest" href="../manifest.webmanifest?v=23">
     <link rel="apple-touch-icon" href="../assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png">
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png">
     <link rel="icon" href="../assets/icon-192.png" type="image/png">
     <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="../styles.css?v=22">
-    <link rel="stylesheet" href="../attendant.css?v=22">
+    <link rel="stylesheet" href="../styles.css?v=23">
+    <link rel="stylesheet" href="../attendant.css?v=23">
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="Navegação principal">
+      <aside class="sidebar" aria-label="NavegaÃ§Ã£o principal">
         <a class="brand" href="#dashboard" aria-label="Home Studio BI">
           <span class="brand-mark" aria-hidden="true"><img src="../assets/icon.svg" alt=""></span>
           <span>Home Studio BI</span>
         </a>
         <nav class="side-nav">
           <button class="nav-item is-active" data-page="dashboard" type="button">Dashboard</button>
-          <button class="nav-item" data-page="transactions" type="button">Transações</button>
-          <button class="nav-item" data-page="notifications" type="button">Notificações</button>
+          <button class="nav-item" data-page="transactions" type="button">TransaÃ§Ãµes</button>
+          <button class="nav-item" data-page="notifications" type="button">NotificaÃ§Ãµes</button>
         </nav>
       </aside>
 
@@ -46,17 +46,17 @@
         </div>
 
         <section class="control-panel" aria-label="Filtros">
-          <div class="period-grid" role="group" aria-label="Período">
+          <div class="period-grid" role="group" aria-label="PerÃ­odo">
             <button class="period-button is-active" data-period="today" type="button">Hoje</button>
             <button class="period-button" data-period="yesterday" type="button">Ontem</button>
-            <button class="period-button" data-period="last7" type="button">Últimos 7 dias</button>
-            <button class="period-button" data-period="month" type="button">Este mês</button>
-            <button class="period-button" data-period="lastMonth" type="button">Mês passado</button>
+            <button class="period-button" data-period="last7" type="button">Ãšltimos 7 dias</button>
+            <button class="period-button" data-period="month" type="button">Este mÃªs</button>
+            <button class="period-button" data-period="lastMonth" type="button">MÃªs passado</button>
             <button class="period-button" data-period="custom" type="button">Personalizado</button>
           </div>
           <div class="custom-fields" id="customFields">
             <label>
-              <span>Início</span>
+              <span>InÃ­cio</span>
               <input id="startDate" type="date">
             </label>
             <label>
@@ -72,11 +72,11 @@
 
           <div class="metrics-grid">
             <article class="metric attendant-total-income">
-              <span>Ganhos no período</span>
+              <span>Ganhos no perÃ­odo</span>
               <strong id="metricTotalIncome">R$ 0,00</strong>
             </article>
             <article class="metric attendant-commission">
-              <span>Comissões</span>
+              <span>ComissÃµes</span>
               <strong id="metricCommission">R$ 0,00</strong>
             </article>
             <article class="metric attendant-sales">
@@ -88,18 +88,18 @@
               <strong id="metricFixed">R$ 0,00</strong>
             </article>
             <article class="metric attendant-rate">
-              <span>Comissão atual</span>
+              <span>ComissÃ£o atual</span>
               <strong id="metricRate">0,0%</strong>
             </article>
           </div>
 
           <article class="panel chart-panel attendant-chart-panel">
             <div class="panel-header">
-              <h1 id="salesChartTitle">Vendas por horário</h1>
+              <h1 id="salesChartTitle">Vendas por horÃ¡rio</h1>
               <span class="period-label" id="salesChartPeriod">Hoje</span>
             </div>
             <div class="line-chart-wrap">
-              <svg class="line-chart" id="salesChart" viewBox="0 0 980 330" preserveAspectRatio="xMidYMid meet" aria-label="Gráfico de vendas"></svg>
+              <svg class="line-chart" id="salesChart" viewBox="0 0 980 330" preserveAspectRatio="xMidYMid meet" aria-label="GrÃ¡fico de vendas"></svg>
               <div class="chart-tooltip" id="chartTooltip" hidden></div>
             </div>
           </article>
@@ -108,8 +108,8 @@
         <section class="page" id="page-transactions" data-page="transactions">
           <article class="panel transactions-panel">
             <div class="transactions-head">
-              <h1>Transações</h1>
-              <input id="transactionSearch" type="search" placeholder="Buscar por pagador, origem ou valor" aria-label="Buscar transações">
+              <h1>TransaÃ§Ãµes</h1>
+              <input id="transactionSearch" type="search" placeholder="Buscar por pagador, origem ou valor" aria-label="Buscar transaÃ§Ãµes">
             </div>
             <div class="table-wrap">
               <table>
@@ -118,7 +118,7 @@
                     <th>Data</th>
                     <th>Hora</th>
                     <th>Origem</th>
-                    <th>Descrição</th>
+                    <th>DescriÃ§Ã£o</th>
                     <th>Valor</th>
                   </tr>
                 </thead>
@@ -127,49 +127,49 @@
             </div>
             <div class="pager">
               <button id="prevPage" type="button">Anterior</button>
-              <span id="pageInfo">Página 1 de 1</span>
-              <button id="nextPage" type="button">Próxima</button>
+              <span id="pageInfo">PÃ¡gina 1 de 1</span>
+              <button id="nextPage" type="button">PrÃ³xima</button>
             </div>
           </article>
         </section>
 
         <section class="page" id="page-notifications" data-page="notifications">
           <article class="panel notifications-panel">
-            <h1>Notificações</h1>
+            <h1>NotificaÃ§Ãµes</h1>
             <div class="notification-list notification-simple">
               <label class="notification-row">
-                <span>Notificações de venda</span>
+                <span>NotificaÃ§Ãµes de venda</span>
                 <span class="switch">
                   <input type="checkbox" id="saleNotifications">
                   <span class="slider"></span>
                 </span>
               </label>
             </div>
-            <button class="test-notification" id="testNotification" type="button">Testar notificação</button>
+            <button class="test-notification" id="testNotification" type="button">Testar notificaÃ§Ã£o</button>
           </article>
         </section>
       </main>
 
-      <nav class="bottom-nav attendant-bottom-nav" aria-label="Navegação mobile">
+      <nav class="bottom-nav attendant-bottom-nav" aria-label="NavegaÃ§Ã£o mobile">
         <button class="bottom-item is-active" data-page="dashboard" type="button" aria-label="Dashboard">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"></path></svg>
           <span>Dashboard</span>
         </button>
-        <button class="bottom-item" data-page="transactions" type="button" aria-label="Transações">
+        <button class="bottom-item" data-page="transactions" type="button" aria-label="TransaÃ§Ãµes">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h14v2H5zm0 5h14v2H5z"></path></svg>
-          <span>Transações</span>
+          <span>TransaÃ§Ãµes</span>
         </button>
-        <button class="bottom-item" data-page="notifications" type="button" aria-label="Notificações">
+        <button class="bottom-item" data-page="notifications" type="button" aria-label="NotificaÃ§Ãµes">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-5-2-2v-5a5 5 0 0 0-10 0v5l-2 2v1h14z"></path></svg>
-          <span>Notificações</span>
+          <span>NotificaÃ§Ãµes</span>
         </button>
       </nav>
     </div>
-    <script src="../config.js?v=22"></script>
+    <script src="../config.js?v=23"></script>
     <script>
       window.HSBI_ATTENDANT_CONFIG = { slug: "k9v2m7q4", name: "Sheila" };
     </script>
-    <script src="../attendant.js?v=22"></script>
+    <script src="../attendant.js?v=23"></script>
   </body>
 </html>
 

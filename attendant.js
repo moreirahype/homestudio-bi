@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   "use strict";
 
   const baseConfig = Object.assign(
@@ -545,7 +545,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=22").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=23").then((registration) => registration.update()).catch(console.error);
     }
   }
 
