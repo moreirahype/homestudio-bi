@@ -2,8 +2,8 @@ const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
 const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
-const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa', 'salario_fixo_mensal'];
-const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa', 'inicio', 'fim'];
+const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal'];
+const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
 
 function doGet(e) {
   const params = e.parameter || {};
@@ -105,7 +105,7 @@ function getAttendantsSheet_() {
     sheet.setFrozenRows(1);
   }
   if (sheet.getLastRow() < 2) {
-    sheet.appendRow(['k9v2m7q4', 'Sheila', 10, 'Meta semanal', 1000, 'Prêmio da semana', true, 1000]);
+    sheet.appendRow(['k9v2m7q4', 'Sheila', 10, 1000]);
   }
   return sheet;
 }
@@ -125,6 +125,7 @@ function migrateAttendantsSheet_(sheet, currentHeaders) {
   }));
   sheet.getRange(1, 1, 1, ATTENDANT_HEADERS.length).setValues([ATTENDANT_HEADERS]);
   if (remapped.length) sheet.getRange(2, 1, remapped.length, ATTENDANT_HEADERS.length).setValues(remapped);
+  deleteExtraColumns_(sheet, ATTENDANT_HEADERS.length);
 }
 
 function readAttendantConfigs_() {
@@ -141,12 +142,8 @@ function readAttendantConfigs_() {
 }
 
 function normalizeAttendantCell_(header, value) {
-  if (header === 'comissao_percentual' || header === 'meta_valor' || header === 'salario_fixo_mensal') {
+  if (header === 'comissao_percentual' || header === 'salario_fixo_mensal') {
     return parseNumber_(value);
-  }
-  if (header === 'meta_ativa') {
-    if (typeof value === 'boolean') return value;
-    return ['true', 'sim', 's', '1', 'ativo', 'ativa'].indexOf(String(value || '').toLowerCase().trim()) > -1;
   }
   return value;
 }
@@ -155,39 +152,85 @@ function getGoalsSheet_() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(GOALS_SHEET_NAME);
   if (!sheet) sheet = spreadsheet.insertSheet(GOALS_SHEET_NAME);
-  const current = sheet.getRange(1, 1, 1, GOAL_HEADERS.length).getValues()[0];
+  const currentWidth = Math.max(sheet.getLastColumn(), GOAL_HEADERS.length);
+  const current = sheet.getRange(1, 1, 1, currentWidth).getValues()[0];
   const missingHeaders = GOAL_HEADERS.some((header, index) => current[index] !== header);
   if (missingHeaders) {
-    sheet.getRange(1, 1, 1, GOAL_HEADERS.length).setValues([GOAL_HEADERS]);
+    migrateGoalsSheet_(sheet, current);
     sheet.setFrozenRows(1);
   }
+  deleteExtraColumns_(sheet, GOAL_HEADERS.length);
   return sheet;
 }
 
-function readGoalsForSlug_(slug, fallbackConfig) {
+function migrateGoalsSheet_(sheet, currentHeaders) {
+  const lastRow = sheet.getLastRow();
+  const currentWidth = Math.max(sheet.getLastColumn(), currentHeaders.length);
+  const rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, currentWidth).getValues() : [];
+  const headerIndex = {};
+  currentHeaders.forEach((header, index) => {
+    if (header) headerIndex[String(header).trim()] = index;
+  });
+  const remapped = rows.map((row) => GOAL_HEADERS.map((header) => {
+    if (header === 'meta_ativa') return getExistingGoalCell_(row, headerIndex, 'meta_ativa') || true;
+    return getExistingGoalCell_(row, headerIndex, header);
+  }));
+  sheet.getRange(1, 1, 1, GOAL_HEADERS.length).setValues([GOAL_HEADERS]);
+  if (remapped.length) sheet.getRange(2, 1, remapped.length, GOAL_HEADERS.length).setValues(remapped);
+}
+
+function getExistingGoalCell_(row, headerIndex, header) {
+  const index = headerIndex[header];
+  return index == null ? '' : row[index];
+}
+
+function deleteExtraColumns_(sheet, expectedColumns) {
+  const extraColumns = sheet.getLastColumn() - expectedColumns;
+  if (extraColumns > 0) sheet.deleteColumns(expectedColumns + 1, extraColumns);
+}
+
+function readGoalsForSlug_(slug) {
   const sheet = getGoalsSheet_();
   const lastRow = sheet.getLastRow();
+  const properties = PropertiesService.getScriptProperties();
   const goals = lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, GOAL_HEADERS.length)
     .getValues()
     .map((row) => GOAL_HEADERS.reduce((object, header, index) => {
       object[header] = normalizeGoalCell_(header, row[index]);
       return object;
     }, {}))
+    .map((item) => hydrateGoalStart_(item, properties));
+  return goals
     .filter((item) => String(item.slug || '').trim() === String(slug || '').trim())
-    .filter((item) => item.meta_ativa && Number(item.meta_valor || 0) > 0);
-  if (goals.length) return goals;
-  if (fallbackConfig && fallbackConfig.meta_ativa && Number(fallbackConfig.meta_valor || 0) > 0) {
-    return [{
-      slug: fallbackConfig.slug,
-      meta_titulo: fallbackConfig.meta_titulo || 'Meta',
-      meta_valor: fallbackConfig.meta_valor,
-      meta_premio: fallbackConfig.meta_premio || '',
-      meta_ativa: true,
-      inicio: '',
-      fim: ''
-    }];
+    .filter((item) => item.meta_ativa && Number(item.meta_valor || 0) > 0 && item.meta_inicio);
+}
+
+function hydrateGoalStart_(goal, properties) {
+  const key = getGoalStartKey_(goal);
+  if (!key) return goal;
+  if (goal.meta_ativa && Number(goal.meta_valor || 0) > 0) {
+    let startedAt = properties.getProperty(key);
+    if (!startedAt) {
+      startedAt = new Date().toISOString();
+      properties.setProperty(key, startedAt);
+    }
+    goal.meta_inicio = startedAt;
+  } else {
+    properties.deleteProperty(key);
+    goal.meta_inicio = '';
   }
-  return [];
+  return goal;
+}
+
+function getGoalStartKey_(goal) {
+  const raw = [
+    goal.slug,
+    goal.meta_titulo,
+    goal.meta_valor,
+    goal.meta_premio
+  ].map((part) => String(part || '').trim().toLowerCase()).join('|');
+  if (!String(goal.slug || '').trim() || !String(goal.meta_titulo || '').trim()) return '';
+  return 'goal_started_at_' + Utilities.base64EncodeWebSafe(raw).replace(/=+$/, '');
 }
 
 function normalizeGoalCell_(header, value) {
@@ -195,9 +238,6 @@ function normalizeGoalCell_(header, value) {
   if (header === 'meta_ativa') {
     if (typeof value === 'boolean') return value;
     return ['true', 'sim', 's', '1', 'ativo', 'ativa'].indexOf(String(value || '').toLowerCase().trim()) > -1;
-  }
-  if ((header === 'inicio' || header === 'fim') && value instanceof Date) {
-    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
   return value;
 }
@@ -215,14 +255,28 @@ function getAttendantConfigBySlug_(slug) {
 function readAttendantData_(slug, from, to) {
   const config = getAttendantConfigBySlug_(slug);
   if (!config) return { ok: false, error: 'Atendente não encontrada.', attendant: null, transactions: [] };
-  const transactions = readTransactions_(from, to).filter((item) => normalizePersonName_(item.atendente) === normalizePersonName_(config.nome));
+  const goals = readGoalsForSlug_(slug);
+  const effectiveFrom = getEarliestGoalStart_(goals, from);
+  const transactions = readTransactions_(effectiveFrom, to).filter((item) => normalizePersonName_(item.atendente) === normalizePersonName_(config.nome));
   return {
     ok: true,
     attendant: config,
-    goals: readGoalsForSlug_(slug, config),
+    goals: goals,
     transactions: transactions,
     serverTime: new Date().toISOString()
   };
+}
+
+function getEarliestGoalStart_(goals, fallbackFrom) {
+  const fallback = fallbackFrom || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const dates = goals
+    .map((goal) => goal.meta_inicio ? new Date(goal.meta_inicio) : null)
+    .filter((date) => date && !isNaN(date.getTime()));
+  if (!dates.length) return fallbackFrom;
+  const earliest = dates.reduce((min, date) => date < min ? date : min, dates[0]);
+  const fallbackDate = fallbackFrom ? new Date(fallbackFrom + 'T00:00:00') : null;
+  if (fallbackDate && fallbackDate < earliest) return fallbackFrom;
+  return Utilities.formatDate(earliest, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
 
 function normalizePersonName_(value) {

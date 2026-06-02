@@ -19,10 +19,6 @@
     attendant: {
       nome: pageConfig.name,
       comissao_percentual: 0,
-      meta_premio: "",
-      meta_titulo: "Meta semanal",
-      meta_valor: 0,
-      meta_ativa: false,
       salario_fixo_mensal: 1000
     },
     pageIndex: 1,
@@ -254,8 +250,7 @@
       meta_valor: parseMoneyValue(item.meta_valor || 0),
       meta_premio: item.meta_premio || "",
       meta_ativa: item.meta_ativa !== false && String(item.meta_ativa || "true").toLowerCase() !== "false",
-      inicio: normalizeDateValue(item.inicio),
-      fim: normalizeDateValue(item.fim)
+      meta_inicio: item.meta_inicio || ""
     };
   }
 
@@ -317,25 +312,13 @@
   function getActiveGoals() {
     const activeGoals = state.goals.filter((goal) => goal.meta_ativa && Number(goal.meta_valor || 0) > 0);
     if (activeGoals.length) return activeGoals;
-    if (state.attendant.meta_ativa && Number(state.attendant.meta_valor || 0) > 0) {
-      return [normalizeGoal({
-        slug: pageConfig.slug,
-        meta_titulo: state.attendant.meta_titulo || "Meta",
-        meta_valor: state.attendant.meta_valor,
-        meta_premio: state.attendant.meta_premio || "",
-        meta_ativa: true,
-        inicio: "",
-        fim: ""
-      })];
-    }
     return [];
   }
 
   function getGoalRange(goal) {
-    const week = getWeekRange(new Date());
     return {
-      start: goal.inicio ? parseLocalDate(goal.inicio) : week.start,
-      end: goal.fim ? parseLocalDate(goal.fim) : week.end
+      start: goal.meta_inicio ? parseDate(goal.meta_inicio) : getWeekRange(new Date()).start,
+      end: new Date()
     };
   }
 
@@ -549,7 +532,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=15").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=20").then((registration) => registration.update()).catch(console.error);
     }
   }
 
@@ -562,10 +545,6 @@
         slug: pageConfig.slug,
         nome: "Sheila",
         comissao_percentual: 10,
-        meta_premio: "Jantar especial",
-        meta_titulo: "Meta semanal",
-        meta_valor: 1000,
-        meta_ativa: true,
         salario_fixo_mensal: 1000
       },
       transactions: [
@@ -580,8 +559,7 @@
           meta_valor: 1000,
           meta_premio: "Jantar especial",
           meta_ativa: true,
-          inicio: "",
-          fim: ""
+          meta_inicio: getWeekRange(now).start.toISOString()
         },
         {
           slug: pageConfig.slug,
@@ -589,8 +567,7 @@
           meta_valor: 1500,
           meta_premio: "Bônus surpresa",
           meta_ativa: true,
-          inicio: "",
-          fim: ""
+          meta_inicio: getWeekRange(now).start.toISOString()
         }
       ]
     };
