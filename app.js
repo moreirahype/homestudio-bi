@@ -169,20 +169,21 @@
       setSyncText(`Atualizado ${formatTime(state.lastUpdated)}`);
     } catch (error) {
       console.error(error);
-      const fallback = buildDemoPayload();
+      const fallback = buildEmptyPayload();
       state.transactions = fallback.transactions.map(normalizeTransaction);
       state.loadedTransactionRange = getPreloadRange();
       state.metaByPeriod = Object.fromEntries(standardPeriods.map((period) => [period, fallback.meta]));
+      state.customMeta = null;
       state.lastUpdated = new Date();
       render();
-      setSyncText("Dados locais");
+      setSyncText("Sem dados");
     } finally {
       els.refreshButton.disabled = false;
     }
   }
 
   async function fetchTransactionsPayload(range) {
-    if (!config.apiUrl) return buildDemoPayload();
+    if (!config.apiUrl) return buildEmptyPayload();
     const url = new URL(config.apiUrl);
     url.searchParams.set("action", "data");
     url.searchParams.set("from", toIsoDate(range.start));
@@ -197,7 +198,7 @@
   }
 
   async function fetchMetaPayload(range) {
-    if (!config.apiUrl) return buildDemoPayload().meta;
+    if (!config.apiUrl) return buildEmptyPayload().meta;
     const url = new URL(config.apiUrl);
     url.searchParams.set("action", "meta");
     url.searchParams.set("from", toIsoDate(range.start));
@@ -269,33 +270,8 @@
     });
   }
 
-  function buildDemoPayload() {
-    const now = new Date();
-    const y = new Date(now);
-    y.setDate(now.getDate() - 1);
-    const transactions = [
-      makeDemoSale(now, "Sheila", "Mariana Alves", 497),
-      makeDemoSale(now, "Automação", "Carlos Souza", 197),
-      makeDemoSale(y, "BOT", "Rafael Lima", 297),
-      makeDemoSale(addDays(now, -3), "Sheila", "Fernanda Costa", 397),
-      makeDemoSale(addDays(now, -4), "Automação", "João Martins", 197)
-    ];
-    return { transactions, meta: { spend: 241.51, leads: 213 } };
-  }
-
-  function makeDemoSale(date, attendant, payer, value) {
-    const copy = new Date(date);
-    copy.setHours(Math.max(8, Math.min(22, copy.getHours() - Math.floor(Math.random() * 4))), 15, 0, 0);
-    return {
-      timestamp: copy.toISOString(),
-      data: toIsoDate(copy),
-      hora: formatTime(copy),
-      pagador: payer,
-      telefone: "",
-      moeda: "BRL",
-      valor: value,
-      atendente: attendant
-    };
+  function buildEmptyPayload() {
+    return { transactions: [], meta: { spend: 0, leads: 0 } };
   }
 
   function normalizeTransaction(item) {
@@ -790,7 +766,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=23").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=24").then((registration) => registration.update()).catch(console.error);
     }
   }
 

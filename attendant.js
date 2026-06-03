@@ -18,8 +18,8 @@
     filteredSales: [],
     attendant: {
       nome: pageConfig.name,
-      comissao_percentual: 0,
-      salario_fixo_mensal: 1000
+      comissao_percentual: null,
+      salario_fixo_mensal: 0
     },
     pageIndex: 1,
     lastUpdated: null,
@@ -130,10 +130,10 @@
       setSyncText(`Atualizado ${formatTime(state.lastUpdated)}`);
     } catch (error) {
       console.error(error);
-      applyPayload(buildDemoPayload(), true);
+      applyPayload(buildEmptyPayload(), true);
       state.lastUpdated = new Date();
       render();
-      setSyncText("Dados locais");
+      setSyncText("Sem dados");
     } finally {
       els.refreshButton.disabled = false;
     }
@@ -160,7 +160,7 @@
   }
 
   async function fetchAttendantPayload(range) {
-    if (!baseConfig.apiUrl) return buildDemoPayload();
+    if (!baseConfig.apiUrl) return buildEmptyPayload();
     const url = new URL(baseConfig.apiUrl);
     url.searchParams.set("action", "attendant");
     url.searchParams.set("slug", pageConfig.slug);
@@ -342,7 +342,7 @@
     setText("metricCommission", money(commission));
     setText("metricFixed", money(fixed));
     setText("metricSales", integer(sales.length));
-    setText("metricRate", percent(Number(state.attendant.comissao_percentual || 0) / 100));
+    setText("metricRate", state.attendant.comissao_percentual == null ? "N/A" : percent(Number(state.attendant.comissao_percentual || 0) / 100));
   }
 
   function renderSalesChart() {
@@ -453,7 +453,7 @@
   }
 
   function buildFixedCredits(range) {
-    const salary = Number(state.attendant.salario_fixo_mensal || 1000);
+    const salary = Number(state.attendant.salario_fixo_mensal || 0);
     const daily = Math.round((salary / 30) * 100) / 100;
     const today = endOfDay(new Date());
     const end = endOfDay(range.end) > today ? today : endOfDay(range.end);
@@ -545,59 +545,21 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=23").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=24").then((registration) => registration.update()).catch(console.error);
     }
   }
 
-  function buildDemoPayload() {
-    const now = new Date();
-    const yesterday = addDays(now, -1);
+  function buildEmptyPayload() {
     return {
       ok: true,
       attendant: {
         slug: pageConfig.slug,
-        nome: "Sheila",
-        comissao_percentual: 10,
-        salario_fixo_mensal: 1000
+        nome: pageConfig.name,
+        comissao_percentual: null,
+        salario_fixo_mensal: 0
       },
-      transactions: [
-        makeDemoSale(now, "Elaine", 497),
-        makeDemoSale(now, "Fran Santos", 197),
-        makeDemoSale(yesterday, "Mariana", 297)
-      ],
-      goals: [
-        {
-          slug: pageConfig.slug,
-          meta_titulo: "Meta semanal",
-          meta_valor: 1000,
-          meta_premio: "Jantar especial",
-          meta_ativa: true,
-          meta_inicio: getWeekRange(now).start.toISOString()
-        },
-        {
-          slug: pageConfig.slug,
-          meta_titulo: "Meta extra",
-          meta_valor: 1500,
-          meta_premio: "Bônus surpresa",
-          meta_ativa: true,
-          meta_inicio: getWeekRange(now).start.toISOString()
-        }
-      ]
-    };
-  }
-
-  function makeDemoSale(date, payer, value) {
-    const copy = new Date(date);
-    copy.setHours(Math.max(8, copy.getHours() - 2), 30, 0, 0);
-    return {
-      id: `demo-${copy.getTime()}-${payer}`,
-      timestamp: copy.toISOString(),
-      data: toIsoDate(copy),
-      hora: formatTime(copy),
-      pagador: payer,
-      valor: value,
-      atendente: "Sheila",
-      comissao_percentual: 10
+      transactions: [],
+      goals: []
     };
   }
 
