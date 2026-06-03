@@ -399,7 +399,7 @@
     setMetric("tax", money(state.metrics.tax));
     setMetric("profit", money(state.metrics.profit), signedTone(state.metrics.profit));
     setMetric("margin", state.metrics.margin == null ? "N/A" : percent(state.metrics.margin), signedTone(state.metrics.margin));
-    setMetric("roas", state.metrics.roas == null ? "N/A" : decimal(state.metrics.roas), signedTone(state.metrics.roas));
+    setMetric("roas", state.metrics.roas == null ? "N/A" : decimal(state.metrics.roas), roasTone(state.metrics.roas));
     setMetric("sales", integer(state.metrics.sales));
     setMetric("cpa", state.metrics.cpa == null ? "N/A" : money(state.metrics.cpa));
     setMetric("arpu", state.metrics.arpu == null ? "N/A" : money(state.metrics.arpu));
@@ -418,6 +418,11 @@
   function signedTone(value) {
     if (value == null || Number.isNaN(Number(value)) || Number(value) === 0) return null;
     return Number(value) > 0 ? "positive" : "negative";
+  }
+
+  function roasTone(value) {
+    if (value == null || Number.isNaN(Number(value))) return null;
+    return Number(value) >= 1 ? "positive" : "negative";
   }
 
   function renderSalesChart() {
@@ -766,7 +771,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=24").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=26").then((registration) => registration.update()).catch(console.error);
     }
   }
 
