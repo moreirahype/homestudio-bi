@@ -370,7 +370,7 @@
     const gridYTop = top;
     const gridYMid = top + height / 2;
     const gridYBottom = top + height;
-    document.getElementById("salesChartTitle").textContent = state.period === "today" || state.period === "yesterday" ? "Vendas por horário" : "Vendas por dia";
+    document.getElementById("salesChartTitle").textContent = shouldGroupChartByHour() ? "Vendas por horário" : "Vendas por dia";
     els.chart.innerHTML = `
       <defs>
         <linearGradient id="salesAreaGradientAttendant" x1="0" x2="0" y1="0" y2="1">
@@ -486,7 +486,7 @@
 
   function buildSeries() {
     const range = getDateRange();
-    const byHour = state.period === "today" || state.period === "yesterday";
+    const byHour = shouldGroupChartByHour();
     const labels = byHour ? buildHourLabels() : buildDayLabels(range.start, range.end);
     return labels.map((label, index) => {
       const sales = state.filteredSales.filter((item) => {
@@ -501,6 +501,13 @@
         revenue: sum(sales.map((item) => item.value))
       };
     });
+  }
+
+  function shouldGroupChartByHour() {
+    if (state.appliedPeriod === "today" || state.appliedPeriod === "yesterday") return true;
+    if (state.appliedPeriod !== "custom") return false;
+    const range = getDateRange();
+    return toIsoDate(range.start) === toIsoDate(range.end);
   }
 
   function setPage(page) {
@@ -545,7 +552,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=26").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=27").then((registration) => registration.update()).catch(console.error);
     }
   }
 

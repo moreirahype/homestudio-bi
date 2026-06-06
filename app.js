@@ -451,7 +451,7 @@
     const gridYTop = top;
     const gridYMid = top + height / 2;
     const gridYBottom = top + height;
-    const title = state.period === "today" || state.period === "yesterday" ? "Vendas por horário" : "Vendas por dia";
+    const title = shouldGroupChartByHour() ? "Vendas por horário" : "Vendas por dia";
 
     document.getElementById("salesChartTitle").textContent = title;
     els.chart.innerHTML = `
@@ -526,7 +526,7 @@
 
   function buildSeries() {
     const range = getDateRange();
-    const byHour = state.period === "today" || state.period === "yesterday";
+    const byHour = shouldGroupChartByHour();
     const labels = byHour ? buildHourLabels() : buildDayLabels(range.start, range.end);
     return labels.map((label, index) => {
       const sales = state.filteredTransactions.filter((item) => {
@@ -541,6 +541,13 @@
         revenue: sum(sales.map((item) => item.valor))
       };
     });
+  }
+
+  function shouldGroupChartByHour() {
+    if (state.appliedPeriod === "today" || state.appliedPeriod === "yesterday") return true;
+    if (state.appliedPeriod !== "custom") return false;
+    const range = getDateRange();
+    return toIsoDate(range.start) === toIsoDate(range.end);
   }
 
   function showTooltip(event, point) {
@@ -771,7 +778,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=26").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=27").then((registration) => registration.update()).catch(console.error);
     }
   }
 
