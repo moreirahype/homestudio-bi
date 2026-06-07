@@ -454,12 +454,16 @@
 
   function buildFixedCredits(range) {
     const salary = Number(state.attendant.salario_fixo_mensal || 0);
-    const daily = Math.round((salary / 30) * 100) / 100;
+    const salaryCents = Math.round(salary * 100);
+    const baseDailyCents = Math.floor(salaryCents / 30);
+    const remainderCents = salaryCents - baseDailyCents * 30;
     const today = endOfDay(new Date());
     const end = endOfDay(range.end) > today ? today : endOfDay(range.end);
     const credits = [];
     for (let cursor = startOfDay(range.start); cursor <= end; cursor = addDays(cursor, 1)) {
       if (cursor.getDate() === 31) continue;
+      const dayOfMonth = cursor.getDate();
+      const daily = (baseDailyCents + (dayOfMonth <= remainderCents ? 1 : 0)) / 100;
       const timestamp = new Date(cursor);
       timestamp.setHours(0, 0, 0, 0);
       credits.push({
@@ -553,7 +557,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=28").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=29").then((registration) => registration.update()).catch(console.error);
     }
   }
 
