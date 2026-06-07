@@ -459,6 +459,7 @@
     const end = endOfDay(range.end) > today ? today : endOfDay(range.end);
     const credits = [];
     for (let cursor = startOfDay(range.start); cursor <= end; cursor = addDays(cursor, 1)) {
+      if (cursor.getDate() === 31) continue;
       const timestamp = new Date(cursor);
       timestamp.setHours(0, 0, 0, 0);
       credits.push({
@@ -552,7 +553,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=27").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=28").then((registration) => registration.update()).catch(console.error);
     }
   }
 
