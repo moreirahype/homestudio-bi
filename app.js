@@ -137,7 +137,8 @@
     els.testNotification.addEventListener("click", async () => {
       try {
         await syncOwnerPush(true);
-        await window.HSBIPush.test("owner", {
+        const pushClient = await ensurePushClient();
+        await pushClient.test("owner", {
           title: "Resumo das Campanhas!",
           body: buildNotificationText(),
           url: `${location.origin}${location.pathname}#notifications`
@@ -743,15 +744,36 @@
     return notificationTimes.every((time) => state.notifications[time]);
   }
 
-  function syncOwnerPush(force) {
+  async function syncOwnerPush(force) {
+    const pushClient = await ensurePushClient();
     const times = notificationTimes.filter((time) => state.notifications[time]);
     const preferences = {
       enabled: times.length > 0,
       times
     };
     return force
-      ? window.HSBIPush.sync("owner", preferences)
-      : window.HSBIPush.update("owner", preferences);
+      ? pushClient.sync("owner", preferences)
+      : pushClient.update("owner", preferences);
+  }
+
+  function ensurePushClient() {
+    if (window.HSBIPush) return Promise.resolve(window.HSBIPush);
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-push-client="dynamic"]');
+      if (existing) {
+        existing.addEventListener("load", () => resolve(window.HSBIPush), { once: true });
+        existing.addEventListener("error", () => reject(new Error("Não foi possível carregar o módulo de notificações.")), { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "../push-client.js?v=32";
+      script.dataset.pushClient = "dynamic";
+      script.onload = () => window.HSBIPush
+        ? resolve(window.HSBIPush)
+        : reject(new Error("O módulo de notificações não foi inicializado."));
+      script.onerror = () => reject(new Error("Não foi possível carregar o módulo de notificações."));
+      document.head.appendChild(script);
+    });
   }
 
   function buildNotificationText() {
@@ -772,7 +794,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=30").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=32").then((registration) => registration.update()).catch(console.error);
     }
   }
 

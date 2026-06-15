@@ -109,7 +109,8 @@
     els.testNotification.addEventListener("click", async () => {
       try {
         await syncAttendantPush(true);
-        await window.HSBIPush.test("sheila", {
+        const pushClient = await ensurePushClient();
+        await pushClient.test("sheila", {
           title: "Venda Realizada! 💰",
           body: "",
           url: `${location.origin}${location.pathname}#transactions`
@@ -529,19 +530,40 @@
     return Math.max(1, Math.ceil(state.displayTransactions.length / baseConfig.rowsPerPage));
   }
 
-  function syncAttendantPush(force) {
+  async function syncAttendantPush(force) {
+    const pushClient = await ensurePushClient();
     const preferences = {
       enabled: state.notificationsEnabled,
       times: []
     };
     return force
-      ? window.HSBIPush.sync("sheila", preferences)
-      : window.HSBIPush.update("sheila", preferences);
+      ? pushClient.sync("sheila", preferences)
+      : pushClient.update("sheila", preferences);
+  }
+
+  function ensurePushClient() {
+    if (window.HSBIPush) return Promise.resolve(window.HSBIPush);
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-push-client="dynamic"]');
+      if (existing) {
+        existing.addEventListener("load", () => resolve(window.HSBIPush), { once: true });
+        existing.addEventListener("error", () => reject(new Error("Não foi possível carregar o módulo de notificações.")), { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "../push-client.js?v=32";
+      script.dataset.pushClient = "dynamic";
+      script.onload = () => window.HSBIPush
+        ? resolve(window.HSBIPush)
+        : reject(new Error("O módulo de notificações não foi inicializado."));
+      script.onerror = () => reject(new Error("Não foi possível carregar o módulo de notificações."));
+      document.head.appendChild(script);
+    });
   }
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=30").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=32").then((registration) => registration.update()).catch(console.error);
     }
   }
 
