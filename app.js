@@ -72,7 +72,9 @@
     registerServiceWorker();
     refreshData();
     window.setInterval(() => refreshData(), config.autoRefreshMinutes * 60 * 1000);
-    window.setInterval(checkScheduledNotifications, 60 * 1000);
+    if (typeof Notification !== "undefined" && Notification.permission === "granted" && notificationTimes.some((time) => state.notifications[time])) {
+      window.setTimeout(() => syncOwnerPush().catch(console.error), 1000);
+    }
   }
 
   function bindEvents() {
@@ -116,20 +118,33 @@
 
     els.enableAllNotifications.addEventListener("click", async () => {
       const shouldEnable = !areAllNotificationsEnabled();
-      if (shouldEnable) {
-        const granted = await ensureNotificationPermission();
-        if (!granted) return;
-      }
+      const previous = Object.assign({}, state.notifications);
       notificationTimes.forEach((time) => {
         state.notifications[time] = shouldEnable;
       });
       saveNotificationPrefs();
       renderNotifications();
+      try {
+        await syncOwnerPush();
+      } catch (error) {
+        state.notifications = previous;
+        saveNotificationPrefs();
+        renderNotifications();
+        alert(error.message);
+      }
     });
 
     els.testNotification.addEventListener("click", async () => {
-      const granted = await ensureNotificationPermission();
-      if (granted) sendNotification("Resumo das Campanhas!", buildNotificationText());
+      try {
+        await syncOwnerPush(true);
+        await window.HSBIPush.test("owner", {
+          title: "Resumo das Campanhas!",
+          body: buildNotificationText(),
+          url: `${location.origin}${location.pathname}#notifications`
+        });
+      } catch (error) {
+        alert(error.message);
+      }
     });
 
     document.addEventListener("pointerdown", (event) => {
@@ -708,13 +723,18 @@
 
     els.notificationList.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", async () => {
-        if (input.checked) {
-          const granted = await ensureNotificationPermission();
-          if (!granted) input.checked = false;
-        }
+        const previous = state.notifications[input.dataset.time];
         state.notifications[input.dataset.time] = input.checked;
         saveNotificationPrefs();
         renderNotifications();
+        try {
+          await syncOwnerPush();
+        } catch (error) {
+          state.notifications[input.dataset.time] = previous;
+          saveNotificationPrefs();
+          renderNotifications();
+          alert(error.message);
+        }
       });
     });
   }
@@ -723,41 +743,15 @@
     return notificationTimes.every((time) => state.notifications[time]);
   }
 
-  async function ensureNotificationPermission() {
-    if (!("Notification" in window)) {
-      alert("Este navegador não suporta notificações.");
-      return false;
-    }
-    if (Notification.permission === "granted") return true;
-    if (Notification.permission === "denied") {
-      alert("As notificações estão bloqueadas nas configurações do navegador.");
-      return false;
-    }
-    return (await Notification.requestPermission()) === "granted";
-  }
-
-  function checkScheduledNotifications() {
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
-    const now = new Date();
-    const current = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    if (!state.notifications[current]) return;
-    const key = `hsbi-sent-${toIsoDate(now)}-${current}`;
-    if (localStorage.getItem(key)) return;
-    localStorage.setItem(key, "1");
-    sendNotification("Resumo das Campanhas!", buildNotificationText());
-  }
-
-  function sendNotification(title, body) {
-    const iconUrl = new URL("../assets/icon-192.png", location.href).href;
-    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-      navigator.serviceWorker.ready.then((registration) => registration.showNotification(title, {
-        body,
-        icon: iconUrl,
-        badge: iconUrl
-      }));
-      return;
-    }
-    new Notification(title, { body, icon: iconUrl });
+  function syncOwnerPush(force) {
+    const times = notificationTimes.filter((time) => state.notifications[time]);
+    const preferences = {
+      enabled: times.length > 0,
+      times
+    };
+    return force
+      ? window.HSBIPush.sync("owner", preferences)
+      : window.HSBIPush.update("owner", preferences);
   }
 
   function buildNotificationText() {
@@ -778,7 +772,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=27").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=30").then((registration) => registration.update()).catch(console.error);
     }
   }
 

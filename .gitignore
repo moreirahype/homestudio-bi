@@ -1,0 +1,5 @@
+qa-*.png
+.DS_Store
+Thumbs.db
+push-server/.env
+push-server/.env.local

@@ -58,7 +58,9 @@
     registerServiceWorker();
     refreshData();
     window.setInterval(() => refreshData(), baseConfig.autoRefreshMinutes * 60 * 1000);
-    window.setInterval(pollSalesNotifications, 60 * 1000);
+    if (typeof Notification !== "undefined" && Notification.permission === "granted" && state.notificationsEnabled) {
+      window.setTimeout(() => syncAttendantPush().catch(console.error), 1000);
+    }
   }
 
   function bindEvents() {
@@ -92,19 +94,29 @@
       renderTransactions();
     });
     els.saleNotifications.addEventListener("change", async () => {
-      if (els.saleNotifications.checked) {
-        const granted = await ensureNotificationPermission();
-        if (!granted) {
-          els.saleNotifications.checked = false;
-          return;
-        }
-      }
-      state.notificationsEnabled = els.saleNotifications.checked;
+      const previous = state.notificationsEnabled;
+      state.notificationsEnabled = Boolean(els.saleNotifications.checked);
       saveNotificationPref();
+      try {
+        await syncAttendantPush();
+      } catch (error) {
+        state.notificationsEnabled = previous;
+        els.saleNotifications.checked = previous;
+        saveNotificationPref();
+        alert(error.message);
+      }
     });
     els.testNotification.addEventListener("click", async () => {
-      const granted = await ensureNotificationPermission();
-      if (granted) sendNotification();
+      try {
+        await syncAttendantPush(true);
+        await window.HSBIPush.test("sheila", {
+          title: "Venda Realizada! 💰",
+          body: "",
+          url: `${location.origin}${location.pathname}#transactions`
+        });
+      } catch (error) {
+        alert(error.message);
+      }
     });
     document.addEventListener("pointerdown", (event) => {
       if (!els.tooltip.hidden && !event.target.closest(".chart-point")) hideTooltip();
@@ -202,17 +214,6 @@
     });
   }
 
-  async function pollSalesNotifications() {
-    if (!state.notificationsEnabled) return;
-    try {
-      const payload = await fetchAttendantPayload(getDateRange("today"));
-      applyPayload(payload, false);
-      render();
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
   function trackNewSales(sales) {
     if (!state.hasInitializedSales) {
       sales.forEach((sale) => state.seenSaleIds.add(sale.id));
@@ -222,7 +223,6 @@
     sales.forEach((sale) => {
       if (!state.seenSaleIds.has(sale.id)) {
         state.seenSaleIds.add(sale.id);
-        if (state.notificationsEnabled) sendNotification();
       }
     });
   }
@@ -529,35 +529,19 @@
     return Math.max(1, Math.ceil(state.displayTransactions.length / baseConfig.rowsPerPage));
   }
 
-  function sendNotification() {
-    const title = "Venda Realizada! 💰";
-    const iconUrl = new URL("../assets/icon-192.png", location.href).href;
-    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-      navigator.serviceWorker.ready.then((registration) => registration.showNotification(title, {
-        icon: iconUrl,
-        badge: iconUrl
-      }));
-      return;
-    }
-    new Notification(title, { icon: iconUrl });
-  }
-
-  async function ensureNotificationPermission() {
-    if (!("Notification" in window)) {
-      alert("Este navegador não suporta notificações.");
-      return false;
-    }
-    if (Notification.permission === "granted") return true;
-    if (Notification.permission === "denied") {
-      alert("As notificações estão bloqueadas nas configurações do navegador.");
-      return false;
-    }
-    return (await Notification.requestPermission()) === "granted";
+  function syncAttendantPush(force) {
+    const preferences = {
+      enabled: state.notificationsEnabled,
+      times: []
+    };
+    return force
+      ? window.HSBIPush.sync("sheila", preferences)
+      : window.HSBIPush.update("sheila", preferences);
   }
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=29").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=30").then((registration) => registration.update()).catch(console.error);
     }
   }
 
