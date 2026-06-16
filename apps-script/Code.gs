@@ -1,7 +1,8 @@
 const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
-const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
+const DEBUG_SHEET_NAME = 'Debug';
+const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual', 'produto'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
 
@@ -27,17 +28,175 @@ function doGet(e) {
 
 function doPost(e) {
   const payload = parsePayload_(e);
+  console.log('Payload recebido: ' + JSON.stringify(payload));
+  const validation = validateWebhook_(payload);
+  if (!validation.ok) {
+    console.log('Webhook rejeitado: ' + JSON.stringify(validation));
+    appendDebugLog_('rejected', payload, validation);
+    return outputJson_(validation);
+  }
   const row = normalizeWebhook_(payload);
+  if (!row) {
+    console.log('Webhook ignorado pelo normalizador.');
+    appendDebugLog_('ignored', payload, { ok: true, ignored: true });
+    return outputJson_({ ok: true, ignored: true });
+  }
+  let inserted = false;
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
     const sheet = getTransactionsSheet_();
+    if (transactionExists_(sheet, row[0])) {
+      console.log('Transação duplicada: ' + row[0]);
+      appendDebugLog_('duplicate', payload, { ok: true, duplicate: true, id: row[0], row: row });
+      return outputJson_({ ok: true, duplicate: true, id: row[0] });
+    }
     sheet.appendRow(row);
     pruneOldRows_(sheet);
+    inserted = true;
+    console.log('Transação inserida na aba ' + sheet.getName() + ': ' + JSON.stringify(row));
+    appendDebugLog_('inserted', payload, { ok: true, id: row[0], row: row, sheet: sheet.getName() });
   } finally {
     lock.releaseLock();
   }
+  if (inserted && normalizePersonName_(row[8]) === normalizePersonName_('Sheila')) {
+    try {
+      sendPushRequest_({
+        audience: 'sheila',
+        title: 'Venda Realizada! 💰',
+        body: '',
+        url: getPushProperty_('SHEILA_APP_URL'),
+        tag: 'hsbi-sheila-sale'
+      });
+    } catch (error) {
+      console.error('Falha ao enviar push da Sheila: ' + error);
+    }
+  }
   return outputJson_({ ok: true, id: row[0] });
+}
+
+function appendDebugLog_(status, payload, result) {
+  try {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = spreadsheet.getSheetByName(DEBUG_SHEET_NAME);
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(DEBUG_SHEET_NAME);
+      sheet.appendRow(['timestamp', 'status', 'payload', 'result']);
+      sheet.setFrozenRows(1);
+    }
+    sheet.appendRow([
+      new Date().toISOString(),
+      status,
+      JSON.stringify(payload),
+      JSON.stringify(result)
+    ]);
+  } catch (error) {
+    console.error('Falha ao gravar Debug: ' + error);
+  }
+}
+
+function setupOwnerPushTriggers() {
+  const handlers = [
+    'checkOwnerPushSchedule',
+    'sendOwnerCampaignPush08',
+    'sendOwnerCampaignPush12',
+    'sendOwnerCampaignPush18',
+    'sendOwnerCampaignPush23'
+  ];
+  ScriptApp.getProjectTriggers()
+    .filter((trigger) => handlers.indexOf(trigger.getHandlerFunction()) > -1)
+    .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+  ScriptApp.newTrigger('checkOwnerPushSchedule').timeBased().everyMinutes(5).create();
+  return { ok: true, intervalMinutes: 5 };
+}
+
+function checkOwnerPushSchedule() {
+  const now = new Date();
+  const timezone = Session.getScriptTimeZone();
+  const hour = Utilities.formatDate(now, timezone, 'HH');
+  const minute = Number(Utilities.formatDate(now, timezone, 'mm'));
+  const target = ['08', '12', '18', '23'].indexOf(hour) > -1 && minute < 15
+    ? hour + ':00'
+    : '';
+  if (!target) return { ok: true, skipped: true };
+  const properties = PropertiesService.getScriptProperties();
+  const key = 'OWNER_PUSH_SENT_' + Utilities.formatDate(now, timezone, 'yyyy-MM-dd') + '_' + target;
+  if (properties.getProperty(key)) return { ok: true, duplicate: true };
+  const result = sendOwnerCampaignPush_(target);
+  properties.setProperty(key, now.toISOString());
+  return result;
+}
+
+function sendOwnerCampaignPush08() {
+  return sendOwnerCampaignPush_('08:00');
+}
+
+function sendOwnerCampaignPush12() {
+  return sendOwnerCampaignPush_('12:00');
+}
+
+function sendOwnerCampaignPush18() {
+  return sendOwnerCampaignPush_('18:00');
+}
+
+function sendOwnerCampaignPush23() {
+  return sendOwnerCampaignPush_('23:00');
+}
+
+function sendOwnerCampaignPush_(time) {
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const transactions = readTransactions_(today, today);
+  const meta = readMetaInsights_(today, today);
+  const revenue = transactions.reduce((total, item) => total + parseNumber_(item.valor || 0), 0);
+  const sales = transactions.length;
+  const ads = parseNumber_(meta.spend || 0);
+  const taxRate = Number(PropertiesService.getScriptProperties().getProperty('META_TAX_RATE') || 0.1383);
+  const totalSpend = ads + ads * taxRate;
+  const cpa = sales > 0 ? totalSpend / sales : null;
+  const roas = totalSpend > 0 ? revenue / totalSpend : null;
+  const body =
+    'Seu investimento está em ' + formatBrl_(totalSpend) +
+    ', com faturamento em ' + formatBrl_(revenue) +
+    ', com um CPA de ' + (cpa == null ? 'N/A' : formatBrl_(cpa)) +
+    ' e um ROI de ' + (roas == null ? '0,00' : formatDecimal_(roas)) + '.';
+  return sendPushRequest_({
+    audience: 'owner',
+    time: time,
+    title: 'Resumo das Campanhas!',
+    body: body,
+    url: getPushProperty_('OWNER_APP_URL'),
+    tag: 'hsbi-owner-' + time.replace(':', '')
+  });
+}
+
+function sendPushRequest_(payload) {
+  const baseUrl = getPushProperty_('PUSH_API_URL').replace(/\/$/, '');
+  const secret = getPushProperty_('PUSH_API_SECRET');
+  if (!baseUrl || !secret) throw new Error('Configure PUSH_API_URL e PUSH_API_SECRET.');
+  const response = UrlFetchApp.fetch(baseUrl + '/api/send', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + secret },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+  const text = response.getContentText();
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
+    throw new Error('Servidor push respondeu ' + response.getResponseCode() + ': ' + text);
+  }
+  return JSON.parse(text);
+}
+
+function getPushProperty_(name) {
+  return String(PropertiesService.getScriptProperties().getProperty(name) || '').trim();
+}
+
+function formatBrl_(value) {
+  return 'R$ ' + Number(value || 0).toFixed(2).replace('.', ',');
+}
+
+function formatDecimal_(value) {
+  return Number(value || 0).toFixed(2).replace('.', ',');
 }
 
 function parsePayload_(e) {
@@ -52,32 +211,86 @@ function parsePayload_(e) {
 }
 
 function normalizeWebhook_(payload) {
+  const isCakto = isCaktoPayload_(payload);
+  const event = pickValue_(payload, ['event']);
+  if (isCakto && event !== 'purchase_approved') return null;
   const now = new Date();
-  const timestampValue = pickValue_(payload, ['timestamp', 'dataHora', 'created_at', 'createdAt']);
+  const timestampValue = isCakto
+    ? pickValue_(payload, ['data.paidAt', 'paidAt', 'data.createdAt', 'createdAt'])
+    : pickValue_(payload, ['timestamp', 'dataHora', 'created_at', 'createdAt']);
   const timestamp = timestampValue ? new Date(timestampValue) : now;
-  const originalValue = parseNumber_(pickValue_(payload, ['valor', 'value', 'event_value', 'eventValue', 'amount', 'preco', 'price']) || 0);
-  const originalCurrency = normalizeCurrency_(pickValue_(payload, ['moeda', 'currency', 'coin']) || 'BRL');
+  const originalValue = parseNumber_(isCakto
+    ? pickValue_(payload, ['data.amount', 'amount', 'data.baseAmount', 'baseAmount'])
+    : pickValue_(payload, ['valor', 'value', 'event_value', 'eventValue', 'amount', 'preco', 'price']) || 0);
+  const originalCurrency = normalizeCurrency_(isCakto
+    ? 'BRL'
+    : pickValue_(payload, ['moeda', 'currency', 'coin']) || 'BRL');
   const exchangeRate = getCurrencyRateToBrl_(originalCurrency);
   const valueInBrl = roundCurrency_(originalValue * exchangeRate);
   const attendant = pickValue_(payload, ['atendente', 'attendant', 'vendedor', 'seller', 'responsavel', 'responsible']) || 'Sem atendente';
   const attendantConfig = getAttendantConfigByName_(attendant);
   const commissionPercent = attendantConfig ? attendantConfig.comissao_percentual : '';
   return [
-    Utilities.getUuid(),
+    buildTransactionId_(payload, isCakto),
     timestamp.toISOString(),
     Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
     Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'HH:mm'),
-    pickValue_(payload, ['pagador', 'payer', 'contactName', 'contact_name', 'nome', 'name', 'customer_name', 'cliente']) || 'Sem pagador',
-    pickValue_(payload, ['telefone', 'phone', 'telephone', 'whatsapp', 'celular', 'mobile']) || '',
+    isCakto
+      ? pickValue_(payload, ['data.customer.name', 'customer.name', 'customer_name']) || 'Sem pagador'
+      : pickValue_(payload, ['pagador', 'payer', 'contactName', 'contact_name', 'nome', 'name', 'customer_name', 'cliente']) || 'Sem pagador',
+    isCakto
+      ? pickValue_(payload, ['data.customer.phone', 'customer.phone', 'phone']) || ''
+      : pickValue_(payload, ['telefone', 'phone', 'telephone', 'whatsapp', 'celular', 'mobile']) || '',
     'BRL',
     valueInBrl,
     attendant,
-    pickValue_(payload, ['origem', 'source']) || 'Zapdata',
+    isCakto ? 'Cakto' : pickValue_(payload, ['origem', 'source']) || 'Zapdata',
     originalCurrency,
     originalValue,
     exchangeRate,
-    commissionPercent
+    commissionPercent,
+    pickValue_(payload, ['produto', 'product', 'item_type', 'itemType']) || ''
   ];
+}
+
+function buildTransactionId_(payload, isCakto) {
+  if (isCakto) {
+    return pickValue_(payload, ['data.id', 'id', 'transaction_id', 'payment_id']) || Utilities.getUuid();
+  }
+  return pickValue_(payload, ['transaction_id', 'payment_id', 'order_id', 'sale_id', 'pix_id'])
+    || Utilities.getUuid();
+}
+
+function isCaktoPayload_(payload) {
+  const event = String(pickValue_(payload, ['event']) || '').trim().toLowerCase();
+  if (event === 'purchase_approved') return true;
+  return Boolean(
+    pickValue_(payload, ['secret']) &&
+    pickValue_(payload, ['data.amount', 'data.checkoutUrl', 'data.product.id'])
+  );
+}
+
+function validateWebhook_(payload) {
+  const isGallery = String(pickValue_(payload, ['origem', 'source']) || '').trim().toLowerCase() === 'home studio gallery';
+  if (!isCaktoPayload_(payload) && !isGallery) return { ok: true };
+  const properties = PropertiesService.getScriptProperties();
+  const expectedSecret = isGallery
+    ? properties.getProperty('GALLERY_WEBHOOK_SECRET')
+    : properties.getProperty('CAKTO_WEBHOOK_SECRET');
+  if (!expectedSecret) return { ok: true };
+  const receivedSecret = String(pickValue_(payload, ['hsbi_key', 'cakto_key', 'webhook_secret']) || '');
+  return receivedSecret === expectedSecret
+    ? { ok: true }
+    : { ok: false, error: 'Chave secreta inválida.' };
+}
+
+function transactionExists_(sheet, id) {
+  if (!id || sheet.getLastRow() < 2) return false;
+  return sheet
+    .getRange(2, 1, sheet.getLastRow() - 1, 1)
+    .createTextFinder(String(id))
+    .matchEntireCell(true)
+    .findNext() !== null;
 }
 
 function getTransactionsSheet_() {
@@ -190,19 +403,61 @@ function deleteExtraColumns_(sheet, expectedColumns) {
 }
 
 function readGoalsForSlug_(slug) {
+  const properties = PropertiesService.getScriptProperties();
+  const goals = readGoalRows_()
+    .map((item) => hydrateGoalStart_(item, properties));
+  return goals
+    .filter((item) => String(item.slug || '').trim() === String(slug || '').trim())
+    .filter((item) => item.meta_ativa && Number(item.meta_valor || 0) > 0 && item.meta_inicio);
+}
+
+function inspectGoalStarts() {
+  const properties = PropertiesService.getScriptProperties();
+  const goals = readGoalRows_()
+    .map((goal) => hydrateGoalStart_(goal, properties))
+    .filter((goal) => goal.meta_ativa && Number(goal.meta_valor || 0) > 0 && goal.meta_inicio)
+    .map((goal) => ({
+      slug: goal.slug,
+      meta_titulo: goal.meta_titulo,
+      meta_valor: goal.meta_valor,
+      meta_premio: goal.meta_premio,
+      ativada_em: goal.meta_inicio,
+      propriedade: getGoalStartKey_(goal)
+    }));
+  console.log(JSON.stringify(goals, null, 2));
+  return goals;
+}
+
+function cleanupObsoleteGoalStarts() {
+  const properties = PropertiesService.getScriptProperties();
+  const activeKeys = new Set(
+    readGoalRows_()
+      .filter((goal) => goal.meta_ativa && Number(goal.meta_valor || 0) > 0)
+      .map((goal) => getGoalStartKey_(goal))
+      .filter(Boolean)
+  );
+  const allProperties = properties.getProperties();
+  const removed = [];
+  Object.keys(allProperties).forEach((key) => {
+    if (key.indexOf('goal_started_at_') !== 0 || activeKeys.has(key)) return;
+    properties.deleteProperty(key);
+    removed.push(key);
+  });
+  console.log(JSON.stringify({ removed: removed.length, active: activeKeys.size }, null, 2));
+  return { ok: true, removed: removed.length, active: activeKeys.size };
+}
+
+function readGoalRows_() {
   const sheet = getGoalsSheet_();
   const lastRow = sheet.getLastRow();
-  const properties = PropertiesService.getScriptProperties();
-  const goals = lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, GOAL_HEADERS.length)
+  if (lastRow < 2) return [];
+  return sheet.getRange(2, 1, lastRow - 1, GOAL_HEADERS.length)
     .getValues()
     .map((row) => GOAL_HEADERS.reduce((object, header, index) => {
       object[header] = normalizeGoalCell_(header, row[index]);
       return object;
     }, {}))
-    .map((item) => hydrateGoalStart_(item, properties));
-  return goals
-    .filter((item) => String(item.slug || '').trim() === String(slug || '').trim())
-    .filter((item) => item.meta_ativa && Number(item.meta_valor || 0) > 0 && item.meta_inicio);
+    .filter((goal) => goal.slug && goal.meta_titulo);
 }
 
 function hydrateGoalStart_(goal, properties) {
@@ -352,38 +607,75 @@ function normalizeCell_(header, value) {
 function readMetaInsights_(from, to, includeActions) {
   const properties = PropertiesService.getScriptProperties();
   const token = properties.getProperty('META_ACCESS_TOKEN');
-  const account = properties.getProperty('META_AD_ACCOUNT_ID');
-  if (!token || !account) return { spend: 0, leads: 0 };
+  const accounts = getMetaAdAccounts_(properties);
+  if (!token || !accounts.length) return { spend: 0, leads: 0 };
 
   const version = properties.getProperty('META_API_VERSION') || 'v25.0';
-  const adAccount = account.indexOf('act_') === 0 ? account : 'act_' + account;
   const timeRange = encodeURIComponent(JSON.stringify({
     since: from || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
     until: to || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd')
   }));
-  const url =
-    'https://graph.facebook.com/' +
-    version +
-    '/' +
-    adAccount +
-    '/insights?level=account&fields=spend,actions&time_range=' +
-    timeRange +
-    '&access_token=' +
-    encodeURIComponent(token);
+  const result = { spend: 0, leads: 0 };
+  const actions = [];
+  const errors = [];
 
-  try {
-    const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    const data = JSON.parse(response.getContentText());
-    const first = data.data && data.data[0] ? data.data[0] : {};
-    const result = {
-      spend: parseNumber_(first.spend || 0),
-      leads: countLeads_(first.actions || [])
-    };
-    if (includeActions) result.actions = first.actions || [];
-    return result;
-  } catch (error) {
-    return { spend: 0, leads: 0, error: String(error) };
+  accounts.forEach((account) => {
+    const adAccount = account.indexOf('act_') === 0 ? account : 'act_' + account;
+    const url =
+      'https://graph.facebook.com/' +
+      version +
+      '/' +
+      adAccount +
+      '/insights?level=account&fields=spend,actions&time_range=' +
+      timeRange +
+      '&access_token=' +
+      encodeURIComponent(token);
+    try {
+      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      const data = JSON.parse(response.getContentText());
+      if (response.getResponseCode() >= 400 || data.error) {
+        errors.push({ account: adAccount, error: data.error || response.getContentText() });
+        return;
+      }
+      const first = data.data && data.data[0] ? data.data[0] : {};
+      const accountActions = first.actions || [];
+      result.spend += parseNumber_(first.spend || 0);
+      result.leads += countLeads_(accountActions);
+      if (includeActions) {
+        accountActions.forEach((action) => actions.push({
+          account: adAccount,
+          action_type: action.action_type,
+          value: action.value
+        }));
+      }
+    } catch (error) {
+      errors.push({ account: adAccount, error: String(error) });
+    }
+  });
+
+  result.spend = roundCurrency_(result.spend);
+  if (includeActions) {
+    result.actions = actions;
+    result.accounts = accounts;
+    if (errors.length) result.errors = errors;
   }
+  return result;
+}
+
+function getMetaAdAccounts_(properties) {
+  const raw = String(properties.getProperty('META_AD_ACCOUNT_IDS') || '').trim();
+  if (!raw) return [];
+  const unique = {};
+  return raw
+    .split(/[\s,;]+/)
+    .map((account) => account.trim())
+    .filter(Boolean)
+    .filter((account) => {
+      const normalized = account.indexOf('act_') === 0 ? account.slice(4) : account;
+      if (!/^\d+$/.test(normalized) || unique[normalized]) return false;
+      unique[normalized] = true;
+      return true;
+    });
 }
 
 function countLeads_(actions) {

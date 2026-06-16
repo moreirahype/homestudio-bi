@@ -1,4 +1,4 @@
-const CACHE_NAME = "home-studio-bi-v33";
+const CACHE_NAME = "home-studio-bi-v34";
 const ASSETS = [
   "./styles.css",
   "./app.js",
@@ -12,6 +12,7 @@ const ASSETS = [
   "./k9v2m7q4/",
   "./k9v2m7q4/index.html",
   "./assets/icon.svg",
+  "./assets/icon-source.png",
   "./assets/apple-touch-icon.png",
   "./assets/icon-192.png",
   "./assets/icon-192.svg",
