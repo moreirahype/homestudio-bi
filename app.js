@@ -766,7 +766,7 @@
         return;
       }
       const script = document.createElement("script");
-      script.src = "../push-client.js?v=32";
+      script.src = "../push-client.js?v=33";
       script.dataset.pushClient = "dynamic";
       script.onload = () => window.HSBIPush
         ? resolve(window.HSBIPush)
@@ -794,7 +794,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=32").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=33").then((registration) => registration.update()).catch(console.error);
     }
   }
 
