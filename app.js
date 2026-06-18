@@ -33,6 +33,7 @@
     startDate: document.getElementById("startDate"),
     endDate: document.getElementById("endDate"),
     refreshButton: document.getElementById("refreshButton"),
+    sidebarToggle: document.getElementById("sidebarToggle"),
     syncStatus: document.getElementById("syncStatus"),
     desktopSyncStatus: document.getElementById("desktopSyncStatus"),
     transactionSearch: document.getElementById("transactionSearch"),
@@ -69,6 +70,7 @@
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
+    applySidebarPreference();
     setDefaultDates();
     bindEvents();
     setPage(location.hash.replace("#", "") || "dashboard");
@@ -104,6 +106,9 @@
     });
 
     els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true }));
+    if (els.sidebarToggle) {
+      els.sidebarToggle.addEventListener("click", toggleSidebar);
+    }
     els.transactionSearch.addEventListener("input", () => {
       state.pageIndex = 1;
       renderTransactions();
@@ -164,6 +169,27 @@
       const page = location.hash.replace("#", "");
       if (page) setPage(page);
     });
+  }
+
+  function applySidebarPreference() {
+    const isCollapsed = localStorage.getItem("hsbi-sidebar-collapsed") === "true";
+    document.body.classList.toggle("sidebar-collapsed", isCollapsed);
+    updateSidebarToggle(isCollapsed);
+  }
+
+  function toggleSidebar() {
+    const isCollapsed = !document.body.classList.contains("sidebar-collapsed");
+    document.body.classList.toggle("sidebar-collapsed", isCollapsed);
+    localStorage.setItem("hsbi-sidebar-collapsed", String(isCollapsed));
+    updateSidebarToggle(isCollapsed);
+    requestAnimationFrame(renderSalesChart);
+  }
+
+  function updateSidebarToggle(isCollapsed) {
+    if (!els.sidebarToggle) return;
+    els.sidebarToggle.setAttribute("aria-expanded", String(!isCollapsed));
+    els.sidebarToggle.setAttribute("aria-label", isCollapsed ? "Expandir barra lateral" : "Recolher barra lateral");
+    els.sidebarToggle.title = isCollapsed ? "Expandir barra lateral" : "Recolher barra lateral";
   }
 
   async function refreshData(options = {}) {
@@ -363,7 +389,7 @@
     const hourlyPeriod = document.getElementById("hourlySalesChartPeriod") || document.getElementById("salesChartPeriod");
     const dailyPeriod = document.getElementById("dailySalesChartPeriod");
     if (hourlyPeriod) hourlyPeriod.textContent = getPeriodName(state.appliedPeriod);
-    if (dailyPeriod) dailyPeriod.textContent = getPeriodName(state.appliedPeriod);
+    if (dailyPeriod) dailyPeriod.textContent = getPeriodName(getDailyChartPeriod());
     document.getElementById("attendantsPeriod").textContent = getPeriodName(state.appliedPeriod);
     updateDateDisplays();
   }
@@ -580,9 +606,13 @@
   }
 
   function buildDailySeries() {
-    const range = getDateRange();
+    const range = getDateRange(getDailyChartPeriod());
     return buildDayLabels(range.start, range.end).map((label, index) => {
-      const sales = state.filteredTransactions.filter((item) => toIsoDate(item.timestamp) === label.key);
+      const sales = state.transactions.filter((item) => {
+        return item.timestamp >= startOfDay(range.start)
+          && item.timestamp <= endOfDay(range.end)
+          && toIsoDate(item.timestamp) === label.key;
+      });
       return {
         index,
         label: label.short,
@@ -591,6 +621,10 @@
         revenue: sum(sales.map((item) => item.valor))
       };
     });
+  }
+
+  function getDailyChartPeriod() {
+    return state.appliedPeriod === "today" || state.appliedPeriod === "yesterday" ? "month" : state.appliedPeriod;
   }
 
   function showTooltip(event, point, chart, tooltip) {
