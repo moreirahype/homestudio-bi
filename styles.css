@@ -416,6 +416,10 @@ h2 {
   overflow-x: auto;
 }
 
+.mobile-label {
+  display: none;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -858,6 +862,65 @@ th:last-child {
 
   table {
     min-width: 0;
+  }
+
+  .attendants-panel .table-wrap {
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+
+  .attendants-panel .table-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
+  .attendants-panel table {
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .attendants-panel th,
+  .attendants-panel td {
+    min-width: 0;
+    padding-right: 4px;
+    padding-left: 4px;
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+  }
+
+  .attendants-panel th {
+    font-size: 10px;
+  }
+
+  .attendants-panel th:nth-child(1),
+  .attendants-panel td:nth-child(1) {
+    width: 31%;
+  }
+
+  .attendants-panel th:nth-child(2),
+  .attendants-panel td:nth-child(2) {
+    width: 15%;
+    text-align: center;
+  }
+
+  .attendants-panel th:nth-child(3),
+  .attendants-panel td:nth-child(3) {
+    width: 28%;
+    text-align: right;
+  }
+
+  .attendants-panel th:nth-child(4),
+  .attendants-panel td:nth-child(4) {
+    width: 26%;
+    text-align: right;
+  }
+
+  .attendants-panel .desktop-label {
+    display: none;
+  }
+
+  .attendants-panel .mobile-label {
+    display: inline;
   }
 
   th,

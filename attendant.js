@@ -240,8 +240,7 @@
       timestamp,
       data: data || toIsoDate(timestamp),
       hora: hora || formatTime(timestamp),
-      origem: "Venda",
-      descricao: item.pagador || "Sem pagador",
+      pagador: item.pagador || "Sem pagador",
       gross,
       commissionRate,
       value: gross * (commissionRate / 100)
@@ -422,7 +421,7 @@
   function renderTransactions() {
     const query = els.search.value.trim().toLowerCase();
     const rows = state.displayTransactions
-      .filter((item) => `${item.origem} ${item.descricao} ${item.value} ${money(item.value)}`.toLowerCase().includes(query))
+      .filter((item) => `${item.pagador} ${item.value} ${money(item.value)}`.toLowerCase().includes(query))
       .sort((a, b) => b.timestamp - a.timestamp);
     const tbody = document.getElementById("transactionsBody");
     const totalPages = Math.max(1, Math.ceil(rows.length / baseConfig.rowsPerPage));
@@ -430,15 +429,14 @@
     const visible = rows.slice((state.pageIndex - 1) * baseConfig.rowsPerPage, state.pageIndex * baseConfig.rowsPerPage);
     tbody.innerHTML = "";
     if (!visible.length) {
-      tbody.innerHTML = `<tr><td colspan="5">Nenhuma transação encontrada.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4">Nenhuma transação encontrada.</td></tr>`;
     } else {
       visible.forEach((item) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${formatIsoDateBr(item.data)}</td>
           <td>${escapeHtml(item.hora)}</td>
-          <td>${escapeHtml(item.origem)}</td>
-          <td>${escapeHtml(item.descricao)}</td>
+          <td>${escapeHtml(item.pagador)}</td>
           <td>${money(item.value)}</td>
         `;
         tbody.append(tr);
@@ -473,8 +471,7 @@
         timestamp,
         data: toIsoDate(timestamp),
         hora: "00:00",
-        origem: "Fixo",
-        descricao: "Lucas Moreira",
+        pagador: "Lucas Moreira",
         value: daily,
         gross: 0,
         commissionRate: 0
@@ -551,7 +548,7 @@
         return;
       }
       const script = document.createElement("script");
-      script.src = "../push-client.js?v=40";
+      script.src = "../push-client.js?v=42";
       script.dataset.pushClient = "dynamic";
       script.onload = () => window.HSBIPush
         ? resolve(window.HSBIPush)
@@ -563,7 +560,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=40").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=42").then((registration) => registration.update()).catch(console.error);
     }
   }
 

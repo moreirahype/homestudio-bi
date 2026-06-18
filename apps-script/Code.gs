@@ -2,7 +2,7 @@ const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
 const DEBUG_SHEET_NAME = 'Debug';
-const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual', 'produto'];
+const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
 
@@ -248,8 +248,7 @@ function normalizeWebhook_(payload) {
     originalCurrency,
     originalValue,
     exchangeRate,
-    commissionPercent,
-    pickValue_(payload, ['produto', 'product', 'item_type', 'itemType']) || ''
+    commissionPercent
   ];
 }
 
@@ -297,13 +296,35 @@ function getTransactionsSheet_() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = spreadsheet.getSheetByName(SHEET_NAME);
   if (!sheet) sheet = spreadsheet.insertSheet(SHEET_NAME);
-  const current = sheet.getRange(1, 1, 1, HEADERS.length).getValues()[0];
+  const currentWidth = Math.max(sheet.getLastColumn(), HEADERS.length);
+  const current = sheet.getRange(1, 1, 1, currentWidth).getValues()[0];
   const missingHeaders = HEADERS.some((header, index) => current[index] !== header);
-  if (missingHeaders) {
-    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  if (missingHeaders || currentWidth !== HEADERS.length) {
+    migrateTransactionsSheet_(sheet, current);
     sheet.setFrozenRows(1);
   }
   return sheet;
+}
+
+function migrateTransactionsSheet_(sheet, currentHeaders) {
+  const lastRow = sheet.getLastRow();
+  const currentWidth = Math.max(sheet.getLastColumn(), currentHeaders.length);
+  const rows = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, currentWidth).getValues()
+    : [];
+  const headerIndex = {};
+  currentHeaders.forEach((header, index) => {
+    if (header) headerIndex[String(header).trim()] = index;
+  });
+  const remapped = rows.map((row) => HEADERS.map((header) => {
+    const index = headerIndex[header];
+    return index == null ? '' : row[index];
+  }));
+  sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+  if (remapped.length) {
+    sheet.getRange(2, 1, remapped.length, HEADERS.length).setValues(remapped);
+  }
+  deleteExtraColumns_(sheet, HEADERS.length);
 }
 
 function getAttendantsSheet_() {
