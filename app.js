@@ -39,8 +39,10 @@
     prevPage: document.getElementById("prevPage"),
     nextPage: document.getElementById("nextPage"),
     pageInfo: document.getElementById("pageInfo"),
-    chart: document.getElementById("salesChart"),
-    tooltip: document.getElementById("chartTooltip"),
+    hourlyChart: document.getElementById("hourlySalesChart"),
+    hourlyTooltip: document.getElementById("hourlySalesChartTooltip"),
+    dailyChart: document.getElementById("dailySalesChart"),
+    dailyTooltip: document.getElementById("dailySalesChartTooltip"),
     notificationList: document.getElementById("notificationList"),
     enableAllNotifications: document.getElementById("enableAllNotifications"),
     testNotification: document.getElementById("testNotification")
@@ -55,7 +57,7 @@
     roas: "metricRoas",
     sales: "metricSales",
     cpa: "metricCpa",
-    arpu: "metricArpu",
+    averageTicket: "metricAverageTicket",
     leads: "metricLeads",
     cpl: "metricCpl"
   };
@@ -149,7 +151,7 @@
     });
 
     document.addEventListener("pointerdown", (event) => {
-      if (!els.tooltip.hidden && !event.target.closest(".chart-point")) hideTooltip();
+      if (!event.target.closest(".chart-point")) hideTooltips();
     });
 
     window.addEventListener("resize", debounce(() => {
@@ -356,7 +358,8 @@
       button.classList.toggle("is-active", button.dataset.period === state.period);
     });
     els.customFields.classList.toggle("is-visible", state.period === "custom");
-    document.getElementById("salesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
+    document.getElementById("hourlySalesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
+    document.getElementById("dailySalesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
     document.getElementById("attendantsPeriod").textContent = getPeriodName(state.appliedPeriod);
     updateDateDisplays();
   }
@@ -403,7 +406,7 @@
       roas: totalSpend > 0 ? revenue / totalSpend : null,
       sales,
       cpa: sales > 0 ? totalSpend / sales : null,
-      arpu: sales > 0 ? revenue / sales : null,
+      averageTicket: sales > 0 ? revenue / sales : null,
       leads,
       cpl: leads > 0 ? totalSpend / leads : null
     };
@@ -418,7 +421,7 @@
     setMetric("roas", state.metrics.roas == null ? "N/A" : decimal(state.metrics.roas), roasTone(state.metrics.roas));
     setMetric("sales", integer(state.metrics.sales));
     setMetric("cpa", state.metrics.cpa == null ? "N/A" : money(state.metrics.cpa));
-    setMetric("arpu", state.metrics.arpu == null ? "N/A" : money(state.metrics.arpu));
+    setMetric("averageTicket", state.metrics.averageTicket == null ? "N/A" : money(state.metrics.averageTicket));
     setMetric("leads", integer(state.metrics.leads));
     setMetric("cpl", state.metrics.cpl == null ? "N/A" : money(state.metrics.cpl));
   }
@@ -442,9 +445,13 @@
   }
 
   function renderSalesChart() {
-    const grouped = buildSeries();
-    els.chart.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    const chartBox = els.chart.parentElement.getBoundingClientRect();
+    renderSingleSalesChart(els.hourlyChart, els.hourlyTooltip, buildHourlySeries(), "hourlySalesAreaGradient");
+    renderSingleSalesChart(els.dailyChart, els.dailyTooltip, buildDailySeries(), "dailySalesAreaGradient");
+  }
+
+  function renderSingleSalesChart(chart, tooltip, grouped, gradientId) {
+    chart.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    const chartBox = chart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
     const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
     const left = 34;
@@ -453,12 +460,12 @@
     const bottom = 32;
     const canvasWidth = 980;
     const canvasHeight = Math.max(300, Math.round(canvasWidth * (chartBox.height / Math.max(chartBox.width, 1))));
-    els.chart.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
+    chart.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
     const width = canvasWidth - left - right;
     const height = canvasHeight - top - bottom;
-    const step = grouped.length > 1 ? width / (grouped.length - 1) : width;
+    const step = grouped.length > 1 ? width / (grouped.length - 1) : 0;
     const points = grouped.map((point, index) => {
-      const x = left + index * step;
+      const x = grouped.length > 1 ? left + index * step : left + width / 2;
       const y = top + height - (point.sales / maxSales) * height;
       return Object.assign({ x, y }, point);
     });
@@ -467,12 +474,9 @@
     const gridYTop = top;
     const gridYMid = top + height / 2;
     const gridYBottom = top + height;
-    const title = shouldGroupChartByHour() ? "Vendas por horário" : "Vendas por dia";
-
-    document.getElementById("salesChartTitle").textContent = title;
-    els.chart.innerHTML = `
+    chart.innerHTML = `
       <defs>
-        <linearGradient id="salesAreaGradient" x1="0" x2="0" y1="0" y2="1">
+        <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stop-color="#9fe870" stop-opacity="0.16"></stop>
           <stop offset="100%" stop-color="#9fe870" stop-opacity="0"></stop>
         </linearGradient>
@@ -503,7 +507,7 @@
       .chart-plot-bg{fill:rgba(255,255,255,.012)}
       .grid-line,.axis-line{stroke:rgba(159,232,112,.18);stroke-width:1}
       .grid-line.is-soft{stroke:rgba(159,232,112,.1)}
-      .sales-area{fill:url(#salesAreaGradient)}
+      .sales-area{fill:url(#${gradientId})}
       .sales-line{fill:none;stroke:#9fe870;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px rgba(159,232,112,.16))}
       .chart-point,.chart-point *{pointer-events:all;cursor:pointer;outline:none}
       .point-hit{fill:transparent;stroke:transparent}
@@ -513,13 +517,14 @@
       .axis-text{text-anchor:end}
       .x-label{text-anchor:middle}
     `;
-    els.chart.prepend(style);
+    chart.prepend(style);
 
-    els.chart.querySelectorAll(".chart-point").forEach((node) => {
+    chart.querySelectorAll(".chart-point").forEach((node) => {
       const point = points[Number(node.dataset.index)];
-      node.addEventListener("mouseenter", (event) => showTooltip(event, point));
-      node.addEventListener("mousemove", (event) => showTooltip(event, point));
-      node.addEventListener("mouseleave", hideTooltip);
+      node.addEventListener("mouseenter", (event) => showTooltip(event, point, chart, tooltip));
+      node.addEventListener("mousemove", (event) => showTooltip(event, point, chart, tooltip));
+      node.addEventListener("pointerdown", (event) => showTooltip(event, point, chart, tooltip));
+      node.addEventListener("mouseleave", () => hideTooltip(tooltip));
     });
   }
 
@@ -540,14 +545,11 @@
     return commands.join(" ");
   }
 
-  function buildSeries() {
-    const range = getDateRange();
-    const byHour = shouldGroupChartByHour();
-    const labels = byHour ? buildHourLabels() : buildDayLabels(range.start, range.end);
+  function buildHourlySeries() {
+    const labels = buildHourLabels();
     return labels.map((label, index) => {
       const sales = state.filteredTransactions.filter((item) => {
-        if (byHour) return item.timestamp.getHours() === index;
-        return toIsoDate(item.timestamp) === label.key;
+        return item.timestamp.getHours() === index;
       });
       return {
         index,
@@ -559,29 +561,43 @@
     });
   }
 
-  function shouldGroupChartByHour() {
-    if (state.appliedPeriod === "today" || state.appliedPeriod === "yesterday") return true;
-    if (state.appliedPeriod !== "custom") return false;
+  function buildDailySeries() {
     const range = getDateRange();
-    return toIsoDate(range.start) === toIsoDate(range.end);
+    return buildDayLabels(range.start, range.end).map((label, index) => {
+      const sales = state.filteredTransactions.filter((item) => toIsoDate(item.timestamp) === label.key);
+      return {
+        index,
+        label: label.short,
+        fullLabel: label.full,
+        sales: sales.length,
+        revenue: sum(sales.map((item) => item.valor))
+      };
+    });
   }
 
-  function showTooltip(event, point) {
+  function showTooltip(event, point, chart, tooltip) {
     const rect = event.currentTarget.ownerSVGElement.getBoundingClientRect();
-    const wrap = els.chart.parentElement.getBoundingClientRect();
+    const wrap = chart.parentElement.getBoundingClientRect();
     const viewBox = event.currentTarget.ownerSVGElement.viewBox.baseVal;
     const pointX = ((point.x / viewBox.width) * rect.width) + rect.left - wrap.left;
     const pointY = ((point.y / viewBox.height) * rect.height) + rect.top - wrap.top;
     const x = event.clientX ? event.clientX - wrap.left : pointX;
     const y = event.clientY ? event.clientY - wrap.top : pointY;
-    els.tooltip.hidden = false;
-    els.tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
-    els.tooltip.style.top = `${Math.max(52, y - 8)}px`;
-    els.tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}`;
+    hideTooltips(tooltip);
+    tooltip.hidden = false;
+    tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
+    tooltip.style.top = `${Math.max(52, y - 8)}px`;
+    tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}`;
   }
 
-  function hideTooltip() {
-    els.tooltip.hidden = true;
+  function hideTooltip(tooltip) {
+    tooltip.hidden = true;
+  }
+
+  function hideTooltips(except) {
+    [els.hourlyTooltip, els.dailyTooltip].forEach((tooltip) => {
+      if (tooltip !== except) hideTooltip(tooltip);
+    });
   }
 
   function renderAttendants() {
@@ -766,7 +782,7 @@
         return;
       }
       const script = document.createElement("script");
-      script.src = "../push-client.js?v=35";
+      script.src = "../push-client.js?v=38";
       script.dataset.pushClient = "dynamic";
       script.onload = () => window.HSBIPush
         ? resolve(window.HSBIPush)
@@ -794,7 +810,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=35").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=38").then((registration) => registration.update()).catch(console.error);
     }
   }
 
