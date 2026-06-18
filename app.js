@@ -452,18 +452,18 @@
 
   function renderSalesChart() {
     if (els.hourlyChart && els.dailyChart) {
-      renderSingleSalesChart(els.hourlyChart, els.hourlyTooltip, buildHourlySeries(), "hourlySalesAreaGradient");
-      renderSingleSalesChart(els.dailyChart, els.dailyTooltip, buildDailySeries(), "dailySalesAreaGradient");
+      renderSingleSalesChart(els.hourlyChart, els.hourlyTooltip, buildHourlySeries(), "hourlySalesAreaGradient", "bar");
+      renderSingleSalesChart(els.dailyChart, els.dailyTooltip, buildDailySeries(), "dailySalesAreaGradient", "line");
       return;
     }
     if (els.legacyChart) {
       const legacyTitle = document.getElementById("salesChartTitle");
       if (legacyTitle) legacyTitle.textContent = "Vendas por horário";
-      renderSingleSalesChart(els.legacyChart, els.legacyTooltip, buildHourlySeries(), "legacySalesAreaGradient");
+      renderSingleSalesChart(els.legacyChart, els.legacyTooltip, buildHourlySeries(), "legacySalesAreaGradient", "bar");
     }
   }
 
-  function renderSingleSalesChart(chart, tooltip, grouped, gradientId) {
+  function renderSingleSalesChart(chart, tooltip, grouped, gradientId, mode) {
     if (!chart || !tooltip || !grouped.length) return;
     chart.setAttribute("preserveAspectRatio", "xMidYMid meet");
     const chartBox = chart.parentElement.getBoundingClientRect();
@@ -478,14 +478,19 @@
     chart.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
     const width = canvasWidth - left - right;
     const height = canvasHeight - top - bottom;
-    const step = grouped.length > 1 ? width / (grouped.length - 1) : 0;
+    const step = grouped.length > 1
+      ? mode === "bar" ? width / grouped.length : width / (grouped.length - 1)
+      : 0;
     const points = grouped.map((point, index) => {
-      const x = grouped.length > 1 ? left + index * step : left + width / 2;
+      const x = grouped.length > 1
+        ? mode === "bar" ? left + step * (index + 0.5) : left + index * step
+        : left + width / 2;
       const y = top + height - (point.sales / maxSales) * height;
       return Object.assign({ x, y }, point);
     });
-    const path = makeSmoothPath(points);
+    const path = makeLinearPath(points);
     const areaPath = `${path} L ${points[points.length - 1].x},${top + height} L ${points[0].x},${top + height} Z`;
+    const barWidth = Math.max(7, Math.min(28, step * 0.58));
     const gridYTop = top;
     const gridYMid = top + height / 2;
     const gridYBottom = top + height;
@@ -503,14 +508,16 @@
       <text x="${left - 18}" y="${gridYTop + 5}" class="axis-text">${maxSales}</text>
       <text x="${left - 18}" y="${gridYMid + 5}" class="axis-text">${Math.round(maxSales / 2)}</text>
       <text x="${left - 18}" y="${gridYBottom + 5}" class="axis-text">0</text>
-      <path d="${areaPath}" class="sales-area"></path>
-      <path d="${path}" class="sales-line"></path>
+      ${mode === "line" ? `<path d="${areaPath}" class="sales-area"></path><path d="${path}" class="sales-line"></path>` : ""}
       ${points
         .map(
           (point) => `
             <g class="chart-point" data-index="${point.index}">
-              <circle class="point-hit" cx="${point.x}" cy="${point.y}" r="13"></circle>
-              <circle class="point-dot" cx="${point.x}" cy="${point.y}" r="${point.sales || point.revenue ? 4.8 : 3.8}"></circle>
+              ${mode === "bar"
+                ? `<rect class="sales-bar-hit" x="${point.x - Math.max(barWidth, 18) / 2}" y="${top}" width="${Math.max(barWidth, 18)}" height="${height}" rx="4"></rect>
+                   <rect class="sales-bar" x="${point.x - barWidth / 2}" y="${point.y}" width="${barWidth}" height="${Math.max(2, top + height - point.y)}" rx="${Math.min(6, barWidth / 3)}"></rect>`
+                : `<circle class="point-hit" cx="${point.x}" cy="${point.y}" r="13"></circle>
+                   <circle class="point-dot" cx="${point.x}" cy="${point.y}" r="${point.sales || point.revenue ? 4.8 : 3.8}"></circle>`}
               <text x="${point.x}" y="${canvasHeight - 12}" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
             </g>`
         )
@@ -523,11 +530,14 @@
       .grid-line,.axis-line{stroke:rgba(159,232,112,.18);stroke-width:1}
       .grid-line.is-soft{stroke:rgba(159,232,112,.1)}
       .sales-area{fill:url(#${gradientId})}
-      .sales-line{fill:none;stroke:#9fe870;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px rgba(159,232,112,.16))}
+      .sales-line{fill:none;stroke:#9fe870;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:miter;filter:drop-shadow(0 0 3px rgba(159,232,112,.16))}
       .chart-point,.chart-point *{pointer-events:all;cursor:pointer;outline:none}
       .point-hit{fill:transparent;stroke:transparent}
       .point-dot{fill:#1b241a;stroke:#9fe870;stroke-width:2.5}
       .chart-point:hover .point-dot,.chart-point:focus .point-dot{fill:#9fe870;stroke:#071009;stroke-width:2.2}
+      .sales-bar-hit{fill:transparent;stroke:transparent}
+      .sales-bar{fill:#9fe870;opacity:.78;filter:drop-shadow(0 0 3px rgba(159,232,112,.12));transition:opacity 120ms ease}
+      .chart-point:hover .sales-bar,.chart-point:focus .sales-bar{opacity:1;fill:#b7f887}
       .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
       .axis-text{text-anchor:end}
       .x-label{text-anchor:middle}
@@ -548,16 +558,9 @@
     return total <= 16 || index % 2 === 0;
   }
 
-  function makeSmoothPath(points) {
+  function makeLinearPath(points) {
     if (points.length < 2) return points.map((point) => `M${point.x},${point.y}`).join(" ");
-    const commands = [`M${points[0].x},${points[0].y}`];
-    for (let index = 1; index < points.length; index += 1) {
-      const previous = points[index - 1];
-      const current = points[index];
-      const controlDistance = (current.x - previous.x) * 0.42;
-      commands.push(`C${previous.x + controlDistance},${previous.y} ${current.x - controlDistance},${current.y} ${current.x},${current.y}`);
-    }
-    return commands.join(" ");
+    return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x},${point.y}`).join(" ");
   }
 
   function buildHourlySeries() {
@@ -797,7 +800,7 @@
         return;
       }
       const script = document.createElement("script");
-      script.src = "../push-client.js?v=39";
+      script.src = "../push-client.js?v=40";
       script.dataset.pushClient = "dynamic";
       script.onload = () => window.HSBIPush
         ? resolve(window.HSBIPush)
@@ -825,7 +828,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=39").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=40").then((registration) => registration.update()).catch(console.error);
     }
   }
 
