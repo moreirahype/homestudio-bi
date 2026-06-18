@@ -329,7 +329,8 @@ select:focus {
 .metric-tax { order: 6; }
 .metric-margin { order: 7; }
 .metric-roas { order: 8; }
-.metric-average-ticket { order: 9; }
+.metric-average-ticket,
+.metric-arpu { order: 9; }
 .metric-leads { order: 10; }
 .metric-cpl { order: 11; }
 
@@ -824,7 +825,8 @@ th:last-child {
   .metric-roas { order: 6; }
   .metric-sales { order: 7; }
   .metric-cpa { order: 8; }
-  .metric-average-ticket { order: 9; }
+  .metric-average-ticket,
+  .metric-arpu { order: 9; }
   .metric-leads { order: 10; }
   .metric-cpl { order: 11; }
 

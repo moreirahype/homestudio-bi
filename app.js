@@ -43,6 +43,8 @@
     hourlyTooltip: document.getElementById("hourlySalesChartTooltip"),
     dailyChart: document.getElementById("dailySalesChart"),
     dailyTooltip: document.getElementById("dailySalesChartTooltip"),
+    legacyChart: document.getElementById("salesChart"),
+    legacyTooltip: document.getElementById("chartTooltip"),
     notificationList: document.getElementById("notificationList"),
     enableAllNotifications: document.getElementById("enableAllNotifications"),
     testNotification: document.getElementById("testNotification")
@@ -57,7 +59,7 @@
     roas: "metricRoas",
     sales: "metricSales",
     cpa: "metricCpa",
-    averageTicket: "metricAverageTicket",
+    averageTicket: ["metricAverageTicket", "metricArpu"],
     leads: "metricLeads",
     cpl: "metricCpl"
   };
@@ -358,8 +360,10 @@
       button.classList.toggle("is-active", button.dataset.period === state.period);
     });
     els.customFields.classList.toggle("is-visible", state.period === "custom");
-    document.getElementById("hourlySalesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
-    document.getElementById("dailySalesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
+    const hourlyPeriod = document.getElementById("hourlySalesChartPeriod") || document.getElementById("salesChartPeriod");
+    const dailyPeriod = document.getElementById("dailySalesChartPeriod");
+    if (hourlyPeriod) hourlyPeriod.textContent = getPeriodName(state.appliedPeriod);
+    if (dailyPeriod) dailyPeriod.textContent = getPeriodName(state.appliedPeriod);
     document.getElementById("attendantsPeriod").textContent = getPeriodName(state.appliedPeriod);
     updateDateDisplays();
   }
@@ -427,7 +431,9 @@
   }
 
   function setMetric(key, value, tone) {
-    const el = document.getElementById(metricIds[key]);
+    const ids = Array.isArray(metricIds[key]) ? metricIds[key] : [metricIds[key]];
+    const el = ids.map((id) => document.getElementById(id)).find(Boolean);
+    if (!el) return;
     el.textContent = value;
     el.classList.toggle("is-positive", tone === "positive");
     el.classList.toggle("is-negative", tone === "negative");
@@ -445,11 +451,20 @@
   }
 
   function renderSalesChart() {
-    renderSingleSalesChart(els.hourlyChart, els.hourlyTooltip, buildHourlySeries(), "hourlySalesAreaGradient");
-    renderSingleSalesChart(els.dailyChart, els.dailyTooltip, buildDailySeries(), "dailySalesAreaGradient");
+    if (els.hourlyChart && els.dailyChart) {
+      renderSingleSalesChart(els.hourlyChart, els.hourlyTooltip, buildHourlySeries(), "hourlySalesAreaGradient");
+      renderSingleSalesChart(els.dailyChart, els.dailyTooltip, buildDailySeries(), "dailySalesAreaGradient");
+      return;
+    }
+    if (els.legacyChart) {
+      const legacyTitle = document.getElementById("salesChartTitle");
+      if (legacyTitle) legacyTitle.textContent = "Vendas por horário";
+      renderSingleSalesChart(els.legacyChart, els.legacyTooltip, buildHourlySeries(), "legacySalesAreaGradient");
+    }
   }
 
   function renderSingleSalesChart(chart, tooltip, grouped, gradientId) {
+    if (!chart || !tooltip || !grouped.length) return;
     chart.setAttribute("preserveAspectRatio", "xMidYMid meet");
     const chartBox = chart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
@@ -595,7 +610,7 @@
   }
 
   function hideTooltips(except) {
-    [els.hourlyTooltip, els.dailyTooltip].forEach((tooltip) => {
+    [els.hourlyTooltip, els.dailyTooltip, els.legacyTooltip].filter(Boolean).forEach((tooltip) => {
       if (tooltip !== except) hideTooltip(tooltip);
     });
   }
@@ -782,7 +797,7 @@
         return;
       }
       const script = document.createElement("script");
-      script.src = "../push-client.js?v=38";
+      script.src = "../push-client.js?v=39";
       script.dataset.pushClient = "dynamic";
       script.onload = () => window.HSBIPush
         ? resolve(window.HSBIPush)
@@ -810,7 +825,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=38").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=39").then((registration) => registration.update()).catch(console.error);
     }
   }
 
