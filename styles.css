@@ -693,14 +693,6 @@ th:last-child {
     grid-template-columns: 1fr 1fr;
   }
 
-  #page-dashboard.is-active {
-    display: block;
-  }
-
-  #page-dashboard .chart-panel {
-    margin-top: 18px;
-  }
-
   .period-grid {
     grid-column: 1 / -1;
   }
@@ -715,6 +707,14 @@ th:last-child {
 }
 
 @media (max-width: 720px) {
+  #page-dashboard.is-active {
+    display: block;
+  }
+
+  #page-dashboard .chart-panel {
+    margin-top: 18px;
+  }
+
   .sidebar,
   .desktop-sync {
     display: none;
