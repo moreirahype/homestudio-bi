@@ -281,6 +281,20 @@ select:focus {
   display: block;
 }
 
+#page-dashboard.is-active {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 14px;
+}
+
+#page-dashboard .metrics-grid {
+  grid-column: 1 / -1;
+}
+
+#page-dashboard .chart-panel {
+  margin-top: 0;
+}
+
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -677,6 +691,14 @@ th:last-child {
 @media (max-width: 1120px) {
   .control-panel {
     grid-template-columns: 1fr 1fr;
+  }
+
+  #page-dashboard.is-active {
+    display: block;
+  }
+
+  #page-dashboard .chart-panel {
+    margin-top: 18px;
   }
 
   .period-grid {
