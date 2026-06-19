@@ -25,12 +25,12 @@
 html {
   min-width: 320px;
   scroll-behavior: smooth;
-  scroll-padding-top: 96px;
+  scroll-padding-top: 64px;
   background: var(--bg);
 }
 
 [id] {
-  scroll-margin-top: 96px;
+  scroll-margin-top: 64px;
 }
 
 body {
@@ -1196,11 +1196,11 @@ details p {
 
 @media (max-width: 760px) {
   html {
-    scroll-padding-top: 86px;
+    scroll-padding-top: 58px;
   }
 
   [id] {
-    scroll-margin-top: 86px;
+    scroll-margin-top: 58px;
   }
 
   .site-header {
@@ -1256,6 +1256,12 @@ details p {
   .hero-copy p,
   .section p {
     font-size: 16px;
+  }
+
+  .section h2 + p,
+  .section-heading p,
+  .final-cta h2 + p {
+    padding-top: 10px;
   }
 
   .hero-actions {
