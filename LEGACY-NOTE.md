@@ -1,5 +1,5 @@
 ﻿# Nota
 
-Este repositorio e o app pessoal Home Studio BI.
+Este repositorio voltou a concentrar tudo que mantem o app pessoal funcionando agora.
 
-As mudancas comerciais devem ser feitas nos repositorios Hot Sales separados, para nao quebrar a operacao atual.
+A separacao em repositorios novos fica reservada para a versao comercial do Hot Sales.
