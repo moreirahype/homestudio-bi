@@ -25,12 +25,12 @@
 html {
   min-width: 320px;
   scroll-behavior: smooth;
-  scroll-padding-top: 64px;
+  scroll-padding-top: 44px;
   background: var(--bg);
 }
 
 [id] {
-  scroll-margin-top: 64px;
+  scroll-margin-top: 44px;
 }
 
 body {
@@ -1196,11 +1196,11 @@ details p {
 
 @media (max-width: 760px) {
   html {
-    scroll-padding-top: 58px;
+    scroll-padding-top: 44px;
   }
 
   [id] {
-    scroll-margin-top: 58px;
+    scroll-margin-top: 44px;
   }
 
   .site-header {
