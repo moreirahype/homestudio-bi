@@ -398,25 +398,19 @@
     els.chart.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
     const width = canvasWidth - left - right;
     const height = canvasHeight - top - bottom;
-    const step = grouped.length > 1 ? width / (grouped.length - 1) : width;
+    const step = width / grouped.length;
+    const barWidth = Math.max(8, Math.min(28, step * 0.48));
     const points = grouped.map((point, index) => {
-      const x = left + index * step;
+      const x = left + index * step + step / 2;
       const y = top + height - (point.sales / maxSales) * height;
-      return Object.assign({ x, y }, point);
+      const barHeight = Math.max(point.sales > 0 ? 4 : 0, top + height - y);
+      return Object.assign({ x, y, barX: x - barWidth / 2, barWidth, barHeight }, point);
     });
-    const path = makeSmoothPath(points);
-    const areaPath = `${path} L ${points[points.length - 1].x},${top + height} L ${points[0].x},${top + height} Z`;
     const gridYTop = top;
     const gridYMid = top + height / 2;
     const gridYBottom = top + height;
     document.getElementById("salesChartTitle").textContent = "Vendas por horário";
     els.chart.innerHTML = `
-      <defs>
-        <linearGradient id="salesAreaGradientAttendant" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stop-color="#9fe870" stop-opacity="0.16"></stop>
-          <stop offset="100%" stop-color="#9fe870" stop-opacity="0"></stop>
-        </linearGradient>
-      </defs>
       <rect x="${left}" y="${top}" width="${width}" height="${height}" rx="4" class="chart-plot-bg"></rect>
       <line x1="${left}" y1="${gridYTop}" x2="${canvasWidth - right}" y2="${gridYTop}" class="grid-line"></line>
       <line x1="${left}" y1="${gridYMid}" x2="${canvasWidth - right}" y2="${gridYMid}" class="grid-line is-soft"></line>
@@ -424,12 +418,10 @@
       <text x="${left - 18}" y="${gridYTop + 5}" class="axis-text">${maxSales}</text>
       <text x="${left - 18}" y="${gridYMid + 5}" class="axis-text">${Math.round(maxSales / 2)}</text>
       <text x="${left - 18}" y="${gridYBottom + 5}" class="axis-text">0</text>
-      <path d="${areaPath}" class="sales-area"></path>
-      <path d="${path}" class="sales-line"></path>
       ${points.map((point) => `
         <g class="chart-point" data-index="${point.index}">
-          <circle class="point-hit" cx="${point.x}" cy="${point.y}" r="13"></circle>
-          <circle class="point-dot" cx="${point.x}" cy="${point.y}" r="${point.sales || point.revenue ? 4.8 : 3.8}"></circle>
+          <rect class="bar-hit" x="${point.x - step / 2}" y="${top}" width="${step}" height="${height}"></rect>
+          <rect class="sales-bar" x="${point.barX}" y="${top + height - point.barHeight}" width="${point.barWidth}" height="${point.barHeight}" rx="5"></rect>
           <text x="${point.x}" y="${canvasHeight - 12}" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
         </g>`).join("")}
     `;
@@ -438,12 +430,10 @@
       .chart-plot-bg{fill:rgba(255,255,255,.012)}
       .grid-line,.axis-line{stroke:rgba(159,232,112,.18);stroke-width:1}
       .grid-line.is-soft{stroke:rgba(159,232,112,.1)}
-      .sales-area{fill:url(#salesAreaGradientAttendant)}
-      .sales-line{fill:none;stroke:#9fe870;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px rgba(159,232,112,.16))}
       .chart-point,.chart-point *{pointer-events:all;cursor:pointer;outline:none}
-      .point-hit{fill:transparent;stroke:transparent}
-      .point-dot{fill:#1b241a;stroke:#9fe870;stroke-width:2.5}
-      .chart-point:hover .point-dot{fill:#9fe870;stroke:#071009;stroke-width:2.2}
+      .bar-hit{fill:transparent;stroke:transparent}
+      .sales-bar{fill:#9fe870;filter:drop-shadow(0 0 4px rgba(159,232,112,.16));transition:opacity .16s ease,filter .16s ease}
+      .chart-point:hover .sales-bar{opacity:.92;filter:drop-shadow(0 0 8px rgba(159,232,112,.28))}
       .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
       .axis-text{text-anchor:end}
       .x-label{text-anchor:middle}
