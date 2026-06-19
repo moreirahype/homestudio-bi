@@ -64,7 +64,7 @@ function doPost(e) {
     try {
       sendPushRequest_({
         audience: 'sheila',
-        title: '💰 Venda Realizada!',
+        title: '\uD83D\uDCB0 Venda Realizada!',
         body: '',
         url: getPushProperty_('SHEILA_APP_URL'),
         tag: 'hsbi-sheila-sale'
@@ -182,6 +182,7 @@ function sendPushRequest_(payload) {
     muteHttpExceptions: true
   });
   const text = response.getContentText();
+  appendDebugLog_('push_response', payload, { code: response.getResponseCode(), text: text });
   if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) {
     throw new Error('Servidor push respondeu ' + response.getResponseCode() + ': ' + text);
   }

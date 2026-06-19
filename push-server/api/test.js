@@ -12,10 +12,10 @@ module.exports = async function handler(req, res) {
   if (!record || record.audience !== audience) {
     return json(res, 404, { ok: false, error: "Assinatura não encontrada." });
   }
-  const allowed = await redis(["SET", `push:test:${id}`, "1", "EX", 20, "NX"]);
+  const allowed = await redis(["SET", `push:test:${id}`, "1", "EX", 2, "NX"]);
   if (!allowed) return json(res, 429, { ok: false, error: "Aguarde alguns segundos e tente novamente." });
   const result = await sendToRecord({ id, ...record }, {
-    title: title || (audience === "sheila" ? "Venda Realizada! 💰" : "Resumo das Campanhas!"),
+    title: title || (audience === "sheila" ? "\uD83D\uDCB0 Venda Realizada!" : "Resumo das Campanhas!"),
     body: body || "",
     url: url || "/",
     tag: `hsbi-test-${audience}`

@@ -118,7 +118,7 @@
         await syncAttendantPush(true);
         const pushClient = await ensurePushClient();
         await pushClient.test("sheila", {
-          title: "💰 Venda Realizada!",
+          title: "\uD83D\uDCB0 Venda Realizada!",
           body: "",
           url: `${location.origin}${location.pathname}#transactions`
         });
