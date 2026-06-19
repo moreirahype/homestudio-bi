@@ -44,6 +44,9 @@
     pageInfo: document.getElementById("pageInfo"),
     chart: document.getElementById("salesChart"),
     tooltip: document.getElementById("chartTooltip"),
+    dailyChart: document.getElementById("dailySalesChart"),
+    dailyTooltip: document.getElementById("dailyChartTooltip"),
+    sidebarToggle: document.getElementById("sidebarToggle"),
     saleNotifications: document.getElementById("saleNotifications"),
     testNotification: document.getElementById("testNotification")
   };
@@ -52,6 +55,7 @@
 
   function init() {
     setDefaultDates();
+    applySidebarPreference();
     bindEvents();
     setPage(location.hash.replace("#", "") || "dashboard");
     els.saleNotifications.checked = state.notificationsEnabled;
@@ -81,6 +85,9 @@
       });
     });
     els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true }));
+    if (els.sidebarToggle) {
+      els.sidebarToggle.addEventListener("click", toggleSidebar);
+    }
     els.search.addEventListener("input", () => {
       state.pageIndex = 1;
       renderTransactions();
@@ -120,10 +127,40 @@
       }
     });
     document.addEventListener("pointerdown", (event) => {
-      if (!els.tooltip.hidden && !event.target.closest(".chart-point")) hideTooltip();
+      if (!event.target.closest(".chart-point")) {
+        hideTooltip(els.tooltip);
+        hideTooltip(els.dailyTooltip);
+      }
     });
-    window.addEventListener("resize", debounce(() => renderSalesChart(), 120));
+    window.addEventListener("resize", debounce(() => {
+      renderSalesChart();
+      renderDailySalesChart();
+    }, 120));
     window.addEventListener("hashchange", () => setPage(location.hash.replace("#", "") || "dashboard"));
+  }
+
+  function applySidebarPreference() {
+    const isCollapsed = localStorage.getItem("hsbi-sidebar-collapsed") === "true";
+    document.body.classList.toggle("sidebar-collapsed", isCollapsed);
+    updateSidebarToggle(isCollapsed);
+  }
+
+  function toggleSidebar() {
+    const isCollapsed = !document.body.classList.contains("sidebar-collapsed");
+    document.body.classList.toggle("sidebar-collapsed", isCollapsed);
+    localStorage.setItem("hsbi-sidebar-collapsed", String(isCollapsed));
+    updateSidebarToggle(isCollapsed);
+    requestAnimationFrame(() => {
+      renderSalesChart();
+      renderDailySalesChart();
+    });
+  }
+
+  function updateSidebarToggle(isCollapsed) {
+    if (!els.sidebarToggle) return;
+    els.sidebarToggle.setAttribute("aria-expanded", String(!isCollapsed));
+    els.sidebarToggle.setAttribute("aria-label", isCollapsed ? "Expandir barra lateral" : "Recolher barra lateral");
+    els.sidebarToggle.title = isCollapsed ? "Expandir barra lateral" : "Recolher barra lateral";
   }
 
   async function refreshData(options = {}) {
@@ -265,6 +302,7 @@
     renderGoals();
     renderMetrics();
     renderSalesChart();
+    renderDailySalesChart();
     renderTransactions();
   }
 
@@ -272,6 +310,7 @@
     els.periodButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.period === state.period));
     els.customFields.classList.toggle("is-visible", state.period === "custom");
     document.getElementById("salesChartPeriod").textContent = getPeriodName(state.appliedPeriod);
+    document.getElementById("dailySalesChartPeriod").textContent = getPeriodName(getDailyChartPeriod());
     updateDateDisplays();
   }
 
@@ -346,7 +385,7 @@
   }
 
   function renderSalesChart() {
-    const grouped = buildSeries();
+    const grouped = buildHourlySeries();
     const chartBox = els.chart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
     const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
@@ -370,7 +409,7 @@
     const gridYTop = top;
     const gridYMid = top + height / 2;
     const gridYBottom = top + height;
-    document.getElementById("salesChartTitle").textContent = shouldGroupChartByHour() ? "Vendas por horário" : "Vendas por dia";
+    document.getElementById("salesChartTitle").textContent = "Vendas por horário";
     els.chart.innerHTML = `
       <defs>
         <linearGradient id="salesAreaGradientAttendant" x1="0" x2="0" y1="0" y2="1">
@@ -412,9 +451,82 @@
     els.chart.prepend(style);
     els.chart.querySelectorAll(".chart-point").forEach((node) => {
       const point = points[Number(node.dataset.index)];
-      node.addEventListener("mouseenter", (event) => showTooltip(event, point));
-      node.addEventListener("mousemove", (event) => showTooltip(event, point));
-      node.addEventListener("mouseleave", hideTooltip);
+      node.addEventListener("mouseenter", (event) => showTooltip(event, point, els.tooltip));
+      node.addEventListener("mousemove", (event) => showTooltip(event, point, els.tooltip));
+      node.addEventListener("mouseleave", () => hideTooltip(els.tooltip));
+    });
+  }
+
+  function renderDailySalesChart() {
+    if (!els.dailyChart) return;
+    const grouped = buildDailySeries();
+    const chartBox = els.dailyChart.parentElement.getBoundingClientRect();
+    const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
+    const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
+    const left = 34;
+    const right = 10;
+    const top = 12;
+    const bottom = 32;
+    const canvasWidth = 980;
+    const canvasHeight = Math.max(300, Math.round(canvasWidth * (chartBox.height / Math.max(chartBox.width, 1))));
+    els.dailyChart.setAttribute("viewBox", `0 0 ${canvasWidth} ${canvasHeight}`);
+    const width = canvasWidth - left - right;
+    const height = canvasHeight - top - bottom;
+    const step = grouped.length > 1 ? width / (grouped.length - 1) : width / 2;
+    const points = grouped.map((point, index) => {
+      const x = grouped.length > 1 ? left + index * step : left + step;
+      const y = top + height - (point.sales / maxSales) * height;
+      return Object.assign({ x, y }, point);
+    });
+    const path = makeAngularPath(points);
+    const areaPath = `${path} L ${points[points.length - 1].x},${top + height} L ${points[0].x},${top + height} Z`;
+    const gridYTop = top;
+    const gridYMid = top + height / 2;
+    const gridYBottom = top + height;
+    els.dailyChart.innerHTML = `
+      <defs>
+        <linearGradient id="dailySalesAreaGradientAttendant" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#9fe870" stop-opacity="0.16"></stop>
+          <stop offset="100%" stop-color="#9fe870" stop-opacity="0"></stop>
+        </linearGradient>
+      </defs>
+      <rect x="${left}" y="${top}" width="${width}" height="${height}" rx="4" class="chart-plot-bg"></rect>
+      <line x1="${left}" y1="${gridYTop}" x2="${canvasWidth - right}" y2="${gridYTop}" class="grid-line"></line>
+      <line x1="${left}" y1="${gridYMid}" x2="${canvasWidth - right}" y2="${gridYMid}" class="grid-line is-soft"></line>
+      <line x1="${left}" y1="${gridYBottom}" x2="${canvasWidth - right}" y2="${gridYBottom}" class="axis-line"></line>
+      <text x="${left - 18}" y="${gridYTop + 5}" class="axis-text">${maxSales}</text>
+      <text x="${left - 18}" y="${gridYMid + 5}" class="axis-text">${Math.round(maxSales / 2)}</text>
+      <text x="${left - 18}" y="${gridYBottom + 5}" class="axis-text">0</text>
+      <path d="${areaPath}" class="sales-area"></path>
+      <path d="${path}" class="sales-line"></path>
+      ${points.map((point) => `
+        <g class="chart-point" data-index="${point.index}">
+          <circle class="point-hit" cx="${point.x}" cy="${point.y}" r="13"></circle>
+          <circle class="point-dot" cx="${point.x}" cy="${point.y}" r="${point.sales || point.revenue ? 4.8 : 3.8}"></circle>
+          <text x="${point.x}" y="${canvasHeight - 12}" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
+        </g>`).join("")}
+    `;
+    const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    style.textContent = `
+      .chart-plot-bg{fill:rgba(255,255,255,.012)}
+      .grid-line,.axis-line{stroke:rgba(159,232,112,.18);stroke-width:1}
+      .grid-line.is-soft{stroke:rgba(159,232,112,.1)}
+      .sales-area{fill:url(#dailySalesAreaGradientAttendant)}
+      .sales-line{fill:none;stroke:#9fe870;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px rgba(159,232,112,.16))}
+      .chart-point,.chart-point *{pointer-events:all;cursor:pointer;outline:none}
+      .point-hit{fill:transparent;stroke:transparent}
+      .point-dot{fill:#1b241a;stroke:#9fe870;stroke-width:2.5}
+      .chart-point:hover .point-dot{fill:#9fe870;stroke:#071009;stroke-width:2.2}
+      .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
+      .axis-text{text-anchor:end}
+      .x-label{text-anchor:middle}
+    `;
+    els.dailyChart.prepend(style);
+    els.dailyChart.querySelectorAll(".chart-point").forEach((node) => {
+      const point = points[Number(node.dataset.index)];
+      node.addEventListener("mouseenter", (event) => showTooltip(event, point, els.dailyTooltip));
+      node.addEventListener("mousemove", (event) => showTooltip(event, point, els.dailyTooltip));
+      node.addEventListener("mouseleave", () => hideTooltip(els.dailyTooltip));
     });
   }
 
@@ -487,14 +599,11 @@
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
-  function buildSeries() {
-    const range = getDateRange();
-    const byHour = shouldGroupChartByHour();
-    const labels = byHour ? buildHourLabels() : buildDayLabels(range.start, range.end);
+  function buildHourlySeries() {
+    const labels = buildHourLabels();
     return labels.map((label, index) => {
       const sales = state.filteredSales.filter((item) => {
-        if (byHour) return item.timestamp.getHours() === index;
-        return toIsoDate(item.timestamp) === label.key;
+        return item.timestamp.getHours() === index;
       });
       return {
         index,
@@ -506,11 +615,26 @@
     });
   }
 
-  function shouldGroupChartByHour() {
-    if (state.appliedPeriod === "today" || state.appliedPeriod === "yesterday") return true;
-    if (state.appliedPeriod !== "custom") return false;
-    const range = getDateRange();
-    return toIsoDate(range.start) === toIsoDate(range.end);
+  function buildDailySeries() {
+    const range = getDateRange(getDailyChartPeriod());
+    return buildDayLabels(range.start, range.end).map((label, index) => {
+      const sales = state.transactions.filter((item) => {
+        return item.timestamp >= startOfDay(range.start)
+          && item.timestamp <= endOfDay(range.end)
+          && toIsoDate(item.timestamp) === label.key;
+      });
+      return {
+        index,
+        label: label.short,
+        fullLabel: label.full,
+        sales: sales.length,
+        revenue: sum(sales.map((item) => item.value))
+      };
+    });
+  }
+
+  function getDailyChartPeriod() {
+    return state.appliedPeriod === "today" || state.appliedPeriod === "yesterday" ? "month" : state.appliedPeriod;
   }
 
   function setPage(page) {
@@ -520,7 +644,10 @@
     els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.page === page));
     document.body.dataset.currentPage = page;
     if (location.hash !== `#${page}`) history.replaceState(null, "", `#${page}`);
-    if (page === "dashboard") requestAnimationFrame(renderSalesChart);
+    if (page === "dashboard") requestAnimationFrame(() => {
+      renderSalesChart();
+      renderDailySalesChart();
+    });
   }
 
   function getTotalPages() {
@@ -652,27 +779,31 @@
     return commands.join(" ");
   }
 
+  function makeAngularPath(points) {
+    return points.map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
+  }
+
   function shouldShowAxisLabel(index, total) {
     if (window.innerWidth <= 720) return total <= 12 || index % 2 === 0;
     return total <= 16 || index % 2 === 0;
   }
 
-  function showTooltip(event, point) {
+  function showTooltip(event, point, tooltip) {
     const rect = event.currentTarget.ownerSVGElement.getBoundingClientRect();
-    const wrap = els.chart.parentElement.getBoundingClientRect();
+    const wrap = event.currentTarget.ownerSVGElement.parentElement.getBoundingClientRect();
     const viewBox = event.currentTarget.ownerSVGElement.viewBox.baseVal;
     const pointX = ((point.x / viewBox.width) * rect.width) + rect.left - wrap.left;
     const pointY = ((point.y / viewBox.height) * rect.height) + rect.top - wrap.top;
     const x = event.clientX ? event.clientX - wrap.left : pointX;
     const y = event.clientY ? event.clientY - wrap.top : pointY;
-    els.tooltip.hidden = false;
-    els.tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
-    els.tooltip.style.top = `${Math.max(52, y - 8)}px`;
-    els.tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Comissão: ${money(point.revenue)}`;
+    tooltip.hidden = false;
+    tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
+    tooltip.style.top = `${Math.max(52, y - 8)}px`;
+    tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Comissão: ${money(point.revenue)}`;
   }
 
-  function hideTooltip() {
-    els.tooltip.hidden = true;
+  function hideTooltip(tooltip) {
+    if (tooltip) tooltip.hidden = true;
   }
 
   function parseDate(value) {

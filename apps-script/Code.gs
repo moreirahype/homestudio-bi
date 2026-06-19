@@ -2,7 +2,7 @@ const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
 const DEBUG_SHEET_NAME = 'Debug';
-const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
+const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual', 'produto'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
 
@@ -52,6 +52,7 @@ function doPost(e) {
       return outputJson_({ ok: true, duplicate: true, id: row[0] });
     }
     sheet.appendRow(row);
+    sortTransactionsSheet_(sheet);
     pruneOldRows_(sheet);
     inserted = true;
     console.log('Transação inserida na aba ' + sheet.getName() + ': ' + JSON.stringify(row));
@@ -248,7 +249,8 @@ function normalizeWebhook_(payload) {
     originalCurrency,
     originalValue,
     exchangeRate,
-    commissionPercent
+    commissionPercent,
+    pickValue_(payload, ['produto', 'product', 'productName', 'product_name', 'item_type', 'itemType']) || ''
   ];
 }
 
@@ -325,6 +327,14 @@ function migrateTransactionsSheet_(sheet, currentHeaders) {
     sheet.getRange(2, 1, remapped.length, HEADERS.length).setValues(remapped);
   }
   deleteExtraColumns_(sheet, HEADERS.length);
+}
+
+function sortTransactionsSheet_(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return;
+  sheet
+    .getRange(2, 1, lastRow - 1, HEADERS.length)
+    .sort([{ column: 2, ascending: false }]);
 }
 
 function getAttendantsSheet_() {

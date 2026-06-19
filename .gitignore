@@ -3,3 +3,6 @@ qa-*.png
 Thumbs.db
 push-server/.env
 push-server/.env.local
+.tools/
+home-studio-gallery/
+tmp-demo-dashboard.html

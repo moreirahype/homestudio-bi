@@ -12,6 +12,10 @@
   margin-bottom: 18px;
 }
 
+.attendant-main #page-dashboard .goals-grid {
+  grid-column: 1 / -1;
+}
+
 .goals-grid.is-hidden {
   display: none;
 }
