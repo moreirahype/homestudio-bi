@@ -64,7 +64,7 @@ function doPost(e) {
     try {
       sendPushRequest_({
         audience: 'sheila',
-        title: 'Venda Realizada! 💰',
+        title: '💰 Venda Realizada!',
         body: '',
         url: getPushProperty_('SHEILA_APP_URL'),
         tag: 'hsbi-sheila-sale'
