@@ -1,16 +1,17 @@
-# Home Studio BI
+﻿# Home Studio BI
 
-Este repositorio virou apenas o historico/legado do prototipo.
+Este repositorio voltou a ser o app pessoal/operacional da minha estrutura de fotos.
 
-O produto foi separado em repositorios limpos:
+Links principais no GitHub Pages:
 
-- Landing page: https://github.com/moreirahype/hot-sales
-- App/PWA: https://github.com/moreirahype/hot-sales-app
-- Push server: https://github.com/moreirahype/hot-sales-push
-- Apps Script: https://github.com/moreirahype/hot-sales-apps-script
+- Dashboard principal: `/x7p4r9m2/`
+- App da Sheila: `/k9v2m7q4/`
 
-Use a pasta local abaixo como fonte atual do projeto:
+A versao comercial do produto Hot Sales esta sendo criada separadamente nos repositorios:
 
-`D:\OneDrive\Documents\Hot Sales`
+- https://github.com/moreirahype/hot-sales
+- https://github.com/moreirahype/hot-sales-app
+- https://github.com/moreirahype/hot-sales-push
+- https://github.com/moreirahype/hot-sales-apps-script
 
-Esta pasta antiga deve ficar apenas como referencia historica enquanto a migracao estiver sendo confirmada.
+Para meu uso pessoal, este repositorio mantem o PWA e uma copia do Apps Script em `apps-script/Code.gs`.
