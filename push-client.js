@@ -89,7 +89,20 @@
     });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || "Falha ao enviar a notificação de teste.");
+    await showLocalTestNotification(audience, notification);
     return result;
+  }
+
+  async function showLocalTestNotification(audience, notification) {
+    if (Notification.permission !== "granted" || !("serviceWorker" in navigator)) return;
+    const registration = await navigator.serviceWorker.ready;
+    await registration.showNotification(notification.title || "Home Studio BI", {
+      body: notification.body || "",
+      icon: new URL("./assets/icon-192.png", location.origin + location.pathname).href,
+      badge: new URL("./assets/icon-192.png", location.origin + location.pathname).href,
+      tag: `hsbi-test-${audience}`,
+      data: { url: notification.url || location.href }
+    });
   }
 
   window.HSBIPush = { requestPermission, sync, update, test };
