@@ -6,3 +6,4 @@ push-server/.env.local
 .tools/
 home-studio-gallery/
 tmp-demo-dashboard.html
+split-repos/
