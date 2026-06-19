@@ -186,9 +186,16 @@ h3 {
 
 .section p,
 .final-cta p {
-  margin-top: 26px;
+  margin-top: 30px;
   color: var(--muted);
   font-size: 18px;
+}
+
+.section h2 + p,
+.section-heading p,
+.final-cta h2 + p {
+  margin-top: 0;
+  padding-top: 36px;
 }
 
 .hero-actions {
@@ -778,10 +785,6 @@ details {
 .section-heading {
   max-width: 760px;
   margin-bottom: 34px;
-}
-
-.section-heading p {
-  margin-top: 28px;
 }
 
 .attendant-section {
