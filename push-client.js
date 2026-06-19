@@ -43,7 +43,7 @@
   async function sync(audience, preferences) {
     const config = assertConfigured();
     if (!(await requestPermission())) throw new Error("Permissão de notificação não concedida.");
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await ensureServiceWorkerRegistration();
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
@@ -110,7 +110,7 @@
       new Notification(notification.title || "Home Studio BI", { body: notification.body || "" });
       return true;
     }
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await ensureServiceWorkerRegistration();
     const iconUrl = new URL("../assets/icon-192.png", location.href).href;
     await registration.showNotification(notification.title || "Home Studio BI", {
       body: notification.body || "",
@@ -120,6 +120,27 @@
       data: { url: notification.url || location.href }
     });
     return true;
+  }
+
+  async function ensureServiceWorkerRegistration() {
+    let registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      registration = await navigator.serviceWorker.register("../sw.js?v=61");
+    } else {
+      registration.update().catch(console.error);
+    }
+    await navigator.serviceWorker.ready;
+    if (!registration.active) {
+      await new Promise((resolve) => {
+        const worker = registration.installing || registration.waiting;
+        if (!worker) return resolve();
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "activated") resolve();
+        }, { once: true });
+        window.setTimeout(resolve, 2500);
+      });
+    }
+    return registration;
   }
 
   window.HSBIPush = { requestPermission, sync, update, test };
