@@ -8,6 +8,9 @@ const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_
 
 function doGet(e) {
   const params = e.parameter || {};
+  if (params.action === 'diagnostics') {
+    return outputJson_(runDiagnostics_(params), params.callback);
+  }
   if (params.action === 'data') {
     return outputJson_({
       transactions: readTransactions_(params.from, params.to),
@@ -24,6 +27,40 @@ function doGet(e) {
     return outputJson_(readAttendantData_(params.slug, params.from, params.to), params.callback);
   }
   return outputJson_({ ok: true, app: 'Home Studio BI' }, params.callback);
+}
+
+function runDiagnostics_(params) {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const properties = PropertiesService.getScriptProperties();
+  const propertyNames = [
+    'PUSH_API_URL',
+    'PUSH_API_SECRET',
+    'SHEILA_APP_URL',
+    'OWNER_APP_URL',
+    'META_ACCESS_TOKEN',
+    'META_AD_ACCOUNT_IDS'
+  ];
+  const configured = {};
+  propertyNames.forEach((name) => {
+    configured[name] = Boolean(String(properties.getProperty(name) || '').trim());
+  });
+
+  let debugTouched = false;
+  if (String(params.touchDebug || '') === '1') {
+    appendDebugLog_('diagnostic_ping', { action: 'diagnostics' }, { ok: true, at: new Date().toISOString() });
+    debugTouched = true;
+  }
+
+  return {
+    ok: true,
+    diagnosticVersion: '2026-06-19-01',
+    spreadsheetId: spreadsheet.getId(),
+    spreadsheetName: spreadsheet.getName(),
+    sheets: spreadsheet.getSheets().map((sheet) => sheet.getName()),
+    scriptTimeZone: Session.getScriptTimeZone(),
+    configured: configured,
+    debugTouched: debugTouched
+  };
 }
 
 function doPost(e) {
