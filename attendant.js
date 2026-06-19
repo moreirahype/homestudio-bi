@@ -399,7 +399,7 @@
     const width = canvasWidth - left - right;
     const height = canvasHeight - top - bottom;
     const step = width / grouped.length;
-    const barWidth = Math.max(8, Math.min(28, step * 0.48));
+    const barWidth = Math.max(7, Math.min(28, step * 0.58));
     const points = grouped.map((point, index) => {
       const x = left + index * step + step / 2;
       const y = top + height - (point.sales / maxSales) * height;
@@ -420,8 +420,8 @@
       <text x="${left - 18}" y="${gridYBottom + 5}" class="axis-text">0</text>
       ${points.map((point) => `
         <g class="chart-point" data-index="${point.index}">
-          <rect class="bar-hit" x="${point.x - step / 2}" y="${top}" width="${step}" height="${height}"></rect>
-          <rect class="sales-bar" x="${point.barX}" y="${top + height - point.barHeight}" width="${point.barWidth}" height="${point.barHeight}" rx="5"></rect>
+          <rect class="sales-bar-hit" x="${point.x - Math.max(point.barWidth, 18) / 2}" y="${top}" width="${Math.max(point.barWidth, 18)}" height="${height}" rx="4"></rect>
+          <rect class="sales-bar" x="${point.barX}" y="${top + height - point.barHeight}" width="${point.barWidth}" height="${point.barHeight}" rx="${Math.min(6, point.barWidth / 3)}"></rect>
           <text x="${point.x}" y="${canvasHeight - 12}" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
         </g>`).join("")}
     `;
@@ -431,9 +431,9 @@
       .grid-line,.axis-line{stroke:rgba(159,232,112,.18);stroke-width:1}
       .grid-line.is-soft{stroke:rgba(159,232,112,.1)}
       .chart-point,.chart-point *{pointer-events:all;cursor:pointer;outline:none}
-      .bar-hit{fill:transparent;stroke:transparent}
-      .sales-bar{fill:#9fe870;filter:drop-shadow(0 0 4px rgba(159,232,112,.16));transition:opacity .16s ease,filter .16s ease}
-      .chart-point:hover .sales-bar{opacity:.92;filter:drop-shadow(0 0 8px rgba(159,232,112,.28))}
+      .sales-bar-hit{fill:transparent;stroke:transparent}
+      .sales-bar{fill:#a8f078;opacity:.82;filter:drop-shadow(0 0 3px rgba(168,240,120,.14));transition:opacity 120ms ease,fill 120ms ease}
+      .chart-point:hover .sales-bar,.chart-point:focus .sales-bar{opacity:1;fill:#bcff8c}
       .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
       .axis-text{text-anchor:end}
       .x-label{text-anchor:middle}

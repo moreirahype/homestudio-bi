@@ -579,8 +579,8 @@
       .point-dot{fill:#1b241a;stroke:#9fe870;stroke-width:2.5}
       .chart-point:hover .point-dot,.chart-point:focus .point-dot{fill:#9fe870;stroke:#071009;stroke-width:2.2}
       .sales-bar-hit{fill:transparent;stroke:transparent}
-      .sales-bar{fill:#9fe870;opacity:.78;filter:drop-shadow(0 0 3px rgba(159,232,112,.12));transition:opacity 120ms ease}
-      .chart-point:hover .sales-bar,.chart-point:focus .sales-bar{opacity:1;fill:#b7f887}
+      .sales-bar{fill:#a8f078;opacity:.82;filter:drop-shadow(0 0 3px rgba(168,240,120,.14));transition:opacity 120ms ease,fill 120ms ease}
+      .chart-point:hover .sales-bar,.chart-point:focus .sales-bar{opacity:1;fill:#bcff8c}
       .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
       .axis-text{text-anchor:end}
       .x-label{text-anchor:middle}
