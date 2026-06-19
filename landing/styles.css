@@ -1318,6 +1318,14 @@ details p {
     padding: 14px 0;
   }
 
+  .transactions-shot {
+    min-height: auto;
+  }
+
+  .transactions-shot .shot-header {
+    margin-bottom: 12px;
+  }
+
   .fake-table b {
     font-size: 11px;
   }
@@ -1440,6 +1448,10 @@ details p {
   .phone-preview,
   .price-card {
     padding: 20px;
+  }
+
+  .transactions-shot .fake-table div {
+    padding: 12px 0;
   }
 
   .phone-preview {
