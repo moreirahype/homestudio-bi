@@ -426,7 +426,7 @@
     const tax = ads * Number(config.metaTaxRate || 0);
     const totalSpend = ads + tax;
     const profit = revenue - totalSpend;
-    const leads = Number(state.meta.leads || state.meta.conversations || state.meta.conversas || 0);
+    const leads = getLeadBase(state.meta);
     return {
       revenue,
       ads,
@@ -440,8 +440,22 @@
       averageTicket: sales > 0 ? revenue / sales : null,
       leads,
       cpl: leads > 0 ? totalSpend / leads : null,
-      conversionRate: sales > 0 ? leads / sales : null
+      conversionRate: leads > 0 ? sales / leads : 0
     };
+  }
+
+  function getLeadBase(meta) {
+    const source = meta || {};
+    const candidates = [
+      source.leads,
+      source.conversations,
+      source.conversas,
+      source.messaging_conversations,
+      source.onsite_conversion_messaging_conversation_started_7d,
+      source.omni_messaging_conversation_started_7d
+    ];
+    const value = candidates.find((item) => Number.isFinite(Number(item)) && Number(item) > 0);
+    return value == null ? 0 : Number(value);
   }
 
   function renderMetrics() {
