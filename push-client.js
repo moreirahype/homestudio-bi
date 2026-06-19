@@ -88,6 +88,10 @@
       body: JSON.stringify(Object.assign({ id, audience }, notification))
     });
     const result = await response.json();
+    if (response.status === 429) {
+      await showLocalTestNotification(audience, notification);
+      return { ok: true, localOnly: true, throttled: true };
+    }
     if (!response.ok || !result.ok) throw new Error(result.error || "Falha ao enviar a notificação de teste.");
     await showLocalTestNotification(audience, notification);
     return result;

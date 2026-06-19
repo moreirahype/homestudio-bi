@@ -403,7 +403,7 @@
     const points = grouped.map((point, index) => {
       const x = left + index * step + step / 2;
       const y = top + height - (point.sales / maxSales) * height;
-      const barHeight = Math.max(point.sales > 0 ? 4 : 0, top + height - y);
+      const barHeight = Math.max(2, top + height - y);
       return Object.assign({ x, y, barX: x - barWidth / 2, barWidth, barHeight }, point);
     });
     const gridYTop = top;
