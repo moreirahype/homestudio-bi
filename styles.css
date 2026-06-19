@@ -99,7 +99,7 @@ button {
 }
 
 .brand span:last-child,
-.nav-item {
+.nav-item span {
   transition: opacity 160ms ease;
 }
 
@@ -151,6 +151,10 @@ button {
 }
 
 .nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   width: 100%;
   min-height: 44px;
   padding: 0 15px;
@@ -159,6 +163,13 @@ button {
   background: transparent;
   color: var(--muted);
   text-align: left;
+}
+
+.nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  fill: currentColor;
 }
 
 .nav-item:hover,
@@ -177,7 +188,7 @@ button {
 
 body.sidebar-collapsed .sidebar {
   width: var(--sidebar-collapsed);
-  padding-inline: 14px;
+  padding-inline: 12px;
 }
 
 body.sidebar-collapsed .main {
@@ -195,22 +206,34 @@ body.sidebar-collapsed .brand span:last-child {
 }
 
 body.sidebar-collapsed .nav-item {
+  justify-content: center;
   padding-inline: 0;
-  color: transparent;
-  text-align: center;
-}
-
-body.sidebar-collapsed .nav-item::first-letter {
   color: var(--muted);
+  border-radius: 10px;
 }
 
-body.sidebar-collapsed .nav-item.is-active::first-letter,
-body.sidebar-collapsed .nav-item:hover::first-letter {
+body.sidebar-collapsed .nav-item.is-active,
+body.sidebar-collapsed .nav-item:hover {
   color: var(--accent);
+}
+
+body.sidebar-collapsed .nav-item span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  white-space: nowrap;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 body.sidebar-collapsed .sidebar-toggle span {
   clip-path: polygon(74% 50%, 34% 18%, 24% 30%, 50% 50%, 24% 70%, 34% 82%);
+}
+
+body.sidebar-collapsed .sidebar-toggle {
+  min-height: 42px;
+  padding: 0;
 }
 
 .mobile-header {

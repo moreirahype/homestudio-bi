@@ -8,14 +8,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="Home Studio BI">
     <title>Home Studio BI</title>
-    <link rel="manifest" href="../manifest.webmanifest?v=45">
-    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png?v=45">
-    <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png?v=45">
-    <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=45">
-    <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=45">
-    <link rel="icon" href="../assets/icon-192.png?v=45" type="image/png">
-    <link rel="icon" href="../assets/icon.svg?v=45" type="image/svg+xml">
-    <link rel="stylesheet" href="../styles.css?v=45">
+    <link rel="manifest" href="../manifest.webmanifest?v=46">
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png?v=46">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png?v=46">
+    <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=46">
+    <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=46">
+    <link rel="icon" href="../assets/icon-192.png?v=46" type="image/png">
+    <link rel="icon" href="../assets/icon.svg?v=46" type="image/svg+xml">
+    <link rel="stylesheet" href="../styles.css?v=46">
   </head>
   <body>
     <div class="app-shell">
@@ -30,10 +30,22 @@
           <span aria-hidden="true"></span>
         </button>
         <nav class="side-nav">
-          <button class="nav-item is-active" data-page="dashboard" type="button">Dashboard</button>
-          <button class="nav-item" data-page="attendants" type="button">Atendentes</button>
-          <button class="nav-item" data-page="transactions" type="button">Transações</button>
-          <button class="nav-item" data-page="notifications" type="button">Notificações</button>
+          <button class="nav-item is-active" data-page="dashboard" type="button" aria-label="Dashboard">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"></path></svg>
+            <span>Dashboard</span>
+          </button>
+          <button class="nav-item" data-page="attendants" type="button" aria-label="Atendentes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7 8a7 7 0 0 1 14 0z"></path></svg>
+            <span>Atendentes</span>
+          </button>
+          <button class="nav-item" data-page="transactions" type="button" aria-label="Transações">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h14v2H5zm0 5h14v2H5z"></path></svg>
+            <span>Transações</span>
+          </button>
+          <button class="nav-item" data-page="notifications" type="button" aria-label="Notificações">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-5-2-2v-5a5 5 0 0 0-10 0v5l-2 2v1h14z"></path></svg>
+            <span>Notificações</span>
+          </button>
         </nav>
       </aside>
 
@@ -234,9 +246,9 @@
         </button>
       </nav>
     </div>
-    <script src="../config.js?v=45"></script>
-    <script src="../push-client.js?v=45"></script>
-    <script src="../app.js?v=45"></script>
+    <script src="../config.js?v=46"></script>
+    <script src="../push-client.js?v=46"></script>
+    <script src="../app.js?v=46"></script>
   </body>
 </html>
 
