@@ -62,7 +62,8 @@
     cpa: "metricCpa",
     averageTicket: ["metricAverageTicket", "metricArpu"],
     leads: "metricLeads",
-    cpl: "metricCpl"
+    cpl: "metricCpl",
+    conversionRate: "metricConversionRate"
   };
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
@@ -425,7 +426,7 @@
     const tax = ads * Number(config.metaTaxRate || 0);
     const totalSpend = ads + tax;
     const profit = revenue - totalSpend;
-    const leads = Number(state.meta.leads || 0);
+    const leads = Number(state.meta.leads || state.meta.conversations || state.meta.conversas || 0);
     return {
       revenue,
       ads,
@@ -438,7 +439,8 @@
       cpa: sales > 0 ? totalSpend / sales : null,
       averageTicket: sales > 0 ? revenue / sales : null,
       leads,
-      cpl: leads > 0 ? totalSpend / leads : null
+      cpl: leads > 0 ? totalSpend / leads : null,
+      conversionRate: sales > 0 ? leads / sales : null
     };
   }
 
@@ -454,6 +456,7 @@
     setMetric("averageTicket", state.metrics.averageTicket == null ? "N/A" : money(state.metrics.averageTicket));
     setMetric("leads", integer(state.metrics.leads));
     setMetric("cpl", state.metrics.cpl == null ? "N/A" : money(state.metrics.cpl));
+    setMetric("conversionRate", state.metrics.conversionRate == null ? "N/A" : percent(state.metrics.conversionRate));
   }
 
   function setMetric(key, value, tone) {
