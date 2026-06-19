@@ -82,6 +82,15 @@
   async function test(audience, notification) {
     const id = localStorage.getItem(subscriptionIdKey(audience));
     if (!id) throw new Error("Ative pelo menos uma notificação antes de testar.");
+    const localShown = await showLocalTestNotification(audience, notification);
+    if (localShown) {
+      sendRemoteTest(audience, id, notification).catch(console.error);
+      return { ok: true, localOnly: true };
+    }
+    return sendRemoteTest(audience, id, notification);
+  }
+
+  async function sendRemoteTest(audience, id, notification) {
     const response = await fetch(apiUrl("/api/test"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -89,24 +98,28 @@
     });
     const result = await response.json();
     if (response.status === 429) {
-      await showLocalTestNotification(audience, notification);
-      return { ok: true, localOnly: true, throttled: true };
+      return { ok: true, throttled: true };
     }
     if (!response.ok || !result.ok) throw new Error(result.error || "Falha ao enviar a notificação de teste.");
-    await showLocalTestNotification(audience, notification);
     return result;
   }
 
   async function showLocalTestNotification(audience, notification) {
-    if (Notification.permission !== "granted" || !("serviceWorker" in navigator)) return;
+    if (Notification.permission !== "granted") return false;
+    if (!("serviceWorker" in navigator)) {
+      new Notification(notification.title || "Home Studio BI", { body: notification.body || "" });
+      return true;
+    }
     const registration = await navigator.serviceWorker.ready;
+    const iconUrl = new URL("../assets/icon-192.png", location.href).href;
     await registration.showNotification(notification.title || "Home Studio BI", {
       body: notification.body || "",
-      icon: new URL("./assets/icon-192.png", location.origin + location.pathname).href,
-      badge: new URL("./assets/icon-192.png", location.origin + location.pathname).href,
+      icon: iconUrl,
+      badge: iconUrl,
       tag: `hsbi-test-${audience}`,
       data: { url: notification.url || location.href }
     });
+    return true;
   }
 
   window.HSBIPush = { requestPermission, sync, update, test };
