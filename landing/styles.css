@@ -178,10 +178,15 @@ h3 {
   line-height: 1.15;
 }
 
-.hero-copy p,
+.hero-copy p {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 18px;
+}
+
 .section p,
 .final-cta p {
-  margin-top: 18px;
+  margin-top: 26px;
   color: var(--muted);
   font-size: 18px;
 }
@@ -776,7 +781,7 @@ details {
 }
 
 .section-heading p {
-  margin-top: 20px;
+  margin-top: 28px;
 }
 
 .attendant-section {
@@ -1214,7 +1219,7 @@ details p {
   }
 
   .hero {
-    padding: 24px 0 42px;
+    padding: 42px 0 42px;
   }
 
   .section {
