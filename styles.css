@@ -144,10 +144,35 @@ button {
 }
 
 .sidebar-toggle span {
-  width: 18px;
+  position: relative;
+  width: 22px;
   height: 18px;
+}
+
+.sidebar-toggle span::before,
+.sidebar-toggle span::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.sidebar-toggle span::before {
+  left: 2px;
+  width: 2px;
+  height: 15px;
+  border-radius: 999px;
   background: currentColor;
-  clip-path: polygon(26% 50%, 66% 18%, 76% 30%, 50% 50%, 76% 70%, 66% 82%);
+  opacity: 0.72;
+}
+
+.sidebar-toggle span::after {
+  left: 8px;
+  width: 9px;
+  height: 9px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: translateY(-50%) rotate(-45deg);
 }
 
 .nav-item {
@@ -195,11 +220,11 @@ body.sidebar-collapsed .main {
   margin-left: var(--sidebar-collapsed);
 }
 
-body.sidebar-collapsed .brand {
+body.sidebar-collapsed .sidebar .brand {
   justify-content: center;
 }
 
-body.sidebar-collapsed .brand span:last-child {
+body.sidebar-collapsed .sidebar .brand span:last-child {
   width: 0;
   opacity: 0;
   overflow: hidden;
@@ -228,7 +253,7 @@ body.sidebar-collapsed .nav-item span {
 }
 
 body.sidebar-collapsed .sidebar-toggle span {
-  clip-path: polygon(74% 50%, 34% 18%, 24% 30%, 50% 50%, 24% 70%, 34% 82%);
+  transform: scaleX(-1);
 }
 
 body.sidebar-collapsed .sidebar-toggle {
@@ -424,10 +449,6 @@ select:focus {
   color: var(--positive);
 }
 
-.metric-cpl {
-  grid-column: span 2;
-}
-
 .metric-revenue { order: 1; }
 .metric-ads { order: 2; }
 .metric-profit { order: 3; }
@@ -440,6 +461,7 @@ select:focus {
 .metric-arpu { order: 9; }
 .metric-leads { order: 10; }
 .metric-cpl { order: 11; }
+.metric-conversion-rate { order: 12; }
 
 .panel {
   margin-top: 18px;
@@ -794,7 +816,8 @@ th:last-child {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .metric-cpl {
+  .metric-cpl,
+  .metric-conversion-rate {
     grid-column: auto;
   }
 }
@@ -948,6 +971,7 @@ th:last-child {
   .metric-arpu { order: 9; }
   .metric-leads { order: 10; }
   .metric-cpl { order: 11; }
+  .metric-conversion-rate { order: 12; }
 
   .panel {
     padding: 18px;
