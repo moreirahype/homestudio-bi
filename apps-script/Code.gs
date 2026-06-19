@@ -71,6 +71,7 @@ function doPost(e) {
       });
     } catch (error) {
       console.error('Falha ao enviar push da Sheila: ' + error);
+      appendDebugLog_('push_error', payload, { audience: 'sheila', error: String(error) });
     }
   }
   return outputJson_({ ok: true, id: row[0] });
