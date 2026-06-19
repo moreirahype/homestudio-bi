@@ -1,16 +1,12 @@
-# Legado do Protótipo
+# Legado
 
-Esta pasta é o workspace antigo do protótipo Home Studio BI.
+Este workspace era o monorepo do prototipo Home Studio BI.
 
-O produto Hot Sales foi separado em repositórios limpos na pasta:
+A partir da separacao comercial do Hot Sales, o codigo ativo foi movido para:
 
-`D:\OneDrive\Documents\Hot Sales`
+- `D:\OneDrive\Documents\Hot Sales\hot-sales`
+- `D:\OneDrive\Documents\Hot Sales\hot-sales-app`
+- `D:\OneDrive\Documents\Hot Sales\hot-sales-push`
+- `D:\OneDrive\Documents\Hot Sales\hot-sales-apps-script`
 
-Repos atuais:
-
-- `hot-sales`
-- `hot-sales-app`
-- `hot-sales-push`
-- `hot-sales-apps-script`
-
-Mantenha esta pasta apenas como backup até confirmar que tudo já foi publicado nos novos repositórios.
+Nao adicione novas funcionalidades neste repositorio legado.
