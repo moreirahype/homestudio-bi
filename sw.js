@@ -1,4 +1,4 @@
-const CACHE_NAME = "home-studio-bi-v54";
+const CACHE_NAME = "home-studio-bi-v55";
 const ASSETS = [
   "./styles.css",
   "./app.js",
@@ -11,13 +11,9 @@ const ASSETS = [
   "./x7p4r9m2/index.html",
   "./k9v2m7q4/",
   "./k9v2m7q4/index.html",
-  "./assets/icon.svg",
-  "./assets/icon-source.png",
   "./assets/apple-touch-icon.png",
   "./assets/icon-192.png",
-  "./assets/icon-192.svg",
-  "./assets/icon-512.png",
-  "./assets/icon-512.svg"
+  "./assets/icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
