@@ -1,4 +1,4 @@
-const CACHE_NAME = "home-studio-bi-v49";
+const CACHE_NAME = "home-studio-bi-v51";
 const ASSETS = [
   "./styles.css",
   "./app.js",

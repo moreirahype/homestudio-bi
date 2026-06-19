@@ -836,9 +836,27 @@ th:last-child {
     display: none;
   }
 
+  body.sidebar-collapsed .sidebar {
+    display: none;
+  }
+
   .main {
     margin-left: 0;
     padding: calc(42px + env(safe-area-inset-top)) 12px calc(134px + env(safe-area-inset-bottom));
+  }
+
+  body.sidebar-collapsed .main {
+    margin-left: 0;
+  }
+
+  body.sidebar-collapsed .mobile-header .brand {
+    justify-content: flex-start;
+  }
+
+  body.sidebar-collapsed .mobile-header .brand span:last-child {
+    width: auto;
+    opacity: 1;
+    overflow: visible;
   }
 
   .mobile-header {
