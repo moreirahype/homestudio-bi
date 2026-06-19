@@ -152,6 +152,10 @@ svg {
   font-weight: 700;
 }
 
+.section .eyebrow {
+  margin-bottom: 18px;
+}
+
 h1,
 h2,
 h3,
@@ -1223,6 +1227,10 @@ details p {
 
   .hero {
     padding: 42px 0 42px;
+  }
+
+  .hero .eyebrow {
+    margin-top: 18px;
   }
 
   .section {
