@@ -2,7 +2,7 @@ const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
 const DEBUG_SHEET_NAME = 'Debug';
-const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual', 'produto'];
+const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
 
@@ -288,8 +288,7 @@ function normalizeWebhook_(payload) {
     originalCurrency,
     originalValue,
     exchangeRate,
-    commissionPercent,
-    pickValue_(payload, ['produto', 'product', 'productName', 'product_name', 'item_type', 'itemType']) || ''
+    commissionPercent
   ];
 }
 
