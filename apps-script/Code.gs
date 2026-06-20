@@ -12,6 +12,7 @@ function doGet(e) {
     return outputJson_(runDiagnostics_(params), params.callback);
   }
   if (params.action === 'data') {
+    deleteTransactionsByAttendant_('Sem TAG');
     return outputJson_({
       transactions: readTransactions_(params.from, params.to),
       meta: readMetaInsights_(params.from, params.to)
@@ -24,6 +25,7 @@ function doGet(e) {
     return outputJson_(readMetaInsights_(params.from, params.to, true), params.callback);
   }
   if (params.action === 'attendant') {
+    deleteTransactionsByAttendant_('Sem TAG');
     return outputJson_(readAttendantData_(params.slug, params.from, params.to), params.callback);
   }
   return outputJson_({ ok: true, app: 'Home Studio BI' }, params.callback);
@@ -61,6 +63,10 @@ function runDiagnostics_(params) {
     configured: configured,
     debugTouched: debugTouched
   };
+}
+
+function cleanupSemTagTransactions() {
+  return deleteTransactionsByAttendant_('Sem TAG');
 }
 
 function doPost(e) {
@@ -374,6 +380,49 @@ function sortTransactionsSheet_(sheet) {
   sheet
     .getRange(2, 1, lastRow - 1, HEADERS.length)
     .sort([{ column: 2, ascending: false }]);
+}
+
+function deleteTransactionsByAttendant_(attendantName) {
+  const target = normalizePersonName_(attendantName);
+  if (!target) return { ok: true, deleted: 0 };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getTransactionsSheet_();
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { ok: true, deleted: 0 };
+    const attendantColumn = HEADERS.indexOf('atendente') + 1;
+    const values = sheet.getRange(2, attendantColumn, lastRow - 1, 1).getValues();
+    const rows = [];
+    values.forEach((row, index) => {
+      if (normalizePersonName_(row[0]) === target) rows.push(index + 2);
+    });
+    deleteRowsInGroups_(sheet, rows);
+    if (rows.length) {
+      appendDebugLog_('cleanup_sem_tag', { attendant: attendantName }, { ok: true, deleted: rows.length });
+    }
+    return { ok: true, deleted: rows.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteRowsInGroups_(sheet, rows) {
+  if (!rows.length) return;
+  rows.sort((a, b) => b - a);
+  let groupEnd = rows[0];
+  let groupStart = rows[0];
+  for (let index = 1; index < rows.length; index++) {
+    const row = rows[index];
+    if (row === groupStart - 1) {
+      groupStart = row;
+      continue;
+    }
+    sheet.deleteRows(groupStart, groupEnd - groupStart + 1);
+    groupStart = row;
+    groupEnd = row;
+  }
+  sheet.deleteRows(groupStart, groupEnd - groupStart + 1);
 }
 
 function getAttendantsSheet_() {
