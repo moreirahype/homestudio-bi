@@ -341,7 +341,9 @@
       moedaOriginal: originalCurrency,
       valorOriginal: originalValue,
       valor: convertedValue,
-      atendente: item.atendente || item.attendant || "Sem atendente"
+      atendente: item.atendente || item.attendant || "Sem atendente",
+      origem: item.origem || item.source || "",
+      produto: item.produto || item.product || item.productName || item.product_name || ""
     };
   }
 
@@ -427,6 +429,7 @@
     const totalSpend = ads + tax;
     const profit = revenue - totalSpend;
     const leads = getLeadBase(state.meta);
+    const conversionSales = countFrontConversionSales(transactions, state.transactions);
     return {
       revenue,
       ads,
@@ -440,8 +443,48 @@
       averageTicket: sales > 0 ? revenue / sales : null,
       leads,
       cpl: leads > 0 ? totalSpend / leads : null,
-      conversionRate: leads > 0 ? sales / leads : 0
+      conversionSales,
+      conversionRate: leads > 0 ? conversionSales / leads : null
     };
+  }
+
+  function countFrontConversionSales(periodTransactions, allTransactions) {
+    const periodIds = new Set(periodTransactions.map((item) => item.id));
+    const seenBuyers = new Set();
+    return (allTransactions || [])
+      .filter((item) => !isGalleryTransaction(item))
+      .slice()
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .reduce((total, item) => {
+        const buyerKey = getBuyerKey(item);
+        if (!buyerKey) return total;
+        const isFirstPurchase = !seenBuyers.has(buyerKey);
+        seenBuyers.add(buyerKey);
+        return isFirstPurchase && periodIds.has(item.id) ? total + 1 : total;
+      }, 0);
+  }
+
+  function isGalleryTransaction(item) {
+    const source = normalizeSearchText(item.origem);
+    const product = normalizeSearchText(item.produto);
+    return source.includes("gallery") ||
+      source.includes("galeria") ||
+      product.includes("gallery") ||
+      product.includes("galeria");
+  }
+
+  function getBuyerKey(item) {
+    const phone = String(item.telefone || "").replace(/\D/g, "");
+    if (phone) return `phone:${phone}`;
+    const payer = normalizeSearchText(item.pagador).replace(/\s+/g, " ").trim();
+    return payer && payer !== "sem pagador" ? `payer:${payer}` : "";
+  }
+
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
   }
 
   function getLeadBase(meta) {
