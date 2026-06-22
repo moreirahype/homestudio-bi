@@ -21,12 +21,20 @@ module.exports = async function handler(req, res) {
     records = records.filter((record) => (record.preferences?.times || []).includes(body.time));
   }
 
-  const results = await Promise.all(records.map((record) => sendToRecord(record, {
-    title: body.title,
-    body: body.body || "",
-    url: body.url || "/",
-    tag: body.tag || `hsbi-${audience}`
-  })));
+  const results = await Promise.all(records.map((record) => {
+    const style = ["profit_status", "detailed", "creative"].includes(record.preferences?.reportStyle)
+      ? record.preferences.reportStyle
+      : "detailed";
+    const variant = audience === "owner" && body.kind === "report"
+      ? body.variants?.[style] || body.variants?.detailed
+      : null;
+    return sendToRecord(record, {
+      title: variant?.title || body.title,
+      body: variant?.body || body.body || "",
+      url: body.url || "/",
+      tag: body.tag || `hsbi-${audience}`
+    });
+  }));
   return json(res, 200, {
     ok: true,
     audience,

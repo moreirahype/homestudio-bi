@@ -11,7 +11,10 @@ module.exports = async function handler(req, res) {
   record.preferences = {
     enabled: body.preferences?.enabled !== false,
     times: Array.isArray(body.preferences?.times) ? body.preferences.times : [],
-    salesEnabled: body.preferences?.salesEnabled !== false
+    salesEnabled: body.preferences?.salesEnabled !== false,
+    reportStyle: ["profit_status", "detailed", "creative"].includes(body.preferences?.reportStyle)
+      ? body.preferences.reportStyle
+      : "detailed"
   };
   record.updatedAt = new Date().toISOString();
   await saveSubscription(body.id, record);

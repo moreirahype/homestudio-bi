@@ -107,12 +107,12 @@
   async function showLocalTestNotification(audience, notification) {
     if (Notification.permission !== "granted") return false;
     if (!("serviceWorker" in navigator)) {
-      new Notification(notification.title || "Home Studio BI", { body: notification.body || "" });
+      new Notification(notification.title || "Hot Sales", { body: notification.body || "" });
       return true;
     }
     const registration = await ensureServiceWorkerRegistration();
     const iconUrl = new URL("../assets/icon-192.png", location.href).href;
-    await registration.showNotification(notification.title || "Home Studio BI", {
+    await registration.showNotification(notification.title || "Hot Sales", {
       body: notification.body || "",
       icon: iconUrl,
       badge: iconUrl,
@@ -125,7 +125,7 @@
   async function ensureServiceWorkerRegistration() {
     let registration = await navigator.serviceWorker.getRegistration();
     if (!registration) {
-      registration = await navigator.serviceWorker.register("../sw.js?v=61");
+      registration = await navigator.serviceWorker.register("../sw.js?v=62");
     } else {
       registration.update().catch(console.error);
     }

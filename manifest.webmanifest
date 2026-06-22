@@ -1,6 +1,6 @@
 {
-  "name": "Home Studio BI",
-  "short_name": "Home Studio BI",
+  "name": "Hot Sales",
+  "short_name": "Hot Sales",
   "description": "Dashboard de vendas, anúncios, atendentes e notificações.",
   "scope": "./",
   "display": "standalone",

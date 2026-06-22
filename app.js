@@ -65,6 +65,8 @@
     legacyTooltip: document.getElementById("chartTooltip"),
     notificationList: document.getElementById("notificationList"),
     saleNotificationList: document.getElementById("saleNotificationList"),
+    reportStyleOptions: document.getElementById("reportStyleOptions"),
+    reportPreviewTitle: document.getElementById("reportPreviewTitle"),
     enableAllNotifications: document.getElementById("enableAllNotifications"),
     testNotification: document.getElementById("testNotification")
   };
@@ -180,9 +182,10 @@
       try {
         await syncOwnerPush(true);
         const pushClient = await ensurePushClient();
+        const preview = buildReportPreview();
         await pushClient.test("owner", {
-          title: "Resumo das Campanhas!",
-          body: buildNotificationText(),
+          title: preview.title,
+          body: preview.body,
           url: `${location.origin}${location.pathname}#notifications`
         });
       } catch (error) {
@@ -993,7 +996,9 @@
   function renderNotificationSummary() {
     const summary = document.getElementById("notificationSummary");
     if (!summary) return;
-    summary.textContent = buildNotificationText();
+    const preview = buildReportPreview();
+    summary.textContent = preview.body;
+    if (els.reportPreviewTitle) els.reportPreviewTitle.textContent = preview.title;
   }
 
   function renderNotifications() {
@@ -1036,6 +1041,37 @@
       )
       .join("");
 
+    if (els.reportStyleOptions) {
+      const styles = [
+        ["profit_status", "Status de lucro"],
+        ["detailed", "Resumo detalhado"],
+        ["creative", "Notificações criativas"]
+      ];
+      els.reportStyleOptions.innerHTML = styles.map(([value, label]) => `
+        <label class="report-style-option ${getReportStyle() === value ? "is-active" : ""}">
+          <input type="radio" name="reportStyle" value="${value}" ${getReportStyle() === value ? "checked" : ""}>
+          <span>${label}</span>
+        </label>`).join("");
+      els.reportStyleOptions.querySelectorAll("input").forEach((input) => {
+        input.addEventListener("change", async () => {
+          const previous = state.notifications.reportStyle;
+          state.notifications.reportStyle = input.value;
+          saveNotificationPrefs();
+          renderNotifications();
+          renderNotificationSummary();
+          try {
+            await syncOwnerPush();
+          } catch (error) {
+            state.notifications.reportStyle = previous;
+            saveNotificationPrefs();
+            renderNotifications();
+            renderNotificationSummary();
+            alert(error.message);
+          }
+        });
+      });
+    }
+
     els.notificationList.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", async () => {
         const previous = state.notifications[input.dataset.time];
@@ -1062,13 +1098,20 @@
     return state.notifications.salesEnabled !== false;
   }
 
+  function getReportStyle() {
+    return ["profit_status", "detailed", "creative"].includes(state.notifications.reportStyle)
+      ? state.notifications.reportStyle
+      : "detailed";
+  }
+
   async function syncOwnerPush(force) {
     const pushClient = await ensurePushClient();
     const times = notificationTimes.filter((time) => state.notifications[time]);
     const preferences = {
       enabled: isSaleNotificationsEnabled() || times.length > 0,
       times,
-      salesEnabled: isSaleNotificationsEnabled()
+      salesEnabled: isSaleNotificationsEnabled(),
+      reportStyle: getReportStyle()
     };
     return force
       ? pushClient.sync("owner", preferences)
@@ -1085,7 +1128,7 @@
         return;
       }
       const script = document.createElement("script");
-      script.src = "../push-client.js?v=42";
+      script.src = "../push-client.js?v=62";
       script.dataset.pushClient = "dynamic";
       script.onload = () => window.HSBIPush
         ? resolve(window.HSBIPush)
@@ -1099,9 +1142,26 @@
     return `Seu investimento está em ${money(state.metrics.totalSpend || 0)}, com faturamento em ${money(state.metrics.revenue || 0)}, com um CPA de ${state.metrics.cpa == null ? "N/A" : money(state.metrics.cpa)} e um ROI de ${state.metrics.roas == null ? "0,00" : decimal(state.metrics.roas)}.`;
   }
 
+  function buildReportPreview() {
+    const style = getReportStyle();
+    const profit = Number(state.metrics.profit || 0);
+    const hasProfit = profit >= 0;
+    if (style === "profit_status") {
+      return hasProfit
+        ? { title: "Parabéns!", body: `O dia está finalizando e você lucrou ${money(profit)}!` }
+        : { title: "Não desanime.", body: `O dia está finalizando com ${money(Math.abs(profit))} de prejuízo. Ajuste a rota e siga em frente.` };
+    }
+    if (style === "creative") {
+      return hasProfit
+        ? { title: "Dois reais ou um lucro misterioso?", body: `Parabéns! Você teve ${money(profit)} de lucro até agora... 🤑🤑🤑` }
+        : { title: "Respira, ajusta e continua.", body: `O resultado está em ${money(Math.abs(profit))} de prejuízo agora. Um dia não define a operação.` };
+    }
+    return { title: "Resumo das Campanhas!", body: buildNotificationText() };
+  }
+
   function loadNotificationPrefs() {
     try {
-      return Object.assign({ salesEnabled: true }, JSON.parse(localStorage.getItem("hsbi-notifications") || "{}"));
+      return Object.assign({ salesEnabled: true, reportStyle: "detailed" }, JSON.parse(localStorage.getItem("hsbi-notifications") || "{}"));
     } catch {
       return {};
     }
@@ -1113,7 +1173,7 @@
 
   function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("../sw.js?v=61").then((registration) => registration.update()).catch(console.error);
+      navigator.serviceWorker.register("../sw.js?v=62").then((registration) => registration.update()).catch(console.error);
     }
   }
 

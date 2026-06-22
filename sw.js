@@ -1,4 +1,4 @@
-const CACHE_NAME = "home-studio-bi-v61";
+const CACHE_NAME = "hot-sales-v62";
 const ASSETS = [
   "./styles.css",
   "./app.js",
@@ -50,11 +50,11 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
-    payload = { title: "Home Studio BI", body: event.data ? event.data.text() : "" };
+    payload = { title: "Hot Sales", body: event.data ? event.data.text() : "" };
   }
   const url = payload.url || self.registration.scope;
   event.waitUntil(
-    self.registration.showNotification(payload.title || "Home Studio BI", {
+    self.registration.showNotification(payload.title || "Hot Sales", {
       body: payload.body || "",
       icon: new URL("./assets/icon-192.png", self.registration.scope).href,
       badge: new URL("./assets/icon-192.png", self.registration.scope).href,

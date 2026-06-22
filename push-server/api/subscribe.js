@@ -18,7 +18,10 @@ module.exports = async function handler(req, res) {
   const preferences = {
     enabled: body.preferences?.enabled !== false,
     times: Array.isArray(body.preferences?.times) ? body.preferences.times : [],
-    salesEnabled: body.preferences?.salesEnabled !== false
+    salesEnabled: body.preferences?.salesEnabled !== false,
+    reportStyle: ["profit_status", "detailed", "creative"].includes(body.preferences?.reportStyle)
+      ? body.preferences.reportStyle
+      : "detailed"
   };
   await saveSubscription(id, {
     audience,

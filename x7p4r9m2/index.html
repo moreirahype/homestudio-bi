@@ -6,24 +6,24 @@
     <meta name="theme-color" content="#0e120d">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="Home Studio BI">
-    <title>Home Studio BI</title>
-    <link rel="manifest" href="../manifest.webmanifest?v=55">
+    <meta name="apple-mobile-web-app-title" content="Hot Sales">
+    <title>Hot Sales</title>
+    <link rel="manifest" href="../manifest.webmanifest?v=57">
     <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png?v=55">
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png?v=55">
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=58">
+    <link rel="stylesheet" href="../styles.css?v=59">
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Navegação principal">
-        <a class="brand" href="#dashboard" aria-label="Home Studio BI">
+        <a class="brand" href="#dashboard" aria-label="Hot Sales">
           <span class="brand-mark" aria-hidden="true">
             <img src="../assets/icon-192.png?v=55" alt="">
           </span>
-          <span>Home Studio BI</span>
+          <span>Hot Sales</span>
         </a>
         <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher barra lateral" aria-expanded="true" title="Recolher barra lateral">
           <span aria-hidden="true"></span>
@@ -50,11 +50,11 @@
 
       <main class="main">
         <header class="mobile-header">
-          <a class="brand" href="#dashboard" aria-label="Home Studio BI">
+          <a class="brand" href="#dashboard" aria-label="Hot Sales">
             <span class="brand-mark" aria-hidden="true">
               <img src="../assets/icon-192.png?v=55" alt="">
             </span>
-            <span>Home Studio BI</span>
+            <span>Hot Sales</span>
           </a>
           <span class="sync-pill" id="syncStatus">Carregando</span>
         </header>
@@ -270,20 +270,54 @@
         <section class="page" id="page-notifications" data-page="notifications">
           <article class="panel notifications-panel">
             <h1>Notificações</h1>
-            <div class="summary-card">
-              <strong>Resumo das Campanhas!</strong>
-              <p id="notificationSummary">Seu investimento está em R$ 0,00, com faturamento em R$ 0,00, com um CPA de N/A e um ROI de 0,00.</p>
+            <div class="notifications-layout">
+              <section class="notification-section sale-notification-section">
+                <div class="notification-section-head">
+                  <div>
+                    <h2>Notificações de Venda</h2>
+                    <p>Receba um alerta sempre que uma nova venda for registrada.</p>
+                  </div>
+                </div>
+                <div class="notification-list" id="saleNotificationList"></div>
+                <div class="notification-preview-wrap">
+                  <h3>Prévia da notificação</h3>
+                  <div class="notification-preview">
+                    <img src="../assets/icon-192.png?v=55" alt="">
+                    <div>
+                      <strong>💰 Venda Realizada!</strong>
+                      <span>Valor: R$ 99,90 · Sheila</span>
+                      <small>Hot Sales</small>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="notification-section report-notification-section">
+                <div class="notification-section-head report-heading">
+                  <div>
+                    <h2>Notificações de Relatório</h2>
+                    <p>Escolha os horários e o estilo dos seus resumos.</p>
+                  </div>
+                  <button id="enableAllNotifications" type="button">Ativar todos</button>
+                </div>
+                <h3>Horários</h3>
+                <div class="notification-list" id="notificationList"></div>
+                <h3>Padrão de notificação</h3>
+                <div class="report-style-options" id="reportStyleOptions"></div>
+                <div class="notification-preview-wrap">
+                  <h3>Prévia da notificação</h3>
+                  <div class="notification-preview" id="reportNotificationPreview">
+                    <img src="../assets/icon-192.png?v=55" alt="">
+                    <div>
+                      <strong id="reportPreviewTitle">Resumo das Campanhas!</strong>
+                      <span id="notificationSummary">Seu investimento está em R$ 0,00, com faturamento em R$ 0,00, com um CPA de N/A e um ROI de 0,00.</span>
+                      <small>Hot Sales</small>
+                    </div>
+                  </div>
+                </div>
+                <button class="test-notification" id="testNotification" type="button">Testar notificação</button>
+              </section>
             </div>
-            <div class="notification-actions sale-notification-heading">
-              <h2>Vendas</h2>
-            </div>
-            <div class="notification-list" id="saleNotificationList"></div>
-            <div class="notification-actions">
-              <h2>Horários</h2>
-              <button id="enableAllNotifications" type="button">Ativar todos</button>
-            </div>
-            <div class="notification-list" id="notificationList"></div>
-            <button class="test-notification" id="testNotification" type="button">Testar notificação</button>
           </article>
         </section>
       </main>
@@ -308,8 +342,8 @@
       </nav>
     </div>
     <script src="../config.js?v=55"></script>
-    <script src="../push-client.js?v=61"></script>
-    <script src="../app.js?v=64"></script>
+    <script src="../push-client.js?v=62"></script>
+    <script src="../app.js?v=65"></script>
   </body>
 </html>
 

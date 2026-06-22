@@ -28,7 +28,7 @@ function doGet(e) {
   if (params.action === 'attendant') {
     return outputJson_(readAttendantData_(params.slug, params.from, params.to), params.callback);
   }
-  return outputJson_({ ok: true, app: 'Home Studio BI' }, params.callback);
+  return outputJson_({ ok: true, app: 'Hot Sales' }, params.callback);
 }
 
 function runDiagnostics_(params) {
@@ -110,7 +110,7 @@ function doPost(e) {
         audience: 'owner',
         kind: 'sale',
         title: '\uD83D\uDCB0 Venda Realizada!',
-        body: 'Valor: ' + formatBrl_(row[7]) + ' \u00B7 Atendente: ' + String(row[8] || 'Sem atendente'),
+        body: 'Valor: ' + formatBrl_(row[7]) + ' \u00B7 ' + String(row[8] || 'Sem atendente'),
         url: getPushProperty_('OWNER_APP_URL') + '#transactions',
         tag: 'hsbi-owner-sale-' + String(row[0])
       });
@@ -252,21 +252,70 @@ function sendOwnerCampaignPush_(time) {
   const ads = parseNumber_(meta.spend || 0);
   const taxRate = Number(PropertiesService.getScriptProperties().getProperty('META_TAX_RATE') || 0.1383);
   const totalSpend = ads + ads * taxRate;
+  const profit = revenue - totalSpend;
   const cpa = sales > 0 ? totalSpend / sales : null;
   const roas = totalSpend > 0 ? revenue / totalSpend : null;
-  const body =
+  const detailedBody =
     'Seu investimento está em ' + formatBrl_(totalSpend) +
     ', com faturamento em ' + formatBrl_(revenue) +
     ', com um CPA de ' + (cpa == null ? 'N/A' : formatBrl_(cpa)) +
     ' e um ROI de ' + (roas == null ? '0,00' : formatDecimal_(roas)) + '.';
+  const profitStatus = buildProfitStatusReport_(profit, time);
+  const creative = buildCreativeReport_(profit);
   return sendPushRequest_({
     audience: 'owner',
+    kind: 'report',
     time: time,
     title: 'Resumo das Campanhas!',
-    body: body,
+    body: detailedBody,
+    variants: {
+      profit_status: profitStatus,
+      detailed: {
+        title: 'Resumo das Campanhas!',
+        body: detailedBody
+      },
+      creative: creative
+    },
     url: getPushProperty_('OWNER_APP_URL'),
     tag: 'hsbi-owner-' + time.replace(':', '')
   });
+}
+
+function buildProfitStatusReport_(profit, time) {
+  const amount = formatBrl_(Math.abs(profit));
+  const isClosing = time === '23:00';
+  if (profit >= 0) {
+    return {
+      title: 'Parabéns!',
+      body: isClosing
+        ? 'O dia está finalizando e você lucrou ' + amount + '!'
+        : 'Até agora, você lucrou ' + amount + '!'
+    };
+  }
+  return {
+    title: 'Não desanime.',
+    body: isClosing
+      ? 'O dia está finalizando com ' + amount + ' de prejuízo. Amanhã é uma nova rodada.'
+      : 'Até agora, o resultado está em ' + amount + ' de prejuízo. Ajuste a rota e siga em frente.'
+  };
+}
+
+function buildCreativeReport_(profit) {
+  const amount = formatBrl_(Math.abs(profit));
+  const messages = profit >= 0
+    ? [
+        { title: 'Dois reais ou um lucro misterioso?', body: 'Parabéns! Você teve ' + amount + ' de lucro até agora... 🤑 🤑 🤑' },
+        { title: 'O caixa sorriu.', body: amount + ' de lucro e a operação respirando bonito. 🚀' },
+        { title: 'Hoje o tráfego veio educado.', body: 'Até agora, ' + amount + ' de lucro. A máquina está girando. 🔥' },
+        { title: 'Pix caiu, planilha nem abriu.', body: amount + ' de lucro até agora. É sobre isso. 💸' }
+      ]
+    : [
+        { title: 'Respira, ajusta e continua.', body: 'O resultado está em ' + amount + ' de prejuízo agora. Um dia não define a operação.' },
+        { title: 'Nem todo gráfico sobe em linha reta.', body: amount + ' de prejuízo até agora. Leia os dados, ajuste e volte mais forte.' },
+        { title: 'Hoje foi treino, não sentença.', body: 'O resultado está negativo em ' + amount + '. Amanhã tem outra rodada.' },
+        { title: 'Calma no volante.', body: amount + ' de prejuízo até agora. Não escale emoção; escale o que os dados confirmarem.' }
+      ];
+  return messages[Math.floor(Math.random() * messages.length)];
 }
 
 function sendPushRequest_(payload) {
