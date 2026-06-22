@@ -109,8 +109,8 @@ function doPost(e) {
       sendPushRequest_({
         audience: 'owner',
         kind: 'sale',
-        title: '\uD83D\uDCB0 Venda Realizada!',
-        body: 'Valor: ' + formatBrl_(row[7]) + ' \u00B7 ' + String(row[8] || 'Sem atendente'),
+        title: '\uD83D\uDCB0 PIX de ' + formatBrl_(row[7]) + ' recebido!',
+        body: String(row[8] || 'Sem atendente'),
         url: getPushProperty_('OWNER_APP_URL') + '#transactions',
         tag: 'hsbi-owner-sale-' + String(row[0])
       });
@@ -307,13 +307,25 @@ function buildCreativeReport_(profit) {
         { title: 'Dois reais ou um lucro misterioso?', body: 'Parabéns! Você teve ' + amount + ' de lucro até agora... 🤑 🤑 🤑' },
         { title: 'O caixa sorriu.', body: amount + ' de lucro e a operação respirando bonito. 🚀' },
         { title: 'Hoje o tráfego veio educado.', body: 'Até agora, ' + amount + ' de lucro. A máquina está girando. 🔥' },
-        { title: 'Pix caiu, planilha nem abriu.', body: amount + ' de lucro até agora. É sobre isso. 💸' }
+        { title: 'Pix caiu, planilha nem abriu.', body: amount + ' de lucro até agora. É sobre isso. 💸' },
+        { title: 'A conta fechou no verde.', body: 'Seu lucro chegou a ' + amount + '. Pode comemorar, mas sem tirar o pé dos dados. 📈' },
+        { title: 'O anúncio trabalhou bonito.', body: amount + ' de lucro até agora. Hoje a campanha fez o dever de casa. 😎' },
+        { title: 'Tem cheiro de escala no ar.', body: 'A operação já acumula ' + amount + ' de lucro. Olho nos números e vamos em frente. ⚡' },
+        { title: 'Venda boa deixa rastro.', body: 'E o rastro de hoje já soma ' + amount + ' de lucro. 💚' },
+        { title: 'Seu dashboard está sorrindo.', body: amount + ' de lucro até agora. Verde combina com o dia. 😏' },
+        { title: 'A máquina não dormiu.', body: 'Enquanto você tocava a operação, o lucro chegou a ' + amount + '. 🔥' }
       ]
     : [
         { title: 'Respira, ajusta e continua.', body: 'O resultado está em ' + amount + ' de prejuízo agora. Um dia não define a operação.' },
         { title: 'Nem todo gráfico sobe em linha reta.', body: amount + ' de prejuízo até agora. Leia os dados, ajuste e volte mais forte.' },
         { title: 'Hoje foi treino, não sentença.', body: 'O resultado está negativo em ' + amount + '. Amanhã tem outra rodada.' },
-        { title: 'Calma no volante.', body: amount + ' de prejuízo até agora. Não escale emoção; escale o que os dados confirmarem.' }
+        { title: 'Calma no volante.', body: amount + ' de prejuízo até agora. Não escale emoção; escale o que os dados confirmarem.' },
+        { title: 'O dado avisou. Agora é ajustar.', body: 'O prejuízo está em ' + amount + '. Corte o ruído e procure o ponto que precisa mudar.' },
+        { title: 'Campanha ruim também ensina.', body: amount + ' de prejuízo até agora. Transforme o número em decisão, não em desânimo.' },
+        { title: 'Hoje o verde tirou folga.', body: 'O resultado está em ' + amount + ' de prejuízo. Revise a rota antes de acelerar. 🧭' },
+        { title: 'Sem pânico, com métrica.', body: amount + ' de prejuízo até agora. Decisão boa começa olhando o cenário inteiro.' },
+        { title: 'O jogo ainda não acabou.', body: 'O prejuízo está em ' + amount + '. Ajuste a oferta, o anúncio ou a operação e siga testando.' },
+        { title: 'Proteja o caixa.', body: amount + ' de prejuízo até agora. Talvez seja hora de pausar, analisar e voltar com precisão.' }
       ];
   return messages[Math.floor(Math.random() * messages.length)];
 }

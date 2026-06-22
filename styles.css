@@ -957,10 +957,33 @@ tr:hover .transaction-edit-button,
 }
 
 .report-style-option input {
+  appearance: none;
+  -webkit-appearance: none;
   width: 16px;
+  height: 16px;
   min-height: 16px;
+  flex: 0 0 16px;
   margin: 0;
-  accent-color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  outline: none;
+}
+
+.report-style-option input::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+.report-style-option input:checked::before {
+  transform: scale(1);
 }
 
 .report-style-option span {

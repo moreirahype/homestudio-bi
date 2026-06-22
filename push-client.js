@@ -125,7 +125,7 @@
   async function ensureServiceWorkerRegistration() {
     let registration = await navigator.serviceWorker.getRegistration();
     if (!registration) {
-      registration = await navigator.serviceWorker.register("../sw.js?v=62");
+      registration = await navigator.serviceWorker.register("../sw.js?v=63");
     } else {
       registration.update().catch(console.error);
     }
