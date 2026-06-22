@@ -315,6 +315,7 @@ body[data-current-page="notifications"] .control-panel {
 .period-button,
 .pager button,
 .notification-actions button,
+.report-heading button,
 .test-notification {
   min-height: 44px;
   border: 1px solid var(--line);
@@ -834,27 +835,21 @@ tr:hover .transaction-edit-button,
   font-weight: var(--weight-bold);
 }
 
-.notifications-panel {
-  max-width: none;
+.notifications-page-title {
+  margin: 18px 0 0;
 }
 
 .notifications-layout {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
   margin-top: 18px;
-  overflow: hidden;
-  border: 1px solid rgba(159, 232, 112, 0.18);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.018);
 }
 
 .notification-section {
   min-width: 0;
   padding: 22px;
-}
-
-.notification-section + .notification-section {
-  border-left: 1px solid rgba(159, 232, 112, 0.18);
+  margin-top: 0;
 }
 
 .notification-section-head,
@@ -1317,15 +1312,11 @@ tr:hover .transaction-edit-button,
 
   .notifications-layout {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .notification-section {
     padding: 18px;
-  }
-
-  .notification-section + .notification-section {
-    border-top: 1px solid rgba(159, 232, 112, 0.18);
-    border-left: 0;
   }
 
   .report-heading {
