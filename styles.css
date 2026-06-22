@@ -588,6 +588,39 @@ th:last-child {
   max-width: 360px;
 }
 
+.manual-sale-form {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.75fr) minmax(180px, 1fr) minmax(160px, 0.9fr) 170px;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid rgba(159, 232, 112, 0.16);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.manual-sale-form label {
+  display: grid;
+  gap: 7px;
+  color: #cbe8c8;
+  font-size: var(--text-xs);
+}
+
+.manual-sale-form button {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #071009;
+  font-weight: var(--weight-bold);
+}
+
+.manual-sale-form button:disabled {
+  cursor: wait;
+  opacity: 0.74;
+}
+
 .pager {
   display: grid;
   grid-template-columns: 120px 1fr 120px;
@@ -1015,6 +1048,11 @@ th:last-child {
 
   .transactions-head input {
     max-width: none;
+  }
+
+  .manual-sale-form {
+    grid-template-columns: 1fr;
+    padding: 14px;
   }
 
   table {

@@ -37,6 +37,11 @@
     syncStatus: document.getElementById("syncStatus"),
     desktopSyncStatus: document.getElementById("desktopSyncStatus"),
     transactionSearch: document.getElementById("transactionSearch"),
+    manualSaleForm: document.getElementById("manualSaleForm"),
+    manualSaleValue: document.getElementById("manualSaleValue"),
+    manualSalePayer: document.getElementById("manualSalePayer"),
+    manualSaleAttendant: document.getElementById("manualSaleAttendant"),
+    manualSaleSubmit: document.getElementById("manualSaleSubmit"),
     prevPage: document.getElementById("prevPage"),
     nextPage: document.getElementById("nextPage"),
     pageInfo: document.getElementById("pageInfo"),
@@ -114,6 +119,10 @@
       state.pageIndex = 1;
       renderTransactions();
     });
+
+    if (els.manualSaleForm) {
+      els.manualSaleForm.addEventListener("submit", submitManualSale);
+    }
 
     els.prevPage.addEventListener("click", () => {
       state.pageIndex = Math.max(1, state.pageIndex - 1);
@@ -273,6 +282,48 @@
       console.error(error);
       state.customMeta = { spend: 0, leads: 0 };
     }
+  }
+
+  async function submitManualSale(event) {
+    event.preventDefault();
+    if (!config.apiUrl) {
+      alert("Configure a URL da API antes de adicionar vendas.");
+      return;
+    }
+    const value = parseMoneyValue(els.manualSaleValue.value);
+    if (!value || value <= 0) {
+      alert("Informe um valor de venda válido.");
+      els.manualSaleValue.focus();
+      return;
+    }
+    const now = new Date();
+    const payload = new FormData();
+    payload.set("origem", "Manual");
+    payload.set("moeda", "BRL");
+    payload.set("valor", String(value).replace(".", ","));
+    payload.set("pagador", els.manualSalePayer.value.trim() || "Venda manual");
+    payload.set("atendente", els.manualSaleAttendant.value.trim() || "Sem atendente");
+    payload.set("timestamp", now.toISOString());
+    payload.set("transaction_id", `manual-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`);
+
+    setManualSaleLoading(true);
+    try {
+      await fetch(config.apiUrl, { method: "POST", mode: "no-cors", body: payload });
+      els.manualSaleForm.reset();
+      await delay(900);
+      await refreshData({ applySelection: true });
+    } catch (error) {
+      console.error(error);
+      alert("Não foi possível adicionar a venda agora.");
+    } finally {
+      setManualSaleLoading(false);
+    }
+  }
+
+  function setManualSaleLoading(isLoading) {
+    if (!els.manualSaleSubmit) return;
+    els.manualSaleSubmit.disabled = isLoading;
+    els.manualSaleSubmit.textContent = isLoading ? "Adicionando..." : "Adicionar venda";
   }
 
   function isRangeLoaded(range) {
@@ -1114,6 +1165,10 @@
       window.clearTimeout(timeout);
       timeout = window.setTimeout(() => callback(...args), wait);
     };
+  }
+
+  function delay(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
   function escapeHtml(value) {
