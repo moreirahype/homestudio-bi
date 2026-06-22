@@ -2,6 +2,8 @@ const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
 const DEBUG_SHEET_NAME = 'Debug';
+const OWNER_PUSH_SENT_LOG_PROPERTY = 'OWNER_PUSH_SENT_LOG';
+const OWNER_PUSH_SENT_LOG_RETENTION_DAYS = 14;
 const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
@@ -159,11 +161,50 @@ function checkOwnerPushSchedule() {
     : '';
   if (!target) return { ok: true, skipped: true };
   const properties = PropertiesService.getScriptProperties();
-  const key = 'OWNER_PUSH_SENT_' + Utilities.formatDate(now, timezone, 'yyyy-MM-dd') + '_' + target;
-  if (properties.getProperty(key)) return { ok: true, duplicate: true };
+  const today = Utilities.formatDate(now, timezone, 'yyyy-MM-dd');
+  const sentLog = getOwnerPushSentLog_(properties, today);
+  if ((sentLog[today] || []).indexOf(target) > -1) return { ok: true, duplicate: true };
   const result = sendOwnerCampaignPush_(target);
-  properties.setProperty(key, now.toISOString());
+  sentLog[today] = sentLog[today] || [];
+  sentLog[today].push(target);
+  properties.setProperty(OWNER_PUSH_SENT_LOG_PROPERTY, JSON.stringify(pruneOwnerPushSentLog_(sentLog, today)));
   return result;
+}
+
+function getOwnerPushSentLog_(properties, today) {
+  cleanupLegacyOwnerPushSentProperties_(properties);
+  try {
+    const log = JSON.parse(properties.getProperty(OWNER_PUSH_SENT_LOG_PROPERTY) || '{}');
+    return pruneOwnerPushSentLog_(log && typeof log === 'object' ? log : {}, today);
+  } catch (error) {
+    return {};
+  }
+}
+
+function pruneOwnerPushSentLog_(log, today) {
+  const todayDate = new Date(today + 'T00:00:00');
+  const cutoff = new Date(todayDate);
+  cutoff.setDate(cutoff.getDate() - OWNER_PUSH_SENT_LOG_RETENTION_DAYS);
+  Object.keys(log).forEach((date) => {
+    if (new Date(date + 'T00:00:00') < cutoff) delete log[date];
+  });
+  return log;
+}
+
+function cleanupLegacyOwnerPushSentProperties_(properties) {
+  const allProperties = properties.getProperties();
+  Object.keys(allProperties)
+    .filter((key) => key.indexOf('OWNER_PUSH_SENT_') === 0 && key !== OWNER_PUSH_SENT_LOG_PROPERTY)
+    .forEach((key) => properties.deleteProperty(key));
+}
+
+function cleanupOwnerPushSentProperties() {
+  const properties = PropertiesService.getScriptProperties();
+  cleanupLegacyOwnerPushSentProperties_(properties);
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const log = getOwnerPushSentLog_(properties, today);
+  properties.setProperty(OWNER_PUSH_SENT_LOG_PROPERTY, JSON.stringify(pruneOwnerPushSentLog_(log, today)));
+  return { ok: true, property: OWNER_PUSH_SENT_LOG_PROPERTY };
 }
 
 function sendOwnerCampaignPush08() {
