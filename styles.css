@@ -581,11 +581,24 @@ th:last-child {
 }
 
 .transaction-value-cell {
+  position: relative;
+  padding-right: 48px;
   text-align: right;
+}
+
+#page-transactions th:last-child {
+  padding-right: 48px;
+}
+
+.transaction-value-cell > span {
+  display: block;
 }
 
 .transaction-edit-button {
   display: inline-grid;
+  position: absolute;
+  top: 50%;
+  right: 10px;
   width: 30px;
   height: 30px;
   place-items: center;
@@ -594,16 +607,14 @@ th:last-child {
   background: rgba(159, 232, 112, 0.06);
   color: var(--muted);
   opacity: 0;
-  transform: translateX(3px);
-  margin-left: 8px;
-  vertical-align: middle;
+  transform: translate(3px, -50%);
   transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease, color 140ms ease, background 140ms ease;
 }
 
 tr:hover .transaction-edit-button,
 .transaction-edit-button:focus-visible {
   opacity: 1;
-  transform: translateX(0);
+  transform: translate(0, -50%);
 }
 
 .transaction-edit-button:hover {
@@ -1263,7 +1274,7 @@ tr:hover .transaction-edit-button,
 
   .transaction-edit-button {
     opacity: 1;
-    transform: none;
+    transform: translate(0, -50%);
   }
 
   .transaction-editor-card {
