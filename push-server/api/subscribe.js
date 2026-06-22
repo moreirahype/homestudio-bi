@@ -17,7 +17,8 @@ module.exports = async function handler(req, res) {
   const id = crypto.createHash("sha256").update(`${audience}:${subscription.endpoint}`).digest("hex");
   const preferences = {
     enabled: body.preferences?.enabled !== false,
-    times: Array.isArray(body.preferences?.times) ? body.preferences.times : []
+    times: Array.isArray(body.preferences?.times) ? body.preferences.times : [],
+    salesEnabled: body.preferences?.salesEnabled !== false
   };
   await saveSubscription(id, {
     audience,

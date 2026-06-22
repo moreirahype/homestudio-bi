@@ -10,7 +10,8 @@ module.exports = async function handler(req, res) {
   if (!record) return json(res, 404, { ok: false, error: "Assinatura não encontrada." });
   record.preferences = {
     enabled: body.preferences?.enabled !== false,
-    times: Array.isArray(body.preferences?.times) ? body.preferences.times : []
+    times: Array.isArray(body.preferences?.times) ? body.preferences.times : [],
+    salesEnabled: body.preferences?.salesEnabled !== false
   };
   record.updatedAt = new Date().toISOString();
   await saveSubscription(body.id, record);

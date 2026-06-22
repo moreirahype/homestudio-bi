@@ -104,6 +104,21 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+  if (inserted) {
+    try {
+      sendPushRequest_({
+        audience: 'owner',
+        kind: 'sale',
+        title: '\uD83D\uDCB0 Venda Realizada!',
+        body: 'Valor: ' + formatBrl_(row[7]) + ' \u00B7 Atendente: ' + String(row[8] || 'Sem atendente'),
+        url: getPushProperty_('OWNER_APP_URL') + '#transactions',
+        tag: 'hsbi-owner-sale-' + String(row[0])
+      });
+    } catch (error) {
+      console.error('Falha ao enviar push de venda ao dono: ' + error);
+      appendDebugLog_('push_error', payload, { audience: 'owner', kind: 'sale', error: String(error) });
+    }
+  }
   if (inserted && normalizePersonName_(row[8]) === normalizePersonName_('Sheila')) {
     try {
       sendPushRequest_({

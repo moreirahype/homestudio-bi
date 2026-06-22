@@ -14,6 +14,9 @@ module.exports = async function handler(req, res) {
 
   let records = await listSubscriptions(audience);
   records = records.filter((record) => record.preferences?.enabled !== false);
+  if (audience === "owner" && body.kind === "sale") {
+    records = records.filter((record) => record.preferences?.salesEnabled !== false);
+  }
   if (audience === "owner" && body.time) {
     records = records.filter((record) => (record.preferences?.times || []).includes(body.time));
   }

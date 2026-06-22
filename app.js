@@ -64,6 +64,7 @@
     legacyChart: document.getElementById("salesChart"),
     legacyTooltip: document.getElementById("chartTooltip"),
     notificationList: document.getElementById("notificationList"),
+    saleNotificationList: document.getElementById("saleNotificationList"),
     enableAllNotifications: document.getElementById("enableAllNotifications"),
     testNotification: document.getElementById("testNotification")
   };
@@ -96,7 +97,7 @@
     registerServiceWorker();
     refreshData();
     window.setInterval(() => refreshData(), config.autoRefreshMinutes * 60 * 1000);
-    if (typeof Notification !== "undefined" && Notification.permission === "granted" && notificationTimes.some((time) => state.notifications[time])) {
+    if (typeof Notification !== "undefined" && Notification.permission === "granted" && (isSaleNotificationsEnabled() || notificationTimes.some((time) => state.notifications[time]))) {
       window.setTimeout(() => syncOwnerPush().catch(console.error), 1000);
     }
   }
@@ -159,6 +160,7 @@
     els.enableAllNotifications.addEventListener("click", async () => {
       const shouldEnable = !areAllNotificationsEnabled();
       const previous = Object.assign({}, state.notifications);
+      state.notifications.salesEnabled = shouldEnable;
       notificationTimes.forEach((time) => {
         state.notifications[time] = shouldEnable;
       });
@@ -996,6 +998,31 @@
 
   function renderNotifications() {
     els.enableAllNotifications.textContent = areAllNotificationsEnabled() ? "Desativar todos" : "Ativar todos";
+    if (els.saleNotificationList) {
+      els.saleNotificationList.innerHTML = `
+        <label class="notification-row sale-notification-row">
+          <span>Notificações de venda</span>
+          <span class="switch">
+            <input type="checkbox" data-notification="sales" ${isSaleNotificationsEnabled() ? "checked" : ""}>
+            <span class="slider"></span>
+          </span>
+        </label>`;
+      const saleInput = els.saleNotificationList.querySelector("input");
+      saleInput.addEventListener("change", async () => {
+        const previous = state.notifications.salesEnabled;
+        state.notifications.salesEnabled = saleInput.checked;
+        saveNotificationPrefs();
+        renderNotifications();
+        try {
+          await syncOwnerPush();
+        } catch (error) {
+          state.notifications.salesEnabled = previous;
+          saveNotificationPrefs();
+          renderNotifications();
+          alert(error.message);
+        }
+      });
+    }
     els.notificationList.innerHTML = notificationTimes
       .map(
         (time) => `
@@ -1028,15 +1055,20 @@
   }
 
   function areAllNotificationsEnabled() {
-    return notificationTimes.every((time) => state.notifications[time]);
+    return isSaleNotificationsEnabled() && notificationTimes.every((time) => state.notifications[time]);
+  }
+
+  function isSaleNotificationsEnabled() {
+    return state.notifications.salesEnabled !== false;
   }
 
   async function syncOwnerPush(force) {
     const pushClient = await ensurePushClient();
     const times = notificationTimes.filter((time) => state.notifications[time]);
     const preferences = {
-      enabled: times.length > 0,
-      times
+      enabled: isSaleNotificationsEnabled() || times.length > 0,
+      times,
+      salesEnabled: isSaleNotificationsEnabled()
     };
     return force
       ? pushClient.sync("owner", preferences)
@@ -1069,7 +1101,7 @@
 
   function loadNotificationPrefs() {
     try {
-      return Object.assign({}, JSON.parse(localStorage.getItem("hsbi-notifications") || "{}"));
+      return Object.assign({ salesEnabled: true }, JSON.parse(localStorage.getItem("hsbi-notifications") || "{}"));
     } catch {
       return {};
     }
