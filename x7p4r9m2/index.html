@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=56">
+    <link rel="stylesheet" href="../styles.css?v=57">
   </head>
   <body>
     <div class="app-shell">
@@ -220,6 +220,45 @@
                 <tbody id="transactionsBody"></tbody>
               </table>
             </div>
+            <dialog class="transaction-editor" id="transactionEditor">
+              <form method="dialog" class="transaction-editor-card" id="transactionEditForm">
+                <div class="editor-head">
+                  <h2>Editar transação</h2>
+                  <button class="editor-close" id="transactionEditCancel" value="cancel" type="button" aria-label="Fechar">×</button>
+                </div>
+                <input id="transactionEditId" type="hidden">
+                <div class="editor-grid">
+                  <label>
+                    <span>Data</span>
+                    <input id="transactionEditDate" type="date" required>
+                  </label>
+                  <label>
+                    <span>Hora</span>
+                    <input id="transactionEditTime" type="time" required>
+                  </label>
+                  <label>
+                    <span>Pagador</span>
+                    <input id="transactionEditPayer" type="text" autocomplete="off">
+                  </label>
+                  <label>
+                    <span>Atendente</span>
+                    <input id="transactionEditAttendant" type="text" autocomplete="off">
+                  </label>
+                  <label>
+                    <span>Moeda</span>
+                    <input id="transactionEditCurrency" type="text" maxlength="3" autocomplete="off">
+                  </label>
+                  <label>
+                    <span>Valor</span>
+                    <input id="transactionEditValue" type="text" inputmode="decimal" required autocomplete="off">
+                  </label>
+                </div>
+                <div class="editor-actions">
+                  <button class="ghost-action" id="transactionEditCancelBottom" type="button">Cancelar</button>
+                  <button class="save-action" id="transactionEditSubmit" type="submit">Salvar</button>
+                </div>
+              </form>
+            </dialog>
             <div class="pager">
               <button id="prevPage" type="button">Anterior</button>
               <span id="pageInfo">Página 1 de 1</span>
@@ -266,7 +305,7 @@
     </div>
     <script src="../config.js?v=55"></script>
     <script src="../push-client.js?v=61"></script>
-    <script src="../app.js?v=62"></script>
+    <script src="../app.js?v=63"></script>
   </body>
 </html>
 

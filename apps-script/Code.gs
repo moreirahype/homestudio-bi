@@ -68,6 +68,11 @@ function runDiagnostics_(params) {
 function doPost(e) {
   const payload = parsePayload_(e);
   console.log('Payload recebido: ' + JSON.stringify(payload));
+  if (String(pickValue_(payload, ['action']) || '') === 'updateTransaction') {
+    const result = updateTransaction_(payload);
+    appendDebugLog_(result.ok ? 'updated' : 'update_error', payload, result);
+    return outputJson_(result);
+  }
   const validation = validateWebhook_(payload);
   if (!validation.ok) {
     console.log('Webhook rejeitado: ' + JSON.stringify(validation));
@@ -371,6 +376,58 @@ function transactionExists_(sheet, id) {
     .createTextFinder(String(id))
     .matchEntireCell(true)
     .findNext() !== null;
+}
+
+function updateTransaction_(payload) {
+  const id = String(pickValue_(payload, ['id']) || '').trim();
+  if (!id) return { ok: false, error: 'ID da transação não informado.' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getTransactionsSheet_();
+    const rowNumber = findTransactionRowById_(sheet, id);
+    if (!rowNumber) return { ok: false, error: 'Transação não encontrada.' };
+    const current = rowToObject_(sheet.getRange(rowNumber, 1, 1, HEADERS.length).getValues()[0]);
+    const originalCurrency = normalizeCurrency_(pickValue_(payload, ['moeda_original', 'currency']) || current.moeda_original || current.moeda || 'BRL');
+    const originalValue = parseNumber_(pickValue_(payload, ['valor_original', 'valor', 'value']) || current.valor_original || current.valor || 0);
+    const exchangeRate = getCurrencyRateToBrl_(originalCurrency);
+    const valueInBrl = roundCurrency_(originalValue * exchangeRate);
+    const attendant = pickValue_(payload, ['atendente', 'attendant']) || current.atendente || 'Sem atendente';
+    const attendantConfig = getAttendantConfigByName_(attendant);
+    const updated = Object.assign({}, current, {
+      data: pickValue_(payload, ['data']) || current.data,
+      hora: normalizeTimeText_(pickValue_(payload, ['hora']) || current.hora),
+      pagador: pickValue_(payload, ['pagador', 'payer']) || current.pagador || 'Sem pagador',
+      atendente: attendant,
+      moeda: 'BRL',
+      valor: valueInBrl,
+      moeda_original: originalCurrency,
+      valor_original: originalValue,
+      cotacao_brl: exchangeRate,
+      comissao_percentual: attendantConfig ? attendantConfig.comissao_percentual : current.comissao_percentual
+    });
+    sheet.getRange(rowNumber, 1, 1, HEADERS.length).setValues([HEADERS.map((header) => updated[header])]);
+    sortTransactionsSheet_(sheet);
+    return { ok: true, id: id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function findTransactionRowById_(sheet, id) {
+  if (!id || sheet.getLastRow() < 2) return 0;
+  const match = sheet
+    .getRange(2, 1, sheet.getLastRow() - 1, 1)
+    .createTextFinder(String(id))
+    .matchEntireCell(true)
+    .findNext();
+  return match ? match.getRow() : 0;
+}
+
+function normalizeTimeText_(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/(\d{1,2}):(\d{2})/);
+  return match ? String(match[1]).padStart(2, '0') + ':' + match[2] : text;
 }
 
 function getTransactionsSheet_() {

@@ -42,6 +42,18 @@
     manualSalePayer: document.getElementById("manualSalePayer"),
     manualSaleAttendant: document.getElementById("manualSaleAttendant"),
     manualSaleSubmit: document.getElementById("manualSaleSubmit"),
+    transactionEditor: document.getElementById("transactionEditor"),
+    transactionEditForm: document.getElementById("transactionEditForm"),
+    transactionEditId: document.getElementById("transactionEditId"),
+    transactionEditDate: document.getElementById("transactionEditDate"),
+    transactionEditTime: document.getElementById("transactionEditTime"),
+    transactionEditPayer: document.getElementById("transactionEditPayer"),
+    transactionEditAttendant: document.getElementById("transactionEditAttendant"),
+    transactionEditCurrency: document.getElementById("transactionEditCurrency"),
+    transactionEditValue: document.getElementById("transactionEditValue"),
+    transactionEditSubmit: document.getElementById("transactionEditSubmit"),
+    transactionEditCancel: document.getElementById("transactionEditCancel"),
+    transactionEditCancelBottom: document.getElementById("transactionEditCancelBottom"),
     prevPage: document.getElementById("prevPage"),
     nextPage: document.getElementById("nextPage"),
     pageInfo: document.getElementById("pageInfo"),
@@ -122,6 +134,15 @@
 
     if (els.manualSaleForm) {
       els.manualSaleForm.addEventListener("submit", submitManualSale);
+    }
+    if (els.transactionEditForm) {
+      els.transactionEditForm.addEventListener("submit", submitTransactionEdit);
+      [els.transactionEditCancel, els.transactionEditCancelBottom].filter(Boolean).forEach((button) => {
+        button.addEventListener("click", closeTransactionEditor);
+      });
+      els.transactionEditor.addEventListener("click", (event) => {
+        if (event.target === els.transactionEditor) closeTransactionEditor();
+      });
     }
 
     els.prevPage.addEventListener("click", () => {
@@ -318,6 +339,85 @@
     } finally {
       setManualSaleLoading(false);
     }
+  }
+
+  async function submitTransactionEdit(event) {
+    event.preventDefault();
+    if (!config.apiUrl) {
+      alert("Configure a URL da API antes de editar transações.");
+      return;
+    }
+    const id = els.transactionEditId.value;
+    const transaction = state.transactions.find((item) => item.id === id);
+    if (!transaction) {
+      alert("Transação não encontrada.");
+      closeTransactionEditor();
+      return;
+    }
+    const value = parseMoneyValue(els.transactionEditValue.value);
+    if (!value || value <= 0) {
+      alert("Informe um valor válido.");
+      els.transactionEditValue.focus();
+      return;
+    }
+    const currency = normalizeCurrency(els.transactionEditCurrency.value || transaction.moedaOriginal || "BRL");
+    const payload = new FormData();
+    payload.set("action", "updateTransaction");
+    payload.set("id", id);
+    payload.set("data", els.transactionEditDate.value);
+    payload.set("hora", els.transactionEditTime.value);
+    payload.set("pagador", els.transactionEditPayer.value.trim() || "Sem pagador");
+    payload.set("atendente", els.transactionEditAttendant.value.trim() || "Sem atendente");
+    payload.set("moeda_original", currency);
+    payload.set("valor_original", String(value).replace(".", ","));
+    payload.set("moeda", "BRL");
+    payload.set("valor", String(currency === "BRL" ? value : convertToBrl(value, currency)).replace(".", ","));
+
+    setTransactionEditLoading(true);
+    try {
+      await fetch(config.apiUrl, { method: "POST", mode: "no-cors", body: payload });
+      closeTransactionEditor();
+      await delay(700);
+      await refreshData({ applySelection: true });
+    } catch (error) {
+      console.error(error);
+      alert("Não foi possível salvar a edição agora.");
+    } finally {
+      setTransactionEditLoading(false);
+    }
+  }
+
+  function openTransactionEditor(id) {
+    const transaction = state.transactions.find((item) => item.id === id);
+    if (!transaction || !els.transactionEditor) return;
+    els.transactionEditId.value = transaction.id;
+    els.transactionEditDate.value = transaction.data || toIsoDate(transaction.timestamp);
+    els.transactionEditTime.value = normalizeTimeValue(transaction.hora || formatTime(transaction.timestamp));
+    els.transactionEditPayer.value = transaction.pagador || "";
+    els.transactionEditAttendant.value = transaction.atendente || "";
+    els.transactionEditCurrency.value = transaction.moedaOriginal || "BRL";
+    els.transactionEditValue.value = decimal(transaction.valorOriginal || transaction.valor || 0);
+    if (typeof els.transactionEditor.showModal === "function") {
+      els.transactionEditor.showModal();
+    } else {
+      els.transactionEditor.setAttribute("open", "");
+    }
+    setTimeout(() => els.transactionEditValue.focus(), 60);
+  }
+
+  function closeTransactionEditor() {
+    if (!els.transactionEditor) return;
+    if (typeof els.transactionEditor.close === "function") {
+      els.transactionEditor.close();
+    } else {
+      els.transactionEditor.removeAttribute("open");
+    }
+  }
+
+  function setTransactionEditLoading(isLoading) {
+    if (!els.transactionEditSubmit) return;
+    els.transactionEditSubmit.disabled = isLoading;
+    els.transactionEditSubmit.textContent = isLoading ? "Salvando..." : "Salvar";
   }
 
   function setManualSaleLoading(isLoading) {
@@ -861,9 +961,17 @@
           <td class="payer-cell">${escapeHtml(item.pagador)}<small>${escapeHtml(item.atendente)}</small></td>
           <td>${escapeHtml(item.atendente)}</td>
           <td>${escapeHtml(item.moedaOriginal)}</td>
-          <td>${formatOriginalValue(item)}</td>
+          <td class="transaction-value-cell">
+            <span>${formatOriginalValue(item)}</span>
+            <button class="transaction-edit-button" type="button" data-id="${escapeHtml(item.id)}" aria-label="Editar transação">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.25V20h2.75L17.8 8.95l-2.75-2.75L4 17.25zm15.92-11.17a1 1 0 0 0 0-1.42l-.58-.58a1 1 0 0 0-1.42 0l-1.16 1.16 2.75 2.75 1.41-1.41z"></path></svg>
+            </button>
+          </td>
         `;
         tbody.append(tr);
+      });
+      tbody.querySelectorAll(".transaction-edit-button").forEach((button) => {
+        button.addEventListener("click", () => openTransactionEditor(button.dataset.id));
       });
     }
 
