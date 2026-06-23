@@ -838,10 +838,12 @@
 
     const chartAnimationCss = animateChart ? `
       .sales-bar{animation:chartBarIn 820ms cubic-bezier(.2,.78,.2,1) both;transform-box:fill-box;transform-origin:center bottom}
-      .sales-line,.sales-area{animation:chartLineRevealIn 820ms cubic-bezier(.2,.78,.2,1) both;transform-box:fill-box;transform-origin:left center}
+      .sales-line{animation:chartLineIn 820ms cubic-bezier(.2,.78,.2,1) both;transform-box:fill-box;transform-origin:center}
+      .sales-area{animation:chartAreaIn 820ms ease both 80ms;transform-box:fill-box;transform-origin:center}
       .point-dot{animation:chartDotIn 620ms ease both;transform-box:fill-box;transform-origin:center}
       @keyframes chartBarIn{from{opacity:0;transform:scaleY(.04)}to{opacity:.82;transform:scaleY(1)}}
-      @keyframes chartLineRevealIn{from{opacity:0;transform:scaleX(.02)}to{opacity:1;transform:scaleX(1)}}
+      @keyframes chartLineIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes chartAreaIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
       @keyframes chartDotIn{from{opacity:0;transform:scale(.72)}to{opacity:1;transform:scale(1)}}
     ` : "";
     const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
