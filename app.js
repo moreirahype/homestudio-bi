@@ -715,7 +715,7 @@
     const previousFrame = metricAnimationFrames.get(el);
     if (previousFrame) window.cancelAnimationFrame(previousFrame);
 
-    const duration = 460;
+    const duration = 820;
     const startedAt = performance.now();
     const change = target;
     const tick = (now) => {
@@ -750,7 +750,14 @@
   function renderSalesChart() {
     if (els.hourlyChart && els.dailyChart) {
       renderSingleSalesChart(els.hourlyChart, els.hourlyTooltip, buildHourlySeries(), "hourlySalesAreaGradient", "bar");
-      renderSingleSalesChart(els.dailyChart, els.dailyTooltip, buildDailySeries(), "dailySalesAreaGradient", "line");
+      renderSingleSalesChart(
+        els.dailyChart,
+        els.dailyTooltip,
+        buildDailySeries(),
+        "dailySalesAreaGradient",
+        "line",
+        state.page === "dashboard" && state.animateDashboard && canAnimateDashboard()
+      );
       return;
     }
     if (els.legacyChart) {
@@ -760,7 +767,7 @@
     }
   }
 
-  function renderSingleSalesChart(chart, tooltip, grouped, gradientId, mode) {
+  function renderSingleSalesChart(chart, tooltip, grouped, gradientId, mode, animateLine = false) {
     if (!chart || !tooltip || !grouped.length) return;
     chart.setAttribute("preserveAspectRatio", "xMidYMid meet");
     const chartBox = chart.parentElement.getBoundingClientRect();
@@ -821,6 +828,20 @@
         .join("")}
     `;
 
+    const lineAnimationCss = animateLine && mode === "line" ? `
+      .sales-line{stroke-dasharray:1200;stroke-dashoffset:1200;animation:dailyLineIn 920ms cubic-bezier(.2,.78,.2,1) forwards}
+      .sales-area{opacity:0;animation:dailyAreaIn 920ms ease forwards 120ms}
+      .point-dot{opacity:0;animation:dailyDotIn 480ms ease forwards}
+      .chart-point:nth-of-type(1) .point-dot{animation-delay:120ms}
+      .chart-point:nth-of-type(2) .point-dot{animation-delay:150ms}
+      .chart-point:nth-of-type(3) .point-dot{animation-delay:180ms}
+      .chart-point:nth-of-type(4) .point-dot{animation-delay:210ms}
+      .chart-point:nth-of-type(5) .point-dot{animation-delay:240ms}
+      .chart-point:nth-of-type(6) .point-dot{animation-delay:270ms}
+      @keyframes dailyLineIn{to{stroke-dashoffset:0}}
+      @keyframes dailyAreaIn{to{opacity:1}}
+      @keyframes dailyDotIn{to{opacity:1}}
+    ` : "";
     const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
     style.textContent = `
       .chart-plot-bg{fill:rgba(255,255,255,.012)}
@@ -838,6 +859,7 @@
       .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
       .axis-text{text-anchor:end}
       .x-label{text-anchor:middle}
+      ${lineAnimationCss}
     `;
     chart.prepend(style);
 
