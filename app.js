@@ -838,11 +838,9 @@
 
     const chartAnimationCss = animateChart ? `
       .sales-bar{animation:chartBarIn 680ms cubic-bezier(.2,.78,.2,1) both;animation-delay:var(--bar-delay,0ms);transform-box:fill-box;transform-origin:center bottom}
-      .sales-line{animation:chartLineIn 820ms cubic-bezier(.2,.78,.2,1) both;transform-box:fill-box;transform-origin:center}
       .sales-area{animation:chartAreaIn 820ms ease both 80ms;transform-box:fill-box;transform-origin:center}
       .point-dot{animation:chartDotIn 620ms ease both;transform-box:fill-box;transform-origin:center}
-      @keyframes chartBarIn{0%{opacity:0;filter:drop-shadow(0 0 0 rgba(168,240,120,0));transform:scaleY(.04)}72%{opacity:1;filter:drop-shadow(0 0 7px rgba(168,240,120,.22));transform:scaleY(1.015)}100%{opacity:.82;filter:drop-shadow(0 0 3px rgba(168,240,120,.14));transform:scaleY(1)}}
-      @keyframes chartLineIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes chartBarIn{0%{opacity:0;transform:scaleY(.04)}72%{opacity:.82;transform:scaleY(1.015)}100%{opacity:.82;transform:scaleY(1)}}
       @keyframes chartAreaIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
       @keyframes chartDotIn{from{opacity:0;transform:scale(.72)}to{opacity:1;transform:scale(1)}}
     ` : "";
