@@ -394,16 +394,17 @@ select:focus {
 
 .refresh-button.is-loading {
   position: relative;
+  color: transparent;
 }
 
 .refresh-button.is-loading::after {
   content: "";
   position: absolute;
-  right: 18px;
+  left: 50%;
   top: 50%;
   width: 18px;
   height: 18px;
-  margin-top: -9px;
+  margin: -9px 0 0 -9px;
   border: 2px solid rgba(7, 16, 9, 0.18);
   border-top-color: rgba(7, 16, 9, 0.86);
   border-radius: 50%;

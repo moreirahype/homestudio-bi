@@ -935,6 +935,7 @@
   function setRefreshButtonLoading(isLoading) {
     if (!els.refreshButton) return;
     els.refreshButton.classList.toggle("is-loading", isLoading);
+    els.refreshButton.setAttribute("aria-busy", String(isLoading));
   }
 
   function loadNotificationPref() {
