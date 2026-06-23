@@ -938,15 +938,20 @@ tr:hover .transaction-edit-button,
 }
 
 .report-style-option {
-  display: flex;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
   min-height: 46px;
   padding: 0 14px;
+  box-sizing: border-box;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   color: var(--muted);
   cursor: pointer;
+  overflow: hidden;
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
 }
 
@@ -961,9 +966,10 @@ tr:hover .transaction-edit-button,
   -webkit-appearance: none;
   width: 16px;
   height: 16px;
+  min-width: 16px;
   min-height: 16px;
-  flex: 0 0 16px;
   margin: 0;
+  box-sizing: border-box;
   border: 1px solid currentColor;
   border-radius: 50%;
   background: transparent;
@@ -988,6 +994,10 @@ tr:hover .transaction-edit-button,
 
 .report-style-option span {
   font-weight: var(--weight-bold);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .summary-card {
