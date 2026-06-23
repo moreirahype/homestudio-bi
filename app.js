@@ -88,7 +88,6 @@
   };
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
-  let pointerLoader = null;
   let notificationToastTimer = null;
   const metricAnimationFrames = new Map();
 
@@ -131,7 +130,7 @@
       });
     });
 
-    els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true, pointerLoading: true }));
+    els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true, buttonLoading: true }));
     if (els.sidebarToggle) {
       els.sidebarToggle.addEventListener("click", toggleSidebar);
     }
@@ -241,7 +240,7 @@
     }
     setSyncText("Atualizando");
     els.refreshButton.disabled = true;
-    setPointerLoading(Boolean(options.pointerLoading));
+    setRefreshButtonLoading(Boolean(options.buttonLoading));
     try {
       const range = getPreloadRange();
       const payload = await fetchTransactionsPayload(range);
@@ -269,7 +268,7 @@
       setSyncText("Sem dados");
     } finally {
       els.refreshButton.disabled = false;
-      setPointerLoading(false);
+      setRefreshButtonLoading(false);
     }
   }
 
@@ -1496,27 +1495,9 @@
     els.desktopSyncStatus.textContent = text;
   }
 
-  function setPointerLoading(isLoading) {
-    if (!window.matchMedia || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-    if (isLoading) {
-      ensurePointerLoader();
-      document.body.classList.add("is-pointer-loading");
-      return;
-    }
-    document.body.classList.remove("is-pointer-loading");
-  }
-
-  function ensurePointerLoader() {
-    if (pointerLoader) return pointerLoader;
-    pointerLoader = document.createElement("div");
-    pointerLoader.className = "pointer-loader";
-    pointerLoader.setAttribute("aria-hidden", "true");
-    document.body.append(pointerLoader);
-    document.addEventListener("pointermove", (event) => {
-      if (!document.body.classList.contains("is-pointer-loading")) return;
-      pointerLoader.style.transform = `translate(${event.clientX - 12}px, ${event.clientY - 12}px)`;
-    }, { passive: true });
-    return pointerLoader;
+  function setRefreshButtonLoading(isLoading) {
+    if (!els.refreshButton) return;
+    els.refreshButton.classList.toggle("is-loading", isLoading);
   }
 })();
 
