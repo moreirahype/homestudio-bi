@@ -89,7 +89,6 @@
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
   let notificationToastTimer = null;
-  let dashboardAnimationTimer = null;
   const metricAnimationFrames = new Map();
 
   document.addEventListener("DOMContentLoaded", init);
@@ -543,7 +542,6 @@
     renderMetrics();
     renderSalesChart();
     if (state.page === "dashboard" && state.animateDashboard) {
-      animateDashboardPanels();
       state.animateDashboard = false;
     }
     renderAttendants();
@@ -583,7 +581,6 @@
       renderMetrics();
       requestAnimationFrame(() => {
         renderSalesChart();
-        animateDashboardPanels();
         state.animateDashboard = false;
       });
     }
@@ -738,18 +735,6 @@
 
   function canAnimateDashboard() {
     return !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
-
-  function animateDashboardPanels() {
-    const dashboard = document.getElementById("page-dashboard");
-    if (!dashboard || !canAnimateDashboard()) return;
-    dashboard.classList.remove("dashboard-enter");
-    void dashboard.offsetWidth;
-    dashboard.classList.add("dashboard-enter");
-    window.clearTimeout(dashboardAnimationTimer);
-    dashboardAnimationTimer = window.setTimeout(() => {
-      dashboard.classList.remove("dashboard-enter");
-    }, 680);
   }
 
   function signedTone(value) {
