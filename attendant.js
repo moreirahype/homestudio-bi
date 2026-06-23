@@ -386,6 +386,7 @@
 
   function renderSalesChart() {
     const grouped = buildHourlySeries();
+    const animateChart = state.page === "dashboard";
     const chartBox = els.chart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
     const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
@@ -419,12 +420,16 @@
       <text x="${left - 18}" y="${gridYMid + 5}" class="axis-text">${Math.round(maxSales / 2)}</text>
       <text x="${left - 18}" y="${gridYBottom + 5}" class="axis-text">0</text>
       ${points.map((point) => `
-        <g class="chart-point" data-index="${point.index}">
+        <g class="chart-point" data-index="${point.index}" style="--bar-delay:${Math.min(point.index * 8, 180)}ms">
           <rect class="sales-bar-hit" x="${point.x - Math.max(point.barWidth, 18) / 2}" y="${top}" width="${Math.max(point.barWidth, 18)}" height="${height}" rx="4"></rect>
           <rect class="sales-bar" x="${point.barX}" y="${top + height - point.barHeight}" width="${point.barWidth}" height="${point.barHeight}" rx="${Math.min(6, point.barWidth / 3)}"></rect>
           <text x="${point.x}" y="${canvasHeight - 12}" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
         </g>`).join("")}
     `;
+    const chartAnimationCss = animateChart ? `
+      .sales-bar{animation:chartBarIn 680ms cubic-bezier(.2,.78,.2,1) both;animation-delay:var(--bar-delay,0ms);transform-box:fill-box;transform-origin:center bottom}
+      @keyframes chartBarIn{0%{opacity:0;transform:scaleY(.04)}72%{opacity:.82;transform:scaleY(1.015)}100%{opacity:.82;transform:scaleY(1)}}
+    ` : "";
     const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
     style.textContent = `
       .chart-plot-bg{fill:rgba(255,255,255,.012)}
@@ -437,6 +442,7 @@
       .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
       .axis-text{text-anchor:end}
       .x-label{text-anchor:middle}
+      ${chartAnimationCss}
     `;
     els.chart.prepend(style);
     els.chart.querySelectorAll(".chart-point").forEach((node) => {
@@ -450,6 +456,7 @@
   function renderDailySalesChart() {
     if (!els.dailyChart) return;
     const grouped = buildDailySeries();
+    const animateChart = state.page === "dashboard";
     const chartBox = els.dailyChart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
     const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
@@ -488,7 +495,7 @@
       <text x="${left - 18}" y="${gridYMid + 5}" class="axis-text">${Math.round(maxSales / 2)}</text>
       <text x="${left - 18}" y="${gridYBottom + 5}" class="axis-text">0</text>
       <path d="${areaPath}" class="sales-area"></path>
-      <path d="${path}" class="sales-line"></path>
+      <path d="${path}" class="sales-line" pathLength="1"></path>
       ${points.map((point) => `
         <g class="chart-point" data-index="${point.index}">
           <circle class="point-hit" cx="${point.x}" cy="${point.y}" r="13"></circle>
@@ -496,6 +503,14 @@
           <text x="${point.x}" y="${canvasHeight - 12}" class="x-label">${shouldShowAxisLabel(point.index, grouped.length) ? point.label : ""}</text>
         </g>`).join("")}
     `;
+    const chartAnimationCss = animateChart ? `
+      .sales-line{stroke-dasharray:1;stroke-dashoffset:1;animation:chartLineTraceIn 820ms cubic-bezier(.2,.78,.2,1) both}
+      .sales-area{animation:chartAreaIn 820ms ease both 140ms;transform-box:fill-box;transform-origin:center}
+      .point-dot{animation:chartDotIn 620ms ease both;transform-box:fill-box;transform-origin:center}
+      @keyframes chartLineTraceIn{to{stroke-dashoffset:0}}
+      @keyframes chartAreaIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes chartDotIn{from{opacity:0;transform:scale(.72)}to{opacity:1;transform:scale(1)}}
+    ` : "";
     const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
     style.textContent = `
       .chart-plot-bg{fill:rgba(255,255,255,.012)}
@@ -510,6 +525,7 @@
       .axis-text,.x-label{fill:#b8c0b4;font-size:var(--text-xs)}
       .axis-text{text-anchor:end}
       .x-label{text-anchor:middle}
+      ${chartAnimationCss}
     `;
     els.dailyChart.prepend(style);
     els.dailyChart.querySelectorAll(".chart-point").forEach((node) => {
