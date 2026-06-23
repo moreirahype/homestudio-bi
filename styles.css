@@ -938,12 +938,11 @@ tr:hover .transaction-edit-button,
 }
 
 .report-style-option {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
+  position: relative;
+  display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-width: 0;
   min-height: 46px;
   padding: 0 14px;
   box-sizing: border-box;
@@ -951,7 +950,6 @@ tr:hover .transaction-edit-button,
   border-radius: var(--radius);
   color: var(--muted);
   cursor: pointer;
-  overflow: hidden;
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
 }
 
@@ -962,42 +960,35 @@ tr:hover .transaction-edit-button,
 }
 
 .report-style-option input {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  min-height: 16px;
-  margin: 0;
-  box-sizing: border-box;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  background: transparent;
-  display: grid;
-  place-items: center;
-  outline: none;
-}
-
-.report-style-option input::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  transform: scale(0);
-  transition: transform 120ms ease;
-}
-
-.report-style-option input:checked::before {
-  transform: scale(1);
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .report-style-option span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-weight: var(--weight-bold);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.report-style-option span::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.report-style-option input:checked + span::before {
+  border-color: var(--accent);
+  background: radial-gradient(circle at center, var(--accent) 0 4px, transparent 4.5px);
 }
 
 .summary-card {
