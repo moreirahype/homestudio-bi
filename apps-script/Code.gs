@@ -5,7 +5,7 @@ const DEBUG_SHEET_NAME = 'Debug';
 const OWNER_PUSH_SENT_LOG_PROPERTY = 'OWNER_PUSH_SENT_LOG';
 const OWNER_PUSH_SENT_LOG_RETENTION_DAYS = 14;
 const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
-const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal'];
+const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal', 'inicio_trabalho', 'pausas'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
 
 function doGet(e) {
@@ -561,7 +561,7 @@ function getAttendantsSheet_() {
     sheet.setFrozenRows(1);
   }
   if (sheet.getLastRow() < 2) {
-    sheet.appendRow(['k9v2m7q4', 'Sheila', 10, 1000]);
+    sheet.appendRow(['k9v2m7q4', 'Sheila', 10, 1000, '', '']);
   }
   return sheet;
 }
@@ -601,7 +601,28 @@ function normalizeAttendantCell_(header, value) {
   if (header === 'comissao_percentual' || header === 'salario_fixo_mensal') {
     return parseNumber_(value);
   }
+  if (header === 'inicio_trabalho') {
+    return normalizeDateCell_(value);
+  }
   return value;
+}
+
+function normalizeDateCell_(value) {
+  if (!value) return '';
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const br = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (br) {
+    const year = br[3].length === 2 ? '20' + br[3] : br[3];
+    return year + '-' + String(br[2]).padStart(2, '0') + '-' + String(br[1]).padStart(2, '0');
+  }
+  const parsed = new Date(text);
+  return isNaN(parsed.getTime())
+    ? text
+    : Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 }
 
 function getGoalsSheet_() {

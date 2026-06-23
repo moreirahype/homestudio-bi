@@ -19,7 +19,9 @@
     attendant: {
       nome: pageConfig.name,
       comissao_percentual: null,
-      salario_fixo_mensal: 0
+      salario_fixo_mensal: 0,
+      inicio_trabalho: "",
+      pausas: ""
     },
     pageIndex: 1,
     lastUpdated: null,
@@ -586,11 +588,14 @@
     const salaryCents = Math.round(salary * 100);
     const baseDailyCents = Math.floor(salaryCents / 30);
     const remainderCents = salaryCents - baseDailyCents * 30;
+    const workStart = getWorkStartDate();
     const today = endOfDay(new Date());
+    const start = workStart && startOfDay(range.start) < workStart ? workStart : startOfDay(range.start);
     const end = endOfDay(range.end) > today ? today : endOfDay(range.end);
     const credits = [];
-    for (let cursor = startOfDay(range.start); cursor <= end; cursor = addDays(cursor, 1)) {
+    for (let cursor = start; cursor <= end; cursor = addDays(cursor, 1)) {
       if (cursor.getDate() === 31) continue;
+      if (!isWorkingDate(cursor)) continue;
       const dayOfMonth = cursor.getDate();
       const daily = (baseDailyCents + (dayOfMonth <= remainderCents ? 1 : 0)) / 100;
       const timestamp = new Date(cursor);
@@ -614,6 +619,7 @@
     const range = getDateRange();
     return state.transactions
       .filter((item) => item.timestamp >= startOfDay(range.start) && item.timestamp <= endOfDay(range.end))
+      .filter((item) => isWorkingDate(item.timestamp))
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 
@@ -639,7 +645,8 @@
       const sales = state.transactions.filter((item) => {
         return item.timestamp >= startOfDay(range.start)
           && item.timestamp <= endOfDay(range.end)
-          && toIsoDate(item.timestamp) === label.key;
+          && toIsoDate(item.timestamp) === label.key
+          && isWorkingDate(item.timestamp);
       });
       return {
         index,
@@ -653,6 +660,53 @@
 
   function getDailyChartPeriod() {
     return state.appliedPeriod === "today" || state.appliedPeriod === "yesterday" ? "month" : state.appliedPeriod;
+  }
+
+  function isWorkingDate(date) {
+    const day = startOfDay(date);
+    const workStart = getWorkStartDate();
+    if (workStart && day < workStart) return false;
+    return !getPauseRanges().some((range) => day >= range.start && day <= range.end);
+  }
+
+  function getWorkStartDate() {
+    const normalized = normalizeFlexibleDate(state.attendant.inicio_trabalho);
+    return normalized ? startOfDay(parseDate(`${normalized}T00:00:00`)) : null;
+  }
+
+  function getPauseRanges() {
+    const raw = String(state.attendant.pausas || "").trim();
+    if (!raw) return [];
+    return raw
+      .split(/[;\n|]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const dates = entry.match(/\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}/g) || [];
+        const start = normalizeFlexibleDate(dates[0]);
+        const end = normalizeFlexibleDate(dates[1] || dates[0]);
+        if (!start || !end) return null;
+        const startDate = startOfDay(parseDate(`${start}T00:00:00`));
+        const endDate = startOfDay(parseDate(`${end}T00:00:00`));
+        return startDate <= endDate
+          ? { start: startDate, end: endDate }
+          : { start: endDate, end: startDate };
+      })
+      .filter(Boolean);
+  }
+
+  function normalizeFlexibleDate(value) {
+    if (!value) return "";
+    if (value instanceof Date) return toIsoDate(value);
+    const text = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+    const br = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (br) {
+      const year = br[3].length === 2 ? `20${br[3]}` : br[3];
+      return `${year}-${br[2].padStart(2, "0")}-${br[1].padStart(2, "0")}`;
+    }
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? "" : toIsoDate(parsed);
   }
 
   function setPage(page) {

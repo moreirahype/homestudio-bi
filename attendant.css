@@ -109,6 +109,11 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
+.attendant-main #page-transactions th:nth-child(4),
+.attendant-main #page-transactions td:nth-child(4) {
+  text-align: right;
+}
+
 .notification-simple {
   margin-top: 16px;
 }
