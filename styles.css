@@ -388,8 +388,53 @@ select:focus {
 }
 
 .refresh-button:disabled {
-  cursor: wait;
+  cursor: pointer;
   opacity: 0.74;
+}
+
+.pointer-loader {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(159, 232, 112, 0.22);
+  border-top-color: var(--accent);
+  border-right-color: rgba(159, 232, 112, 0.72);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transform: translate(-80px, -80px);
+  filter: drop-shadow(0 0 8px rgba(159, 232, 112, 0.22));
+  transition: opacity 120ms ease;
+  animation: pointerLoaderSpin 620ms linear infinite;
+}
+
+body.is-pointer-loading,
+body.is-pointer-loading * {
+  cursor: none !important;
+}
+
+body.is-pointer-loading .pointer-loader {
+  opacity: 1;
+}
+
+@keyframes pointerLoaderSpin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  body.is-pointer-loading,
+  body.is-pointer-loading * {
+    cursor: auto !important;
+  }
+
+  .pointer-loader {
+    display: none;
+  }
 }
 
 .page {

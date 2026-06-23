@@ -51,6 +51,8 @@
     testNotification: document.getElementById("testNotification")
   };
 
+  let pointerLoader = null;
+
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
@@ -84,7 +86,7 @@
         render();
       });
     });
-    els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true }));
+    els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true, pointerLoading: true }));
     if (els.sidebarToggle) {
       els.sidebarToggle.addEventListener("click", toggleSidebar);
     }
@@ -171,6 +173,7 @@
     }
     setSyncText("Atualizando");
     els.refreshButton.disabled = true;
+    setPointerLoading(Boolean(options.pointerLoading));
     try {
       const payload = await fetchAttendantPayload(getPreloadRange());
       applyPayload(payload, true);
@@ -186,6 +189,7 @@
       setSyncText("Sem dados");
     } finally {
       els.refreshButton.disabled = false;
+      setPointerLoading(false);
     }
   }
 
@@ -928,6 +932,29 @@
   function setSyncText(text) {
     els.syncStatus.textContent = text;
     els.desktopSyncStatus.textContent = text;
+  }
+
+  function setPointerLoading(isLoading) {
+    if (!window.matchMedia || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    if (isLoading) {
+      ensurePointerLoader();
+      document.body.classList.add("is-pointer-loading");
+      return;
+    }
+    document.body.classList.remove("is-pointer-loading");
+  }
+
+  function ensurePointerLoader() {
+    if (pointerLoader) return pointerLoader;
+    pointerLoader = document.createElement("div");
+    pointerLoader.className = "pointer-loader";
+    pointerLoader.setAttribute("aria-hidden", "true");
+    document.body.append(pointerLoader);
+    document.addEventListener("pointermove", (event) => {
+      if (!document.body.classList.contains("is-pointer-loading")) return;
+      pointerLoader.style.transform = `translate(${event.clientX - 12}px, ${event.clientY - 12}px)`;
+    }, { passive: true });
+    return pointerLoader;
   }
 
   function loadNotificationPref() {
