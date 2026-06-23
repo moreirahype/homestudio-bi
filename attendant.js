@@ -25,7 +25,8 @@
     lastUpdated: null,
     seenSaleIds: new Set(),
     hasInitializedSales: false,
-    notificationsEnabled: loadNotificationPref()
+    notificationsEnabled: loadNotificationPref(),
+    animateDashboard: false
   };
 
   const els = {
@@ -51,6 +52,8 @@
     testNotification: document.getElementById("testNotification")
   };
 
+  const metricAnimationFrames = new Map();
+
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
@@ -74,6 +77,7 @@
         state.period = button.dataset.period;
         state.pageIndex = 1;
         if (state.period !== "custom") state.appliedPeriod = state.period;
+        if (state.page === "dashboard" && state.period !== "custom") state.animateDashboard = true;
         render();
       });
     });
@@ -177,12 +181,14 @@
       applyPayload(payload, true);
       if (state.appliedPeriod === "custom") await ensurePeriodData();
       state.lastUpdated = new Date();
+      state.animateDashboard = state.page === "dashboard";
       render();
       setSyncText(`Atualizado ${formatTime(state.lastUpdated)}`);
     } catch (error) {
       console.error(error);
       applyPayload(buildEmptyPayload(), true);
       state.lastUpdated = new Date();
+      state.animateDashboard = state.page === "dashboard";
       render();
       setSyncText("Sem dados");
     } finally {
@@ -305,6 +311,9 @@
     renderMetrics();
     renderSalesChart();
     renderDailySalesChart();
+    if (state.page === "dashboard" && state.animateDashboard) {
+      state.animateDashboard = false;
+    }
     renderTransactions();
   }
 
@@ -376,19 +385,20 @@
   }
 
   function renderMetrics() {
+    const animate = state.page === "dashboard" && state.animateDashboard && canAnimateDashboard();
     const sales = state.filteredSales;
     const fixed = buildFixedCredits(getDateRange()).reduce((total, item) => total + item.value, 0);
     const commission = sales.reduce((total, item) => total + item.value, 0);
-    setText("metricTotalIncome", money(commission + fixed));
-    setText("metricCommission", money(commission));
-    setText("metricFixed", money(fixed));
-    setText("metricSales", integer(sales.length));
-    setText("metricRate", state.attendant.comissao_percentual == null ? "N/A" : percent(Number(state.attendant.comissao_percentual || 0) / 100));
+    setText("metricTotalIncome", commission + fixed, { animate, formatter: money });
+    setText("metricCommission", commission, { animate, formatter: money });
+    setText("metricFixed", fixed, { animate, formatter: money });
+    setText("metricSales", sales.length, { animate, formatter: integer });
+    setText("metricRate", state.attendant.comissao_percentual == null ? "N/A" : Number(state.attendant.comissao_percentual || 0) / 100, { animate, formatter: percent });
   }
 
   function renderSalesChart() {
     const grouped = buildHourlySeries();
-    const animateChart = state.page === "dashboard";
+    const animateChart = state.page === "dashboard" && state.animateDashboard && canAnimateDashboard();
     const chartBox = els.chart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
     const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
@@ -458,7 +468,7 @@
   function renderDailySalesChart() {
     if (!els.dailyChart) return;
     const grouped = buildDailySeries();
-    const animateChart = state.page === "dashboard";
+    const animateChart = state.page === "dashboard" && state.animateDashboard && canAnimateDashboard();
     const chartBox = els.dailyChart.parentElement.getBoundingClientRect();
     const highestSales = Math.max(0, ...grouped.map((point) => point.sales));
     const maxSales = Math.max(1, Math.ceil(highestSales * 1.2));
@@ -652,10 +662,15 @@
     els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.page === page));
     document.body.dataset.currentPage = page;
     if (location.hash !== `#${page}`) history.replaceState(null, "", `#${page}`);
-    if (page === "dashboard") requestAnimationFrame(() => {
-      renderSalesChart();
-      renderDailySalesChart();
-    });
+    if (page === "dashboard") {
+      state.animateDashboard = true;
+      renderMetrics();
+      requestAnimationFrame(() => {
+        renderSalesChart();
+        renderDailySalesChart();
+        state.animateDashboard = false;
+      });
+    }
   }
 
   function getTotalPages() {
@@ -911,8 +926,44 @@
     return values.reduce((total, value) => total + Number(value || 0), 0);
   }
 
-  function setText(id, value) {
-    document.getElementById(id).textContent = value;
+  function setText(id, value, options = {}) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const numberValue = Number(value);
+    const hasNumber = value !== null && value !== "" && Number.isFinite(numberValue);
+    const displayValue = hasNumber && options.formatter ? options.formatter(numberValue) : String(value);
+    if (options.animate && hasNumber && options.formatter) {
+      animateMetricValue(el, numberValue, options.formatter, displayValue);
+      return;
+    }
+    const frame = metricAnimationFrames.get(el);
+    if (frame) window.cancelAnimationFrame(frame);
+    metricAnimationFrames.delete(el);
+    el.textContent = displayValue;
+  }
+
+  function animateMetricValue(el, target, formatter, finalText) {
+    const previousFrame = metricAnimationFrames.get(el);
+    if (previousFrame) window.cancelAnimationFrame(previousFrame);
+    const duration = 820;
+    const start = performance.now();
+    const initial = 0;
+    const tick = (now) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = initial + (target - initial) * eased;
+      el.textContent = progress >= 1 ? finalText : formatter(current);
+      if (progress < 1) {
+        metricAnimationFrames.set(el, window.requestAnimationFrame(tick));
+      } else {
+        metricAnimationFrames.delete(el);
+      }
+    };
+    metricAnimationFrames.set(el, window.requestAnimationFrame(tick));
+  }
+
+  function canAnimateDashboard() {
+    return !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
   function escapeHtml(value) {
