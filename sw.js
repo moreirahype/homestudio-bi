@@ -1,4 +1,4 @@
-const CACHE_NAME = "hot-sales-v65";
+const CACHE_NAME = "hot-sales-v66";
 const ASSETS = [
   "./styles.css",
   "./app.js",

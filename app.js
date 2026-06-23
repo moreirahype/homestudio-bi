@@ -87,6 +87,7 @@
   };
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
+  let notificationToastTimer = null;
 
   document.addEventListener("DOMContentLoaded", init);
 
@@ -1061,6 +1062,7 @@
           renderNotificationSummary();
           try {
             await syncOwnerPush();
+            showNotificationSavedToast();
           } catch (error) {
             state.notifications.reportStyle = previous;
             saveNotificationPrefs();
@@ -1116,6 +1118,31 @@
     return force
       ? pushClient.sync("owner", preferences)
       : pushClient.update("owner", preferences);
+  }
+
+  function showNotificationSavedToast() {
+    let toast = document.getElementById("notificationSaveToast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "notificationSaveToast";
+      toast.className = "notification-save-toast";
+
+      const icon = document.createElement("span");
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "\u2713";
+
+      const text = document.createElement("strong");
+      text.textContent = "Alteração salva";
+
+      toast.append(icon, text);
+      document.body.appendChild(toast);
+    }
+
+    window.clearTimeout(notificationToastTimer);
+    toast.classList.add("is-visible");
+    notificationToastTimer = window.setTimeout(() => {
+      toast.classList.remove("is-visible");
+    }, 2200);
   }
 
   function ensurePushClient() {
