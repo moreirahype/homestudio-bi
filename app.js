@@ -820,7 +820,7 @@
       <text x="${left - 18}" y="${gridYTop + 5}" class="axis-text">${maxSales}</text>
       <text x="${left - 18}" y="${gridYMid + 5}" class="axis-text">${Math.round(maxSales / 2)}</text>
       <text x="${left - 18}" y="${gridYBottom + 5}" class="axis-text">0</text>
-      ${mode === "line" ? `<path d="${areaPath}" class="sales-area"></path><path d="${path}" class="sales-line"></path>` : ""}
+      ${mode === "line" ? `<path d="${areaPath}" class="sales-area"></path><path d="${path}" class="sales-line" pathLength="1"></path>` : ""}
       ${points
         .map(
           (point) => `
@@ -838,9 +838,11 @@
 
     const chartAnimationCss = animateChart ? `
       .sales-bar{animation:chartBarIn 680ms cubic-bezier(.2,.78,.2,1) both;animation-delay:var(--bar-delay,0ms);transform-box:fill-box;transform-origin:center bottom}
-      .sales-area{animation:chartAreaIn 820ms ease both 80ms;transform-box:fill-box;transform-origin:center}
+      .sales-line{stroke-dasharray:1;stroke-dashoffset:1;animation:chartLineTraceIn 820ms cubic-bezier(.2,.78,.2,1) both}
+      .sales-area{animation:chartAreaIn 820ms ease both 140ms;transform-box:fill-box;transform-origin:center}
       .point-dot{animation:chartDotIn 620ms ease both;transform-box:fill-box;transform-origin:center}
       @keyframes chartBarIn{0%{opacity:0;transform:scaleY(.04)}72%{opacity:.82;transform:scaleY(1.015)}100%{opacity:.82;transform:scaleY(1)}}
+      @keyframes chartLineTraceIn{to{stroke-dashoffset:0}}
       @keyframes chartAreaIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
       @keyframes chartDotIn{from{opacity:0;transform:scale(.72)}to{opacity:1;transform:scale(1)}}
     ` : "";
