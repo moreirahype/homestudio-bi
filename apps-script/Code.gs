@@ -28,7 +28,7 @@ function doGet(e) {
   if (params.action === 'attendant') {
     return outputJson_(readAttendantData_(params.slug, params.from, params.to), params.callback);
   }
-  return outputJson_({ ok: true, app: 'Hot Sales' }, params.callback);
+  return outputJson_({ ok: true, app: 'High Sales' }, params.callback);
 }
 
 function runDiagnostics_(params) {

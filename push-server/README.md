@@ -1,6 +1,6 @@
-# Hot Sales Push
+# High Sales Push
 
-Backend de Web Push do Hot Sales para deploy na Vercel.
+Backend de Web Push do High Sales para deploy na Vercel.
 
 ## Variáveis
 

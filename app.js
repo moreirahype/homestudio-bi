@@ -22,7 +22,8 @@
     metrics: {},
     pageIndex: 1,
     lastUpdated: null,
-    notifications: loadNotificationPrefs()
+    notifications: loadNotificationPrefs(),
+    animateDashboard: false
   };
 
   const els = {
@@ -88,6 +89,8 @@
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
   let notificationToastTimer = null;
+  let dashboardAnimationTimer = null;
+  const metricAnimationFrames = new Map();
 
   document.addEventListener("DOMContentLoaded", init);
 
@@ -115,6 +118,7 @@
         state.period = button.dataset.period;
         state.pageIndex = 1;
         if (state.period !== "custom") state.appliedPeriod = state.period;
+        if (state.page === "dashboard" && state.period !== "custom") state.animateDashboard = true;
         render();
       });
     });
@@ -248,6 +252,7 @@
       state.metaByPeriod = Object.fromEntries(metaEntries);
       if (state.appliedPeriod === "custom") await loadCustomPeriodData();
       state.lastUpdated = new Date();
+      state.animateDashboard = state.page === "dashboard";
       render();
       setSyncText(`Atualizado ${formatTime(state.lastUpdated)}`);
     } catch (error) {
@@ -258,6 +263,7 @@
       state.metaByPeriod = Object.fromEntries(standardPeriods.map((period) => [period, fallback.meta]));
       state.customMeta = null;
       state.lastUpdated = new Date();
+      state.animateDashboard = state.page === "dashboard";
       render();
       setSyncText("Sem dados");
     } finally {
@@ -536,6 +542,10 @@
     state.metrics = computeMetrics(state.filteredTransactions);
     renderMetrics();
     renderSalesChart();
+    if (state.page === "dashboard" && state.animateDashboard) {
+      animateDashboardPanels();
+      state.animateDashboard = false;
+    }
     renderAttendants();
     renderTransactions();
     renderNotificationSummary();
@@ -568,7 +578,15 @@
     els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.page === page));
     document.body.dataset.currentPage = page;
     if (location.hash !== `#${page}`) history.replaceState(null, "", `#${page}`);
-    if (page === "dashboard" && state.metrics) requestAnimationFrame(renderSalesChart);
+    if (page === "dashboard" && Object.keys(state.metrics || {}).length) {
+      state.animateDashboard = true;
+      renderMetrics();
+      requestAnimationFrame(() => {
+        renderSalesChart();
+        animateDashboardPanels();
+        state.animateDashboard = false;
+      });
+    }
   }
 
   function getFilteredTransactions() {
@@ -659,28 +677,79 @@
   }
 
   function renderMetrics() {
-    setMetric("revenue", money(state.metrics.revenue));
-    setMetric("ads", money(state.metrics.ads));
-    setMetric("tax", money(state.metrics.tax));
-    setMetric("profit", money(state.metrics.profit), signedTone(state.metrics.profit));
-    setMetric("margin", state.metrics.margin == null ? "N/A" : percent(state.metrics.margin), signedTone(state.metrics.margin));
-    setMetric("roas", state.metrics.roas == null ? "N/A" : decimal(state.metrics.roas), roasTone(state.metrics.roas));
-    setMetric("sales", integer(state.metrics.sales));
-    setMetric("cpa", state.metrics.cpa == null ? "N/A" : money(state.metrics.cpa));
-    setMetric("averageTicket", state.metrics.averageTicket == null ? "N/A" : money(state.metrics.averageTicket));
-    setMetric("leads", integer(state.metrics.leads));
-    setMetric("cpl", state.metrics.cpl == null ? "N/A" : money(state.metrics.cpl));
-    setMetric("conversionRate", state.metrics.conversionRate == null ? "N/A" : percent(state.metrics.conversionRate));
+    const animate = state.page === "dashboard" && state.animateDashboard && canAnimateDashboard();
+    setMetric("revenue", state.metrics.revenue, null, { animate, formatter: money });
+    setMetric("ads", state.metrics.ads, null, { animate, formatter: money });
+    setMetric("tax", state.metrics.tax, null, { animate, formatter: money });
+    setMetric("profit", state.metrics.profit, signedTone(state.metrics.profit), { animate, formatter: money });
+    setMetric("margin", state.metrics.margin, signedTone(state.metrics.margin), { animate, formatter: percent, fallback: "N/A" });
+    setMetric("roas", state.metrics.roas, roasTone(state.metrics.roas), { animate, formatter: decimal, fallback: "N/A" });
+    setMetric("sales", state.metrics.sales, null, { animate, formatter: integer });
+    setMetric("cpa", state.metrics.cpa, null, { animate, formatter: money, fallback: "N/A" });
+    setMetric("averageTicket", state.metrics.averageTicket, null, { animate, formatter: money, fallback: "N/A" });
+    setMetric("leads", state.metrics.leads, null, { animate, formatter: integer });
+    setMetric("cpl", state.metrics.cpl, null, { animate, formatter: money, fallback: "N/A" });
+    setMetric("conversionRate", state.metrics.conversionRate, null, { animate, formatter: percent, fallback: "N/A" });
   }
 
-  function setMetric(key, value, tone) {
+  function setMetric(key, value, tone, options = {}) {
     const ids = Array.isArray(metricIds[key]) ? metricIds[key] : [metricIds[key]];
     const el = ids.map((id) => document.getElementById(id)).find(Boolean);
     if (!el) return;
-    el.textContent = value;
+    const numberValue = Number(value);
+    const hasNumber = value != null && value !== "" && Number.isFinite(numberValue);
+    const displayValue = hasNumber
+      ? (options.formatter ? options.formatter(numberValue) : String(value))
+      : (options.fallback || "N/A");
+    if (options.animate && hasNumber && options.formatter) {
+      animateMetricValue(el, numberValue, options.formatter, displayValue);
+    } else {
+      const frame = metricAnimationFrames.get(el);
+      if (frame) window.cancelAnimationFrame(frame);
+      metricAnimationFrames.delete(el);
+      el.textContent = displayValue;
+    }
     el.classList.toggle("is-positive", tone === "positive");
     el.classList.toggle("is-negative", tone === "negative");
     el.classList.toggle("is-alert", tone === "negative");
+  }
+
+  function animateMetricValue(el, target, formatter, finalText) {
+    const previousFrame = metricAnimationFrames.get(el);
+    if (previousFrame) window.cancelAnimationFrame(previousFrame);
+
+    const duration = 460;
+    const startedAt = performance.now();
+    const change = target;
+    const tick = (now) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = progress >= 1 ? finalText : formatter(change * eased);
+      if (progress < 1) {
+        metricAnimationFrames.set(el, window.requestAnimationFrame(tick));
+      } else {
+        metricAnimationFrames.delete(el);
+      }
+    };
+
+    el.textContent = formatter(0);
+    metricAnimationFrames.set(el, window.requestAnimationFrame(tick));
+  }
+
+  function canAnimateDashboard() {
+    return !window.matchMedia || !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function animateDashboardPanels() {
+    const dashboard = document.getElementById("page-dashboard");
+    if (!dashboard || !canAnimateDashboard()) return;
+    dashboard.classList.remove("dashboard-enter");
+    void dashboard.offsetWidth;
+    dashboard.classList.add("dashboard-enter");
+    window.clearTimeout(dashboardAnimationTimer);
+    dashboardAnimationTimer = window.setTimeout(() => {
+      dashboard.classList.remove("dashboard-enter");
+    }, 680);
   }
 
   function signedTone(value) {

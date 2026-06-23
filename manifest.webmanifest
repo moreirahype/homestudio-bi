@@ -1,6 +1,6 @@
 {
-  "name": "Hot Sales",
-  "short_name": "Hot Sales",
+  "name": "High Sales",
+  "short_name": "High Sales",
   "description": "Dashboard de vendas, anúncios, atendentes e notificações.",
   "scope": "./",
   "display": "standalone",

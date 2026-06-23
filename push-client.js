@@ -107,12 +107,12 @@
   async function showLocalTestNotification(audience, notification) {
     if (Notification.permission !== "granted") return false;
     if (!("serviceWorker" in navigator)) {
-      new Notification(notification.title || "Hot Sales", { body: notification.body || "" });
+      new Notification(notification.title || "High Sales", { body: notification.body || "" });
       return true;
     }
     const registration = await ensureServiceWorkerRegistration();
     const iconUrl = new URL("../assets/icon-192.png", location.href).href;
-    await registration.showNotification(notification.title || "Hot Sales", {
+    await registration.showNotification(notification.title || "High Sales", {
       body: notification.body || "",
       icon: iconUrl,
       badge: iconUrl,

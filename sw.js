@@ -1,4 +1,4 @@
-const CACHE_NAME = "hot-sales-v66";
+const CACHE_NAME = "high-sales-v67";
 const ASSETS = [
   "./styles.css",
   "./app.js",
@@ -50,11 +50,11 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
-    payload = { title: "Hot Sales", body: event.data ? event.data.text() : "" };
+    payload = { title: "High Sales", body: event.data ? event.data.text() : "" };
   }
   const url = payload.url || self.registration.scope;
   event.waitUntil(
-    self.registration.showNotification(payload.title || "Hot Sales", {
+    self.registration.showNotification(payload.title || "High Sales", {
       body: payload.body || "",
       icon: new URL("./assets/icon-192.png", self.registration.scope).href,
       badge: new URL("./assets/icon-192.png", self.registration.scope).href,
