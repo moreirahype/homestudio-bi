@@ -387,7 +387,7 @@
   }
 
   function renderMetrics() {
-    const animate = state.page === "dashboard" && state.animateDashboard && canAnimateDashboard();
+    const animate = state.page === "dashboard" && canAnimateDashboard();
     const sales = state.filteredSales;
     const fixed = buildFixedCredits(getDateRange()).reduce((total, item) => total + item.value, 0);
     const commission = sales.reduce((total, item) => total + item.value, 0);
