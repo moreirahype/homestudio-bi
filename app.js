@@ -18,6 +18,7 @@
     customMeta: null,
     meta: { spend: 0, leads: 0 },
     filteredTransactions: [],
+    manualSaleOptions: [],
     loadedTransactionRange: null,
     metrics: {},
     pageIndex: 1,
@@ -248,6 +249,7 @@
         standardPeriods.map(async (period) => [period, await fetchMetaPayload(getDateRange(period))])
       );
       state.transactions = payload.transactions.map(normalizeTransaction);
+      state.manualSaleOptions = normalizeManualSaleOptions(payload.manualSaleOptions);
       state.loadedTransactionRange = range;
       state.metaByPeriod = Object.fromEntries(metaEntries);
       if (state.appliedPeriod === "custom") await loadCustomPeriodData();
@@ -259,6 +261,7 @@
       console.error(error);
       const fallback = buildEmptyPayload();
       state.transactions = fallback.transactions.map(normalizeTransaction);
+      state.manualSaleOptions = normalizeManualSaleOptions(fallback.manualSaleOptions);
       state.loadedTransactionRange = getPreloadRange();
       state.metaByPeriod = Object.fromEntries(standardPeriods.map((period) => [period, fallback.meta]));
       state.customMeta = null;
@@ -343,21 +346,26 @@
     const now = new Date();
     const payload = new FormData();
     payload.set("origem", "Manual");
+    payload.set("action", "manualSale");
     payload.set("moeda", "BRL");
     payload.set("valor", String(value).replace(".", ","));
     payload.set("pagador", els.manualSalePayer.value.trim() || "Venda manual");
-    payload.set("atendente", els.manualSaleAttendant.value.trim() || "Sem atendente");
+    payload.set("atendente", els.manualSaleAttendant.value || "Sem atendente");
     payload.set("timestamp", now.toISOString());
     payload.set("transaction_id", `manual-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`);
+    payload.set("mutation_id", createMutationId("manual"));
 
     setManualSaleLoading(true);
     try {
-      await fetch(config.apiUrl, { method: "POST", mode: "no-cors", body: payload });
+      await submitMutation(payload);
       els.manualSaleForm.reset();
-      await delay(900);
       await refreshData({ applySelection: true });
     } catch (error) {
       console.error(error);
+      if (error && error.message) {
+        alert(error.message);
+        return;
+      }
       alert("Não foi possível adicionar a venda agora.");
     } finally {
       setManualSaleLoading(false);
@@ -395,19 +403,68 @@
     payload.set("valor_original", String(value).replace(".", ","));
     payload.set("moeda", "BRL");
     payload.set("valor", String(currency === "BRL" ? value : convertToBrl(value, currency)).replace(".", ","));
+    payload.set("mutation_id", createMutationId("edit"));
 
     setTransactionEditLoading(true);
     try {
-      await fetch(config.apiUrl, { method: "POST", mode: "no-cors", body: payload });
+      await submitMutation(payload);
       closeTransactionEditor();
-      await delay(700);
       await refreshData({ applySelection: true });
     } catch (error) {
       console.error(error);
+      if (error && error.message) {
+        alert(error.message);
+        return;
+      }
       alert("Não foi possível salvar a edição agora.");
     } finally {
       setTransactionEditLoading(false);
     }
+  }
+
+  async function submitMutation(payload) {
+    const mutationId = payload.get("mutation_id");
+    if (!mutationId) throw new Error("Operacao sem identificador de confirmacao.");
+    try {
+      await fetch(config.apiUrl, { method: "POST", mode: "no-cors", body: payload });
+    } catch (error) {
+      throw new Error("Falha de rede ao enviar a operacao. Confira sua conexao e tente novamente.");
+    }
+    const result = await waitForMutationResult(mutationId);
+    if (!result || result.pending) {
+      throw new Error("A API nao confirmou o salvamento. Confira a conexao e tente novamente.");
+    }
+    if (!result.ok) {
+      throw new Error(result.error || "A API recusou a operacao.");
+    }
+    return result;
+  }
+
+  async function waitForMutationResult(mutationId) {
+    const startedAt = Date.now();
+    let interval = 250;
+    while (Date.now() - startedAt < 30000) {
+      const result = await fetchMutationStatus(mutationId);
+      if (result && !result.pending) return result;
+      await delay(interval);
+      interval = Math.min(interval + 150, 1000);
+    }
+    return { ok: false, pending: true };
+  }
+
+  function fetchMutationStatus(mutationId) {
+    const url = new URL(config.apiUrl);
+    url.searchParams.set("action", "mutationStatus");
+    url.searchParams.set("mutation_id", mutationId);
+    return fetchJsonp(url);
+  }
+
+  function createMutationId(prefix) {
+    const random =
+      window.crypto && typeof window.crypto.randomUUID === "function"
+        ? window.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    return `${prefix}-${random}`;
   }
 
   function openTransactionEditor(id) {
@@ -492,7 +549,16 @@
   }
 
   function buildEmptyPayload() {
-    return { transactions: [], meta: { spend: 0, leads: 0 } };
+    return { transactions: [], manualSaleOptions: [], meta: { spend: 0, leads: 0 } };
+  }
+
+  function normalizeManualSaleOptions(options) {
+    const unique = new Set(["Sem atendente"]);
+    (Array.isArray(options) ? options : []).forEach((option) => {
+      const value = String(option || "").trim();
+      if (value) unique.add(value);
+    });
+    return Array.from(unique);
   }
 
   function normalizeTransaction(item) {
@@ -548,6 +614,7 @@
 
   function render() {
     renderPeriodControls();
+    renderManualSaleOptions();
     state.filteredTransactions = getFilteredTransactions();
     state.meta = getMetaForCurrentPeriod();
     state.metrics = computeMetrics(state.filteredTransactions);
@@ -572,6 +639,16 @@
     if (dailyPeriod) dailyPeriod.textContent = getPeriodName(getDailyChartPeriod());
     document.getElementById("attendantsPeriod").textContent = getPeriodName(state.appliedPeriod);
     updateDateDisplays();
+  }
+
+  function renderManualSaleOptions() {
+    if (!els.manualSaleAttendant) return;
+    const current = els.manualSaleAttendant.value || "Sem atendente";
+    const options = normalizeManualSaleOptions(state.manualSaleOptions);
+    els.manualSaleAttendant.innerHTML = options
+      .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
+      .join("");
+    els.manualSaleAttendant.value = options.includes(current) ? current : options[0];
   }
 
   function updateDateDisplays() {

@@ -1,23 +1,32 @@
 const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
+const MANUAL_SALES_SHEET_NAME = 'Vendas Manuais';
 const DEBUG_SHEET_NAME = 'Debug';
 const OWNER_PUSH_SENT_LOG_PROPERTY = 'OWNER_PUSH_SENT_LOG';
 const OWNER_PUSH_SENT_LOG_RETENTION_DAYS = 14;
 const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal', 'inicio_trabalho', 'pausas'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
+const MANUAL_SALE_HEADERS = ['atendente'];
 
 function doGet(e) {
   const params = e.parameter || {};
   if (params.action === 'diagnostics') {
     return outputJson_(runDiagnostics_(params), params.callback);
   }
+  if (params.action === 'mutationStatus') {
+    return outputJson_(readMutationResult_(params.mutation_id || params.id), params.callback);
+  }
   if (params.action === 'data') {
     return outputJson_({
       transactions: readTransactions_(params.from, params.to),
+      manualSaleOptions: readManualSaleOptions_(),
       meta: readMetaInsights_(params.from, params.to)
     }, params.callback);
+  }
+  if (params.action === 'manualSaleOptions') {
+    return outputJson_({ options: readManualSaleOptions_() }, params.callback);
   }
   if (params.action === 'meta') {
     return outputJson_(readMetaInsights_(params.from, params.to), params.callback);
@@ -67,23 +76,29 @@ function runDiagnostics_(params) {
 
 function doPost(e) {
   const payload = parsePayload_(e);
+  const mutationId = pickValue_(payload, ['mutation_id', 'mutationId', 'client_request_id', 'clientRequestId']);
+  try {
   console.log('Payload recebido: ' + JSON.stringify(payload));
   if (String(pickValue_(payload, ['action']) || '') === 'updateTransaction') {
     const result = updateTransaction_(payload);
     appendDebugLog_(result.ok ? 'updated' : 'update_error', payload, result);
+    recordMutationResult_(mutationId, result);
     return outputJson_(result);
   }
   const validation = validateWebhook_(payload);
   if (!validation.ok) {
     console.log('Webhook rejeitado: ' + JSON.stringify(validation));
     appendDebugLog_('rejected', payload, validation);
+    recordMutationResult_(mutationId, validation);
     return outputJson_(validation);
   }
   const row = normalizeWebhook_(payload);
   if (!row) {
     console.log('Webhook ignorado pelo normalizador.');
-    appendDebugLog_('ignored', payload, { ok: true, ignored: true });
-    return outputJson_({ ok: true, ignored: true });
+    const result = { ok: true, ignored: true };
+    appendDebugLog_('ignored', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
   }
   let inserted = false;
   const lock = LockService.getScriptLock();
@@ -92,8 +107,10 @@ function doPost(e) {
     const sheet = getTransactionsSheet_();
     if (transactionExists_(sheet, row[0])) {
       console.log('Transação duplicada: ' + row[0]);
-      appendDebugLog_('duplicate', payload, { ok: true, duplicate: true, id: row[0], row: row });
-      return outputJson_({ ok: true, duplicate: true, id: row[0] });
+      const result = { ok: true, duplicate: true, id: row[0] };
+      appendDebugLog_('duplicate', payload, Object.assign({}, result, { row: row }));
+      recordMutationResult_(mutationId, result);
+      return outputJson_(result);
     }
     sheet.appendRow(row);
     sortTransactionsSheet_(sheet);
@@ -133,7 +150,43 @@ function doPost(e) {
       appendDebugLog_('push_error', payload, { audience: 'sheila', error: String(error) });
     }
   }
-  return outputJson_({ ok: true, id: row[0] });
+  const result = { ok: true, id: row[0] };
+  recordMutationResult_(mutationId, result);
+  return outputJson_(result);
+  } catch (error) {
+    const result = { ok: false, error: error && error.message ? error.message : String(error) };
+    console.error('Falha ao processar POST: ' + result.error);
+    appendDebugLog_('error', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
+  }
+}
+
+function readMutationResult_(mutationId) {
+  const id = String(mutationId || '').trim();
+  if (!id) return { ok: false, error: 'mutation_id nao informado.' };
+  const cached = CacheService.getScriptCache().get(mutationCacheKey_(id));
+  if (!cached) return { ok: true, pending: true, id: id };
+  try {
+    return JSON.parse(cached);
+  } catch (error) {
+    return { ok: false, error: 'Resultado de operacao invalido.', id: id };
+  }
+}
+
+function recordMutationResult_(mutationId, result) {
+  const id = String(mutationId || '').trim();
+  if (!id) return;
+  const payload = Object.assign({}, result || {}, {
+    pending: false,
+    mutation_id: id,
+    confirmed_at: new Date().toISOString()
+  });
+  CacheService.getScriptCache().put(mutationCacheKey_(id), JSON.stringify(payload), 900);
+}
+
+function mutationCacheKey_(mutationId) {
+  return 'mutation:' + String(mutationId || '').trim();
 }
 
 function appendDebugLog_(status, payload, result) {
@@ -564,6 +617,58 @@ function getAttendantsSheet_() {
     sheet.appendRow(['k9v2m7q4', 'Sheila', 10, 1000, '', '']);
   }
   return sheet;
+}
+
+function getManualSalesSheet_() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName(MANUAL_SALES_SHEET_NAME);
+  if (!sheet) sheet = spreadsheet.insertSheet(MANUAL_SALES_SHEET_NAME);
+  const currentWidth = Math.max(sheet.getLastColumn(), MANUAL_SALE_HEADERS.length);
+  const current = sheet.getRange(1, 1, 1, currentWidth).getValues()[0];
+  const missingHeaders = MANUAL_SALE_HEADERS.some((header, index) => current[index] !== header);
+  if (missingHeaders || currentWidth !== MANUAL_SALE_HEADERS.length) {
+    migrateManualSalesSheet_(sheet, current);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function migrateManualSalesSheet_(sheet, currentHeaders) {
+  const lastRow = sheet.getLastRow();
+  const currentWidth = Math.max(sheet.getLastColumn(), currentHeaders.length);
+  const rows = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, currentWidth).getValues()
+    : [];
+  const headerIndex = {};
+  currentHeaders.forEach((header, index) => {
+    if (header) headerIndex[String(header).trim()] = index;
+  });
+  const remapped = rows.map((row) => MANUAL_SALE_HEADERS.map((header) => {
+    const index = headerIndex[header];
+    return index == null ? '' : row[index];
+  }));
+  sheet.getRange(1, 1, 1, MANUAL_SALE_HEADERS.length).setValues([MANUAL_SALE_HEADERS]);
+  if (remapped.length) {
+    sheet.getRange(2, 1, remapped.length, MANUAL_SALE_HEADERS.length).setValues(remapped);
+  }
+  deleteExtraColumns_(sheet, MANUAL_SALE_HEADERS.length);
+}
+
+function readManualSaleOptions_() {
+  const sheet = getManualSalesSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const unique = {};
+  return sheet
+    .getRange(2, 1, lastRow - 1, 1)
+    .getValues()
+    .map((row) => String(row[0] || '').trim())
+    .filter((value) => {
+      const key = normalizePersonName_(value);
+      if (!key || unique[key]) return false;
+      unique[key] = true;
+      return true;
+    });
 }
 
 function migrateAttendantsSheet_(sheet, currentHeaders) {
