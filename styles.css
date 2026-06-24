@@ -832,6 +832,14 @@ tr:hover .transaction-edit-button,
   font-size: var(--text-xs);
 }
 
+.manual-sale-note {
+  grid-column: 1 / -2;
+  margin: 0;
+  align-self: center;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
 .manual-sale-form button {
   min-height: 44px;
   border: 0;
@@ -1430,6 +1438,10 @@ tr:hover .transaction-edit-button,
   .manual-sale-form button {
     grid-column: 1 / -1;
   }
+
+  .manual-sale-note {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1652,6 +1664,11 @@ tr:hover .transaction-edit-button,
   .manual-sale-form {
     grid-template-columns: 1fr;
     padding: 14px;
+  }
+
+  .manual-sale-note {
+    grid-column: auto;
+    margin-top: -2px;
   }
 
   table {

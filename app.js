@@ -163,9 +163,16 @@
 
     if (els.manualSaleForm) {
       els.manualSaleForm.addEventListener("submit", submitManualSale);
+      if (els.manualSaleCurrency) {
+        els.manualSaleCurrency.addEventListener("change", () => updateCurrencyPlaceholder(els.manualSaleValue, els.manualSaleCurrency.value));
+        updateCurrencyPlaceholder(els.manualSaleValue, els.manualSaleCurrency.value);
+      }
     }
     if (els.transactionEditForm) {
       els.transactionEditForm.addEventListener("submit", submitTransactionEdit);
+      if (els.transactionEditCurrency) {
+        els.transactionEditCurrency.addEventListener("change", () => updateCurrencyPlaceholder(els.transactionEditValue, els.transactionEditCurrency.value));
+      }
       [els.transactionEditCancel, els.transactionEditCancelBottom].filter(Boolean).forEach((button) => {
         button.addEventListener("click", closeTransactionEditor);
       });
@@ -479,9 +486,10 @@
     els.transactionEditDate.value = transaction.data || toIsoDate(transaction.timestamp);
     els.transactionEditTime.value = normalizeTimeValue(transaction.hora || formatTime(transaction.timestamp));
     els.transactionEditPayer.value = transaction.pagador || "";
-    els.transactionEditAttendant.value = transaction.atendente || "";
+    renderTransactionEditAttendantOptions(transaction.atendente || "Sem atendente");
     els.transactionEditCurrency.value = transaction.moedaOriginal || "BRL";
     els.transactionEditValue.value = decimal(transaction.valorOriginal || transaction.valor || 0);
+    updateCurrencyPlaceholder(els.transactionEditValue, els.transactionEditCurrency.value);
     if (typeof els.transactionEditor.showModal === "function") {
       els.transactionEditor.showModal();
     } else {
@@ -703,6 +711,36 @@
       .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
       .join("");
     els.manualSaleAttendant.value = options.includes(current) ? current : options[0];
+  }
+
+  function getAttendantSelectOptions(extraValue) {
+    const unique = new Set(normalizeManualSaleOptions(state.manualSaleOptions));
+    state.transactions.forEach((item) => {
+      const value = String(item.atendente || "").trim();
+      if (value) unique.add(value);
+    });
+    const extra = String(extraValue || "").trim();
+    if (extra) unique.add(extra);
+    return Array.from(unique);
+  }
+
+  function renderTransactionEditAttendantOptions(currentValue) {
+    if (!els.transactionEditAttendant) return;
+    const options = getAttendantSelectOptions(currentValue);
+    els.transactionEditAttendant.innerHTML = options
+      .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
+      .join("");
+    els.transactionEditAttendant.value = options.includes(currentValue) ? currentValue : options[0];
+  }
+
+  function updateCurrencyPlaceholder(input, currency) {
+    if (!input) return;
+    input.placeholder = `${currencySymbol(currency)} 0,00`;
+  }
+
+  function currencySymbol(currency) {
+    const symbols = { BRL: "R$", USD: "US$", EUR: "€", GBP: "£", CHF: "CHF" };
+    return symbols[normalizeCurrency(currency)] || normalizeCurrency(currency);
   }
 
   function renderDashboardFilters() {

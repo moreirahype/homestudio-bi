@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=73">
+    <link rel="stylesheet" href="../styles.css?v=74">
   </head>
   <body>
     <div class="app-shell">
@@ -265,12 +265,13 @@
               </label>
               <label>
                 <span>Data</span>
-                <input id="manualSaleDate" type="date" title="Deixe em branco para usar a data atual">
+                <input id="manualSaleDate" type="date">
               </label>
               <label>
                 <span>Hora</span>
-                <input id="manualSaleTime" type="time" title="Deixe em branco para usar a hora atual">
+                <input id="manualSaleTime" type="time">
               </label>
+              <p class="manual-sale-note">Data e hora sao opcionais. Se ficarem vazias, usamos o momento do lancamento.</p>
               <button id="manualSaleSubmit" type="submit">Adicionar venda</button>
             </form>
             <div class="table-wrap">
@@ -310,11 +311,19 @@
                   </label>
                   <label>
                     <span>Atendente</span>
-                    <input id="transactionEditAttendant" type="text" autocomplete="off">
+                    <select id="transactionEditAttendant">
+                      <option value="Sem atendente">Sem atendente</option>
+                    </select>
                   </label>
                   <label>
                     <span>Moeda</span>
-                    <input id="transactionEditCurrency" type="text" maxlength="3" autocomplete="off">
+                    <select id="transactionEditCurrency">
+                      <option value="BRL">BRL</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="CHF">CHF</option>
+                    </select>
                   </label>
                   <label>
                     <span>Valor</span>
@@ -414,7 +423,7 @@
     </div>
     <script src="../config.js?v=55"></script>
     <script src="../push-client.js?v=63"></script>
-    <script src="../app.js?v=84"></script>
+    <script src="../app.js?v=85"></script>
   </body>
 </html>
 
