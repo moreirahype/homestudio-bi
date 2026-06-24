@@ -85,6 +85,12 @@ function doPost(e) {
     recordMutationResult_(mutationId, result);
     return outputJson_(result);
   }
+  if (String(pickValue_(payload, ['action']) || '') === 'deleteTransaction') {
+    const result = deleteTransaction_(payload);
+    appendDebugLog_(result.ok ? 'deleted' : 'delete_error', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
+  }
   const validation = validateWebhook_(payload);
   if (!validation.ok) {
     console.log('Webhook rejeitado: ' + JSON.stringify(validation));
@@ -538,6 +544,22 @@ function updateTransaction_(payload) {
     sheet.getRange(rowNumber, 1, 1, HEADERS.length).setValues([HEADERS.map((header) => updated[header])]);
     sortTransactionsSheet_(sheet);
     return { ok: true, id: id };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function deleteTransaction_(payload) {
+  const id = String(pickValue_(payload, ['id']) || '').trim();
+  if (!id) return { ok: false, error: 'ID da transação não informado.' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getTransactionsSheet_();
+    const rowNumber = findTransactionRowById_(sheet, id);
+    if (!rowNumber) return { ok: false, error: 'Transação não encontrada.' };
+    sheet.deleteRow(rowNumber);
+    return { ok: true, id: id, deleted: true };
   } finally {
     lock.releaseLock();
   }

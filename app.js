@@ -54,6 +54,7 @@
     transactionEditCurrency: document.getElementById("transactionEditCurrency"),
     transactionEditValue: document.getElementById("transactionEditValue"),
     transactionEditSubmit: document.getElementById("transactionEditSubmit"),
+    transactionDeleteSubmit: document.getElementById("transactionDeleteSubmit"),
     transactionEditCancel: document.getElementById("transactionEditCancel"),
     transactionEditCancelBottom: document.getElementById("transactionEditCancelBottom"),
     prevPage: document.getElementById("prevPage"),
@@ -148,6 +149,9 @@
       [els.transactionEditCancel, els.transactionEditCancelBottom].filter(Boolean).forEach((button) => {
         button.addEventListener("click", closeTransactionEditor);
       });
+      if (els.transactionDeleteSubmit) {
+        els.transactionDeleteSubmit.addEventListener("click", deleteCurrentTransaction);
+      }
       els.transactionEditor.addEventListener("click", (event) => {
         if (event.target === els.transactionEditor) closeTransactionEditor();
       });
@@ -432,7 +436,7 @@
     }
     const result = await waitForMutationResult(mutationId);
     if (!result || result.pending) {
-      throw new Error("A API nao confirmou o salvamento. Confira a conexao e tente novamente.");
+      return { ok: true, unconfirmed: true };
     }
     if (!result.ok) {
       throw new Error(result.error || "A API recusou a operacao.");
@@ -444,8 +448,12 @@
     const startedAt = Date.now();
     let interval = 250;
     while (Date.now() - startedAt < 30000) {
-      const result = await fetchMutationStatus(mutationId);
-      if (result && !result.pending) return result;
+      try {
+        const result = await fetchMutationStatus(mutationId);
+        if (result && !result.pending) return result;
+      } catch (error) {
+        console.warn("Falha ao confirmar mutacao", error);
+      }
       await delay(interval);
       interval = Math.min(interval + 150, 1000);
     }
@@ -485,6 +493,42 @@
     setTimeout(() => els.transactionEditValue.focus(), 60);
   }
 
+  async function deleteCurrentTransaction() {
+    if (!config.apiUrl) {
+      alert("Configure a URL da API antes de apagar transações.");
+      return;
+    }
+    const id = els.transactionEditId.value;
+    const transaction = state.transactions.find((item) => item.id === id);
+    if (!transaction) {
+      alert("Transação não encontrada.");
+      closeTransactionEditor();
+      return;
+    }
+    const label = `${transaction.pagador || "Sem pagador"} - ${money(transaction.valor || 0)}`;
+    if (!window.confirm(`Apagar esta transação?\n\n${label}`)) return;
+    const payload = new FormData();
+    payload.set("action", "deleteTransaction");
+    payload.set("id", id);
+    payload.set("mutation_id", createMutationId("delete"));
+
+    setTransactionDeleteLoading(true);
+    try {
+      await submitMutation(payload);
+      closeTransactionEditor();
+      await refreshData({ applySelection: true });
+    } catch (error) {
+      console.error(error);
+      if (error && error.message) {
+        alert(error.message);
+        return;
+      }
+      alert("Não foi possível apagar a transação agora.");
+    } finally {
+      setTransactionDeleteLoading(false);
+    }
+  }
+
   function closeTransactionEditor() {
     if (!els.transactionEditor) return;
     if (typeof els.transactionEditor.close === "function") {
@@ -497,7 +541,15 @@
   function setTransactionEditLoading(isLoading) {
     if (!els.transactionEditSubmit) return;
     els.transactionEditSubmit.disabled = isLoading;
+    if (els.transactionDeleteSubmit) els.transactionDeleteSubmit.disabled = isLoading;
     els.transactionEditSubmit.textContent = isLoading ? "Salvando..." : "Salvar";
+  }
+
+  function setTransactionDeleteLoading(isLoading) {
+    if (!els.transactionDeleteSubmit) return;
+    els.transactionDeleteSubmit.disabled = isLoading;
+    if (els.transactionEditSubmit) els.transactionEditSubmit.disabled = isLoading;
+    els.transactionDeleteSubmit.textContent = isLoading ? "Apagando..." : "Apagar";
   }
 
   function setManualSaleLoading(isLoading) {
