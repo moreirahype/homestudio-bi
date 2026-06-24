@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=69">
+    <link rel="stylesheet" href="../styles.css?v=70">
   </head>
   <body>
     <div class="app-shell">
@@ -36,6 +36,10 @@
           <button class="nav-item" data-page="attendants" type="button" aria-label="Atendentes">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7 8a7 7 0 0 1 14 0z"></path></svg>
             <span>Atendentes</span>
+          </button>
+          <button class="nav-item" data-page="products" type="button" aria-label="Produtos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5zm3 1.25v8.5h2.25v-8.5zm3.9 4.25v4.25h2.25V12zm3.85-2.7v6.95H17V9.3z"></path></svg>
+            <span>Produtos</span>
           </button>
           <button class="nav-item" data-page="transactions" type="button" aria-label="Transações">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h14v2H5zm0 5h14v2H5z"></path></svg>
@@ -80,6 +84,20 @@
             <label>
               <span>Fim</span>
               <input id="endDate" type="date">
+            </label>
+          </div>
+          <div class="dashboard-filters" aria-label="Filtros do dashboard">
+            <label>
+              <span>Atendente</span>
+              <select id="dashboardAttendantFilter"></select>
+            </label>
+            <label>
+              <span>Produto</span>
+              <select id="dashboardProductFilter"></select>
+            </label>
+            <label>
+              <span>Conta de anúncio</span>
+              <select id="dashboardAccountFilter"></select>
             </label>
           </div>
           <button class="refresh-button" id="refreshButton" type="button">Atualizar</button>
@@ -181,6 +199,36 @@
             </div>
             <div class="empty-state" id="attendantsEmpty">Nenhuma venda atribuída.</div>
             <div class="bar-chart" id="attendantsChart" aria-label="Comparativo de desempenho"></div>
+          </article>
+        </section>
+
+        <section class="page" id="page-products" data-page="products">
+          <article class="panel products-panel">
+            <div class="panel-header">
+              <h1>Produtos</h1>
+              <span class="period-label" id="productsPeriod">Hoje</span>
+            </div>
+            <div class="products-layout">
+              <div class="product-chart-card">
+                <div class="product-donut" id="productsDonut" aria-label="Participação por produto"></div>
+                <div class="product-legend" id="productsLegend"></div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Vendas</th>
+                      <th><span class="desktop-label">Faturamento</span><span class="mobile-label">Fat.</span></th>
+                      <th><span class="desktop-label">Ticket médio</span><span class="mobile-label">Ticket</span></th>
+                      <th>Receita</th>
+                    </tr>
+                  </thead>
+                  <tbody id="productsBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="empty-state" id="productsEmpty">Nenhum produto vendido.</div>
           </article>
         </section>
 
@@ -332,6 +380,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7 8a7 7 0 0 1 14 0z"></path></svg>
           <span>Atendentes</span>
         </button>
+        <button class="bottom-item" data-page="products" type="button" aria-label="Produtos">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5zm3 1.25v8.5h2.25v-8.5zm3.9 4.25v4.25h2.25V12zm3.85-2.7v6.95H17V9.3z"></path></svg>
+          <span>Produtos</span>
+        </button>
         <button class="bottom-item" data-page="transactions" type="button" aria-label="Transações">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h14v2H5zm0 5h14v2H5z"></path></svg>
           <span>Transações</span>
@@ -344,7 +396,7 @@
     </div>
     <script src="../config.js?v=55"></script>
     <script src="../push-client.js?v=63"></script>
-    <script src="../app.js?v=79"></script>
+    <script src="../app.js?v=80"></script>
   </body>
 </html>
 

@@ -5,7 +5,7 @@ const MANUAL_SALES_SHEET_NAME = 'Vendas Manuais';
 const DEBUG_SHEET_NAME = 'Debug';
 const OWNER_PUSH_SENT_LOG_PROPERTY = 'OWNER_PUSH_SENT_LOG';
 const OWNER_PUSH_SENT_LOG_RETENTION_DAYS = 14;
-const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
+const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'produto', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal', 'inicio_trabalho', 'pausas'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
 const MANUAL_SALE_HEADERS = ['atendente'];
@@ -449,6 +449,19 @@ function normalizeWebhook_(payload) {
   const exchangeRate = getCurrencyRateToBrl_(originalCurrency);
   const valueInBrl = roundCurrency_(originalValue * exchangeRate);
   const attendant = pickValue_(payload, ['atendente', 'attendant', 'vendedor', 'seller', 'responsavel', 'responsible']) || 'Sem atendente';
+  const product = pickValue_(payload, [
+    'produto',
+    'product',
+    'product_name',
+    'productName',
+    'item',
+    'oferta',
+    'offer',
+    'data.product.name',
+    'product.name',
+    'data.offer.name',
+    'offer.name'
+  ]) || '';
   const attendantConfig = getAttendantConfigByName_(attendant);
   const commissionPercent = attendantConfig ? attendantConfig.comissao_percentual : '';
   return [
@@ -465,6 +478,7 @@ function normalizeWebhook_(payload) {
     'BRL',
     valueInBrl,
     attendant,
+    product,
     isCakto ? 'Cakto' : pickValue_(payload, ['origem', 'source']) || 'Zapdata',
     originalCurrency,
     originalValue,
@@ -534,6 +548,7 @@ function updateTransaction_(payload) {
       hora: normalizeTimeText_(pickValue_(payload, ['hora']) || current.hora),
       pagador: pickValue_(payload, ['pagador', 'payer']) || current.pagador || 'Sem pagador',
       atendente: attendant,
+      produto: pickValue_(payload, ['produto', 'product', 'product_name', 'productName']) || current.produto || '',
       moeda: 'BRL',
       valor: valueInBrl,
       moeda_original: originalCurrency,
@@ -1022,6 +1037,7 @@ function readMetaInsights_(from, to, includeActions) {
   const result = { spend: 0, leads: 0 };
   const actions = [];
   const errors = [];
+  const accountBreakdown = [];
 
   accounts.forEach((account) => {
     const adAccount = account.indexOf('act_') === 0 ? account : 'act_' + account;
@@ -1041,8 +1057,17 @@ function readMetaInsights_(from, to, includeActions) {
     }
     const first = payload.data.data && payload.data.data[0] ? payload.data.data[0] : {};
     const accountActions = first.actions || [];
-    result.spend += parseNumber_(first.spend || 0);
-    result.leads += countLeads_(accountActions);
+    const accountSpend = parseNumber_(first.spend || 0);
+    const accountLeads = countLeads_(accountActions);
+    result.spend += accountSpend;
+    result.leads += accountLeads;
+    accountBreakdown.push({
+      id: adAccount,
+      account: adAccount,
+      label: adAccount,
+      spend: roundCurrency_(accountSpend),
+      leads: accountLeads
+    });
     if (includeActions) {
       accountActions.forEach((action) => actions.push({
         account: adAccount,
@@ -1054,6 +1079,7 @@ function readMetaInsights_(from, to, includeActions) {
 
   result.spend = roundCurrency_(result.spend);
   result.accounts = accounts;
+  result.accountBreakdown = accountBreakdown;
   if (errors.length) result.errors = errors;
   if (includeActions) {
     result.actions = actions;

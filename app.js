@@ -18,8 +18,10 @@
     customMeta: null,
     meta: { spend: 0, leads: 0 },
     filteredTransactions: [],
+    dashboardTransactions: [],
     manualSaleOptions: [],
     loadedTransactionRange: null,
+    filters: { attendant: "all", product: "all", account: "all" },
     metrics: {},
     pageIndex: 1,
     lastUpdated: null,
@@ -44,6 +46,9 @@
     manualSalePayer: document.getElementById("manualSalePayer"),
     manualSaleAttendant: document.getElementById("manualSaleAttendant"),
     manualSaleSubmit: document.getElementById("manualSaleSubmit"),
+    dashboardAttendantFilter: document.getElementById("dashboardAttendantFilter"),
+    dashboardProductFilter: document.getElementById("dashboardProductFilter"),
+    dashboardAccountFilter: document.getElementById("dashboardAccountFilter"),
     transactionEditor: document.getElementById("transactionEditor"),
     transactionEditForm: document.getElementById("transactionEditForm"),
     transactionEditId: document.getElementById("transactionEditId"),
@@ -90,6 +95,7 @@
   };
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
+  const productChartColors = ["#9fe870", "#d4ff90", "#7fd85f", "#c8f3b6", "#6fbd55", "#e9ffd0", "#88dd70"];
   let notificationToastTimer = null;
   const metricAnimationFrames = new Map();
 
@@ -139,6 +145,17 @@
     els.transactionSearch.addEventListener("input", () => {
       state.pageIndex = 1;
       renderTransactions();
+    });
+
+    [els.dashboardAttendantFilter, els.dashboardProductFilter, els.dashboardAccountFilter].filter(Boolean).forEach((select) => {
+      select.addEventListener("change", () => {
+        state.filters.attendant = els.dashboardAttendantFilter ? els.dashboardAttendantFilter.value : "all";
+        state.filters.product = els.dashboardProductFilter ? els.dashboardProductFilter.value : "all";
+        state.filters.account = els.dashboardAccountFilter ? els.dashboardAccountFilter.value : "all";
+        state.pageIndex = 1;
+        if (state.page === "dashboard") state.animateDashboard = true;
+        render();
+      });
     });
 
     if (els.manualSaleForm) {
@@ -638,15 +655,18 @@
   function render() {
     renderPeriodControls();
     renderManualSaleOptions();
+    renderDashboardFilters();
     state.filteredTransactions = getFilteredTransactions();
+    state.dashboardTransactions = getDashboardTransactions();
     state.meta = getMetaForCurrentPeriod();
-    state.metrics = computeMetrics(state.filteredTransactions);
+    state.metrics = computeMetrics(state.dashboardTransactions);
     renderMetrics();
     renderSalesChart();
     if (state.page === "dashboard" && state.animateDashboard) {
       state.animateDashboard = false;
     }
     renderAttendants();
+    renderProducts();
     renderTransactions();
     renderNotificationSummary();
   }
@@ -661,6 +681,8 @@
     if (hourlyPeriod) hourlyPeriod.textContent = getPeriodName(state.appliedPeriod);
     if (dailyPeriod) dailyPeriod.textContent = getPeriodName(getDailyChartPeriod());
     document.getElementById("attendantsPeriod").textContent = getPeriodName(state.appliedPeriod);
+    const productsPeriod = document.getElementById("productsPeriod");
+    if (productsPeriod) productsPeriod.textContent = getPeriodName(state.appliedPeriod);
     updateDateDisplays();
   }
 
@@ -674,6 +696,60 @@
     els.manualSaleAttendant.value = options.includes(current) ? current : options[0];
   }
 
+  function renderDashboardFilters() {
+    setFilterOptions(
+      els.dashboardAttendantFilter,
+      [{ value: "all", label: "Todos" }].concat(getUniqueTransactionValues("atendente", "Sem atendente")),
+      state.filters.attendant
+    );
+    setFilterOptions(
+      els.dashboardProductFilter,
+      [{ value: "all", label: "Todos" }].concat(getUniqueTransactionValues("produto", "Sem produto")),
+      state.filters.product
+    );
+    setFilterOptions(
+      els.dashboardAccountFilter,
+      [{ value: "all", label: "Todas" }].concat(getAccountFilterOptions()),
+      state.filters.account
+    );
+  }
+
+  function setFilterOptions(select, options, currentValue) {
+    if (!select) return;
+    const values = new Set(options.map((option) => option.value));
+    const nextValue = values.has(currentValue) ? currentValue : "all";
+    if (nextValue !== currentValue) {
+      if (select === els.dashboardAttendantFilter) state.filters.attendant = nextValue;
+      if (select === els.dashboardProductFilter) state.filters.product = nextValue;
+      if (select === els.dashboardAccountFilter) state.filters.account = nextValue;
+    }
+    const html = options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join("");
+    if (select.innerHTML !== html) select.innerHTML = html;
+    select.value = nextValue;
+  }
+
+  function getUniqueTransactionValues(field, fallback) {
+    const map = new Map();
+    state.transactions.forEach((item) => {
+      const label = String(item[field] || fallback).trim() || fallback;
+      const key = normalizeFilterValue(label);
+      if (!map.has(key)) map.set(key, { value: key, label });
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }
+
+  function getAccountFilterOptions() {
+    const map = new Map();
+    Object.values(state.metaByPeriod || {}).concat(state.customMeta || []).forEach((meta) => {
+      (meta && Array.isArray(meta.accountBreakdown) ? meta.accountBreakdown : []).forEach((account) => {
+        const id = String(account.id || account.account || "").trim();
+        if (!id) return;
+        map.set(id, { value: id, label: account.label || account.name || id });
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }
+
   function updateDateDisplays() {
     [els.startDate, els.endDate].forEach((input) => {
       const label = input.closest("label");
@@ -682,7 +758,7 @@
   }
 
   function setPage(page) {
-    if (!["dashboard", "attendants", "transactions", "notifications"].includes(page)) return;
+    if (!["dashboard", "attendants", "products", "transactions", "notifications"].includes(page)) return;
     state.page = page;
     els.pages.forEach((section) => section.classList.toggle("is-active", section.dataset.page === page));
     els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.page === page));
@@ -703,6 +779,15 @@
     return state.transactions
       .filter((item) => item.timestamp >= startOfDay(range.start) && item.timestamp <= endOfDay(range.end))
       .sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  function getDashboardTransactions() {
+    return state.filteredTransactions.filter(matchesDashboardFilters);
+  }
+
+  function matchesDashboardFilters(item) {
+    return (state.filters.attendant === "all" || normalizeFilterValue(item.atendente || "Sem atendente") === state.filters.attendant)
+      && (state.filters.product === "all" || normalizeFilterValue(item.produto || "Sem produto") === state.filters.product);
   }
 
   function computeMetrics(transactions) {
@@ -769,6 +854,10 @@
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
+  }
+
+  function normalizeFilterValue(value) {
+    return normalizeSearchText(value).replace(/\s+/g, " ").trim() || "sem valor";
   }
 
   function getLeadBase(meta) {
@@ -1001,7 +1090,7 @@
   function buildHourlySeries() {
     const labels = buildHourLabels();
     const series = labels.map((label, index) => {
-      const sales = state.filteredTransactions.filter((item) => {
+      const sales = state.dashboardTransactions.filter((item) => {
         return item.timestamp.getHours() === index;
       });
       return {
@@ -1012,7 +1101,7 @@
         revenue: sum(sales.map((item) => item.valor))
       };
     });
-    return addProfitToSeries(series, state.appliedPeriod);
+    return series;
   }
 
   function buildDailySeries() {
@@ -1022,6 +1111,7 @@
       const sales = state.transactions.filter((item) => {
         return item.timestamp >= startOfDay(range.start)
           && item.timestamp <= endOfDay(range.end)
+          && matchesDashboardFilters(item)
           && toIsoDate(item.timestamp) === label.key;
       });
       return {
@@ -1058,7 +1148,8 @@
     tooltip.hidden = false;
     tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
     tooltip.style.top = `${Math.max(52, y - 8)}px`;
-    tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}<br>Lucro: ${money(point.profit || 0)}`;
+    const profitLine = Number.isFinite(Number(point.profit)) ? `<br>Lucro: ${money(point.profit)}` : "";
+    tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}${profitLine}`;
   }
 
   function hideTooltip(tooltip) {
@@ -1143,10 +1234,77 @@
     });
   }
 
+  function renderProducts() {
+    const rows = getProductRows();
+    const tbody = document.getElementById("productsBody");
+    const empty = document.getElementById("productsEmpty");
+    if (!tbody || !empty) return;
+    const totalRevenue = sum(rows.map((row) => row.revenue));
+    tbody.innerHTML = "";
+    rows.forEach((row) => {
+      const share = totalRevenue > 0 ? row.revenue / totalRevenue : 0;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(row.name)}</td>
+        <td>${integer(row.sales)}</td>
+        <td>${money(row.revenue)}</td>
+        <td>${row.sales ? money(row.revenue / row.sales) : "N/A"}</td>
+        <td>${percent(share)}</td>
+      `;
+      tbody.append(tr);
+    });
+    empty.classList.toggle("is-visible", rows.length === 0);
+    renderProductsDonut(rows);
+  }
+
+  function getProductRows() {
+    const map = new Map();
+    state.filteredTransactions.forEach((item) => {
+      const name = String(item.produto || "Sem produto").trim() || "Sem produto";
+      const key = normalizeFilterValue(name);
+      const row = map.get(key) || { name, sales: 0, revenue: 0 };
+      row.sales += 1;
+      row.revenue += item.valor;
+      map.set(key, row);
+    });
+    return Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  }
+
+  function renderProductsDonut(rows) {
+    const donut = document.getElementById("productsDonut");
+    const legend = document.getElementById("productsLegend");
+    if (!donut || !legend) return;
+    const totalRevenue = sum(rows.map((row) => row.revenue));
+    if (!rows.length || totalRevenue <= 0) {
+      donut.style.background = "conic-gradient(rgba(159,232,112,.18) 0 100%)";
+      legend.innerHTML = `<div class="product-legend-item"><i style="--slice-color:rgba(159,232,112,.28)"></i><strong>Sem produtos</strong><span>0%</span></div>`;
+      return;
+    }
+    let cursor = 0;
+    const segments = rows.map((row, index) => {
+      const start = cursor;
+      const size = (row.revenue / totalRevenue) * 100;
+      cursor += size;
+      const color = productChartColors[index % productChartColors.length];
+      return `${color} ${start}% ${cursor}%`;
+    });
+    donut.style.background = `conic-gradient(${segments.join(", ")})`;
+    legend.innerHTML = rows.slice(0, 7).map((row, index) => {
+      const share = row.revenue / totalRevenue;
+      const color = productChartColors[index % productChartColors.length];
+      return `
+        <div class="product-legend-item">
+          <i style="--slice-color:${color}"></i>
+          <strong>${escapeHtml(row.name)}</strong>
+          <span>${percent(share)}</span>
+        </div>`;
+    }).join("");
+  }
+
   function renderTransactions() {
     const query = els.transactionSearch.value.trim().toLowerCase();
     const rows = state.filteredTransactions.filter((item) => {
-      const haystack = `${item.pagador} ${item.atendente} ${item.valor} ${money(item.valor)} ${item.moedaOriginal} ${formatOriginalValue(item)}`.toLowerCase();
+      const haystack = `${item.pagador} ${item.atendente} ${item.produto} ${item.valor} ${money(item.valor)} ${item.moedaOriginal} ${formatOriginalValue(item)}`.toLowerCase();
       return haystack.includes(query);
     });
     const tbody = document.getElementById("transactionsBody");
@@ -1191,7 +1349,7 @@
   function getTotalPages() {
     const query = els.transactionSearch.value.trim().toLowerCase();
     const rows = state.filteredTransactions.filter((item) =>
-      `${item.pagador} ${item.atendente} ${item.valor} ${money(item.valor)} ${item.moedaOriginal} ${formatOriginalValue(item)}`.toLowerCase().includes(query)
+      `${item.pagador} ${item.atendente} ${item.produto} ${item.valor} ${money(item.valor)} ${item.moedaOriginal} ${formatOriginalValue(item)}`.toLowerCase().includes(query)
     );
     return Math.max(1, Math.ceil(rows.length / config.rowsPerPage));
   }
@@ -1407,16 +1565,32 @@
   }
 
   function getMetaForCurrentPeriod() {
-    if (state.appliedPeriod === "custom") return Object.assign({ spend: 0, leads: 0 }, state.customMeta || {});
-    return Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[state.appliedPeriod] || {});
+    const meta = state.appliedPeriod === "custom"
+      ? Object.assign({ spend: 0, leads: 0 }, state.customMeta || {})
+      : Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[state.appliedPeriod] || {});
+    return applyAccountFilterToMeta(meta);
   }
 
   function getTotalSpendForPeriod(period) {
-    const meta = period === "custom"
+    const meta = applyAccountFilterToMeta(period === "custom"
       ? Object.assign({ spend: 0, leads: 0 }, state.customMeta || {})
-      : Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[period] || {});
+      : Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[period] || {}));
     const ads = Number(meta.spend || 0);
     return ads + ads * Number(config.metaTaxRate || 0);
+  }
+
+  function applyAccountFilterToMeta(meta) {
+    const selected = state.filters.account;
+    if (!selected || selected === "all") return meta;
+    const accounts = Array.isArray(meta.accountBreakdown) ? meta.accountBreakdown : [];
+    const account = accounts.find((item) => String(item.id || item.account || "") === selected);
+    if (!account) return Object.assign({}, meta, { spend: 0, leads: 0 });
+    return Object.assign({}, meta, {
+      spend: Number(account.spend || 0),
+      leads: Number(account.leads || 0),
+      conversations: Number(account.conversations || 0),
+      accountBreakdown: [account]
+    });
   }
 
   function getPreloadRange() {
