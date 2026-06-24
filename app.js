@@ -43,8 +43,11 @@
     transactionSearch: document.getElementById("transactionSearch"),
     manualSaleForm: document.getElementById("manualSaleForm"),
     manualSaleValue: document.getElementById("manualSaleValue"),
+    manualSaleCurrency: document.getElementById("manualSaleCurrency"),
     manualSalePayer: document.getElementById("manualSalePayer"),
     manualSaleAttendant: document.getElementById("manualSaleAttendant"),
+    manualSaleDate: document.getElementById("manualSaleDate"),
+    manualSaleTime: document.getElementById("manualSaleTime"),
     manualSaleSubmit: document.getElementById("manualSaleSubmit"),
     dashboardAttendantFilter: document.getElementById("dashboardAttendantFilter"),
     dashboardProductFilter: document.getElementById("dashboardProductFilter"),
@@ -365,15 +368,21 @@
       return;
     }
     const now = new Date();
+    const manualDate = els.manualSaleDate ? els.manualSaleDate.value : "";
+    const manualTime = els.manualSaleTime ? els.manualSaleTime.value : "";
+    const saleTimestamp = manualDate
+      ? parseLocalDateTime(manualDate, manualTime || formatTime(now))
+      : now;
+    const currency = normalizeCurrency(els.manualSaleCurrency ? els.manualSaleCurrency.value : "BRL");
     const payload = new FormData();
     payload.set("origem", "Manual");
     payload.set("action", "manualSale");
-    payload.set("moeda", "BRL");
+    payload.set("moeda", currency);
     payload.set("valor", String(value).replace(".", ","));
     payload.set("pagador", els.manualSalePayer.value.trim() || "Venda manual");
     payload.set("atendente", els.manualSaleAttendant.value || "Sem atendente");
-    payload.set("timestamp", now.toISOString());
-    payload.set("transaction_id", `manual-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`);
+    payload.set("timestamp", saleTimestamp.toISOString());
+    payload.set("transaction_id", `manual-${saleTimestamp.getTime()}-${Math.random().toString(36).slice(2, 8)}`);
     payload.set("mutation_id", createMutationId("manual"));
 
     setManualSaleLoading(true);
@@ -655,8 +664,8 @@
   function render() {
     renderPeriodControls();
     renderManualSaleOptions();
-    renderDashboardFilters();
     state.filteredTransactions = getFilteredTransactions();
+    renderDashboardFilters();
     state.dashboardTransactions = getDashboardTransactions();
     state.meta = getMetaForCurrentPeriod();
     state.metrics = computeMetrics(state.dashboardTransactions);
@@ -697,6 +706,7 @@
   }
 
   function renderDashboardFilters() {
+    const meta = getRawMetaForCurrentPeriod();
     setFilterOptions(
       els.dashboardAttendantFilter,
       [{ value: "all", label: "Todos" }].concat(getUniqueTransactionValues("atendente", "Sem atendente")),
@@ -709,7 +719,7 @@
     );
     setFilterOptions(
       els.dashboardAccountFilter,
-      [{ value: "all", label: "Todas" }].concat(getAccountFilterOptions()),
+      [{ value: "all", label: "Todas" }].concat(getAccountFilterOptions(meta)),
       state.filters.account
     );
   }
@@ -730,7 +740,7 @@
 
   function getUniqueTransactionValues(field, fallback) {
     const map = new Map();
-    state.transactions.forEach((item) => {
+    state.filteredTransactions.forEach((item) => {
       const label = String(item[field] || fallback).trim() || fallback;
       const key = normalizeFilterValue(label);
       if (!map.has(key)) map.set(key, { value: key, label });
@@ -738,14 +748,12 @@
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }
 
-  function getAccountFilterOptions() {
+  function getAccountFilterOptions(meta) {
     const map = new Map();
-    Object.values(state.metaByPeriod || {}).concat(state.customMeta || []).forEach((meta) => {
-      (meta && Array.isArray(meta.accountBreakdown) ? meta.accountBreakdown : []).forEach((account) => {
-        const id = String(account.id || account.account || "").trim();
-        if (!id) return;
-        map.set(id, { value: id, label: account.label || account.name || id });
-      });
+    (meta && Array.isArray(meta.accountBreakdown) ? meta.accountBreakdown : []).forEach((account) => {
+      const id = String(account.id || account.account || "").trim();
+      if (!id || (Number(account.spend || 0) <= 0 && Number(account.leads || 0) <= 0)) return;
+      map.set(id, { value: id, label: account.label || account.name || id });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }
@@ -1095,6 +1103,7 @@
       });
       return {
         index,
+        key: label.key,
         label: label.short,
         fullLabel: label.full,
         sales: sales.length,
@@ -1126,9 +1135,8 @@
   }
 
   function addProfitToSeries(series, period) {
-    const pointCost = series.length ? getTotalSpendForPeriod(period) / series.length : 0;
     return series.map((point) => Object.assign({}, point, {
-      profit: point.revenue - pointCost
+      profit: point.revenue - getTotalSpendForDate(period, point.key)
     }));
   }
 
@@ -1565,10 +1573,7 @@
   }
 
   function getMetaForCurrentPeriod() {
-    const meta = state.appliedPeriod === "custom"
-      ? Object.assign({ spend: 0, leads: 0 }, state.customMeta || {})
-      : Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[state.appliedPeriod] || {});
-    return applyAccountFilterToMeta(meta);
+    return applyAccountFilterToMeta(getRawMetaForCurrentPeriod());
   }
 
   function getTotalSpendForPeriod(period) {
@@ -1576,6 +1581,21 @@
       ? Object.assign({ spend: 0, leads: 0 }, state.customMeta || {})
       : Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[period] || {}));
     const ads = Number(meta.spend || 0);
+    return ads + ads * Number(config.metaTaxRate || 0);
+  }
+
+  function getRawMetaForCurrentPeriod() {
+    return state.appliedPeriod === "custom"
+      ? Object.assign({ spend: 0, leads: 0, daily: [] }, state.customMeta || {})
+      : Object.assign({ spend: 0, leads: 0, daily: [] }, state.metaByPeriod[state.appliedPeriod] || {});
+  }
+
+  function getTotalSpendForDate(period, dateKey) {
+    const meta = applyAccountFilterToMeta(period === "custom"
+      ? Object.assign({ spend: 0, leads: 0, daily: [] }, state.customMeta || {})
+      : Object.assign({ spend: 0, leads: 0, daily: [] }, state.metaByPeriod[period] || {}));
+    const day = (Array.isArray(meta.daily) ? meta.daily : []).find((item) => item.date === dateKey);
+    const ads = Number(day ? day.spend || 0 : 0);
     return ads + ads * Number(config.metaTaxRate || 0);
   }
 
@@ -1589,6 +1609,7 @@
       spend: Number(account.spend || 0),
       leads: Number(account.leads || 0),
       conversations: Number(account.conversations || 0),
+      daily: Array.isArray(account.daily) ? account.daily : [],
       accountBreakdown: [account]
     });
   }

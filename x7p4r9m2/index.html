@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=70">
+    <link rel="stylesheet" href="../styles.css?v=71">
   </head>
   <body>
     <div class="app-shell">
@@ -244,6 +244,16 @@
                 <input id="manualSaleValue" type="text" inputmode="decimal" placeholder="R$ 0,00" autocomplete="off" required>
               </label>
               <label>
+                <span>Moeda</span>
+                <select id="manualSaleCurrency">
+                  <option value="BRL">BRL</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="CHF">CHF</option>
+                </select>
+              </label>
+              <label>
                 <span>Pagador</span>
                 <input id="manualSalePayer" type="text" placeholder="Nome do pagador" autocomplete="off">
               </label>
@@ -252,6 +262,14 @@
                 <select id="manualSaleAttendant">
                   <option value="Sem atendente">Sem atendente</option>
                 </select>
+              </label>
+              <label>
+                <span>Data</span>
+                <input id="manualSaleDate" type="date" title="Deixe em branco para usar a data atual">
+              </label>
+              <label>
+                <span>Hora</span>
+                <input id="manualSaleTime" type="time" title="Deixe em branco para usar a hora atual">
               </label>
               <button id="manualSaleSubmit" type="submit">Adicionar venda</button>
             </form>
@@ -396,7 +414,7 @@
     </div>
     <script src="../config.js?v=55"></script>
     <script src="../push-client.js?v=63"></script>
-    <script src="../app.js?v=80"></script>
+    <script src="../app.js?v=81"></script>
   </body>
 </html>
 

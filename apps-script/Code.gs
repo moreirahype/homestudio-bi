@@ -1038,6 +1038,7 @@ function readMetaInsights_(from, to, includeActions) {
   const actions = [];
   const errors = [];
   const accountBreakdown = [];
+  const dailyTotals = {};
 
   accounts.forEach((account) => {
     const adAccount = account.indexOf('act_') === 0 ? account : 'act_' + account;
@@ -1046,8 +1047,9 @@ function readMetaInsights_(from, to, includeActions) {
       version +
       '/' +
       adAccount +
-      '/insights?level=account&fields=spend,actions&time_range=' +
+      '/insights?level=account&fields=spend,actions,date_start,date_stop&time_range=' +
       timeRange +
+      '&time_increment=1' +
       '&access_token=' +
       encodeURIComponent(token);
     const payload = fetchMetaAccountInsights_(url, adAccount);
@@ -1055,10 +1057,37 @@ function readMetaInsights_(from, to, includeActions) {
       errors.push({ account: adAccount, error: payload.error });
       return;
     }
-    const first = payload.data.data && payload.data.data[0] ? payload.data.data[0] : {};
-    const accountActions = first.actions || [];
-    const accountSpend = parseNumber_(first.spend || 0);
-    const accountLeads = countLeads_(accountActions);
+    const rows = payload.data.data || [];
+    let accountSpend = 0;
+    let accountLeads = 0;
+    const accountDaily = [];
+    rows.forEach((row) => {
+      const date = row.date_start || row.date_stop || '';
+      const rowActions = row.actions || [];
+      const rowSpend = parseNumber_(row.spend || 0);
+      const rowLeads = countLeads_(rowActions);
+      accountSpend += rowSpend;
+      accountLeads += rowLeads;
+      if (date) {
+        accountDaily.push({
+          date: date,
+          spend: roundCurrency_(rowSpend),
+          leads: rowLeads
+        });
+        const total = dailyTotals[date] || { date: date, spend: 0, leads: 0 };
+        total.spend += rowSpend;
+        total.leads += rowLeads;
+        dailyTotals[date] = total;
+      }
+      if (includeActions) {
+        rowActions.forEach((action) => actions.push({
+          account: adAccount,
+          date: date,
+          action_type: action.action_type,
+          value: action.value
+        }));
+      }
+    });
     result.spend += accountSpend;
     result.leads += accountLeads;
     accountBreakdown.push({
@@ -1066,20 +1095,21 @@ function readMetaInsights_(from, to, includeActions) {
       account: adAccount,
       label: adAccount,
       spend: roundCurrency_(accountSpend),
-      leads: accountLeads
+      leads: accountLeads,
+      daily: accountDaily
     });
-    if (includeActions) {
-      accountActions.forEach((action) => actions.push({
-        account: adAccount,
-        action_type: action.action_type,
-        value: action.value
-      }));
-    }
   });
 
   result.spend = roundCurrency_(result.spend);
   result.accounts = accounts;
   result.accountBreakdown = accountBreakdown;
+  result.daily = Object.keys(dailyTotals)
+    .sort()
+    .map((date) => ({
+      date: date,
+      spend: roundCurrency_(dailyTotals[date].spend),
+      leads: dailyTotals[date].leads
+    }));
   if (errors.length) result.errors = errors;
   if (includeActions) {
     result.actions = actions;
