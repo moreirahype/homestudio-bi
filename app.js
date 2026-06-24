@@ -434,37 +434,8 @@
     } catch (error) {
       throw new Error("Falha de rede ao enviar a operacao. Confira sua conexao e tente novamente.");
     }
-    const result = await waitForMutationResult(mutationId);
-    if (!result || result.pending) {
-      return { ok: true, unconfirmed: true };
-    }
-    if (!result.ok) {
-      throw new Error(result.error || "A API recusou a operacao.");
-    }
-    return result;
-  }
-
-  async function waitForMutationResult(mutationId) {
-    const startedAt = Date.now();
-    let interval = 250;
-    while (Date.now() - startedAt < 30000) {
-      try {
-        const result = await fetchMutationStatus(mutationId);
-        if (result && !result.pending) return result;
-      } catch (error) {
-        console.warn("Falha ao confirmar mutacao", error);
-      }
-      await delay(interval);
-      interval = Math.min(interval + 150, 1000);
-    }
-    return { ok: false, pending: true };
-  }
-
-  function fetchMutationStatus(mutationId) {
-    const url = new URL(config.apiUrl);
-    url.searchParams.set("action", "mutationStatus");
-    url.searchParams.set("mutation_id", mutationId);
-    return fetchJsonp(url);
+    await delay(900);
+    return { ok: true, mutation_id: mutationId };
   }
 
   function createMutationId(prefix) {
