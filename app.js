@@ -1000,7 +1000,7 @@
 
   function buildHourlySeries() {
     const labels = buildHourLabels();
-    return labels.map((label, index) => {
+    const series = labels.map((label, index) => {
       const sales = state.filteredTransactions.filter((item) => {
         return item.timestamp.getHours() === index;
       });
@@ -1012,11 +1012,13 @@
         revenue: sum(sales.map((item) => item.valor))
       };
     });
+    return addProfitToSeries(series, state.appliedPeriod);
   }
 
   function buildDailySeries() {
-    const range = getDateRange(getDailyChartPeriod());
-    return buildDayLabels(range.start, range.end).map((label, index) => {
+    const period = getDailyChartPeriod();
+    const range = getDateRange(period);
+    const series = buildDayLabels(range.start, range.end).map((label, index) => {
       const sales = state.transactions.filter((item) => {
         return item.timestamp >= startOfDay(range.start)
           && item.timestamp <= endOfDay(range.end)
@@ -1030,6 +1032,14 @@
         revenue: sum(sales.map((item) => item.valor))
       };
     });
+    return addProfitToSeries(series, period);
+  }
+
+  function addProfitToSeries(series, period) {
+    const pointCost = series.length ? getTotalSpendForPeriod(period) / series.length : 0;
+    return series.map((point) => Object.assign({}, point, {
+      profit: point.revenue - pointCost
+    }));
   }
 
   function getDailyChartPeriod() {
@@ -1048,7 +1058,7 @@
     tooltip.hidden = false;
     tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
     tooltip.style.top = `${Math.max(52, y - 8)}px`;
-    tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}`;
+    tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}<br>Lucro: ${money(point.profit || 0)}`;
   }
 
   function hideTooltip(tooltip) {
@@ -1399,6 +1409,14 @@
   function getMetaForCurrentPeriod() {
     if (state.appliedPeriod === "custom") return Object.assign({ spend: 0, leads: 0 }, state.customMeta || {});
     return Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[state.appliedPeriod] || {});
+  }
+
+  function getTotalSpendForPeriod(period) {
+    const meta = period === "custom"
+      ? Object.assign({ spend: 0, leads: 0 }, state.customMeta || {})
+      : Object.assign({ spend: 0, leads: 0 }, state.metaByPeriod[period] || {});
+    const ads = Number(meta.spend || 0);
+    return ads + ads * Number(config.metaTaxRate || 0);
   }
 
   function getPreloadRange() {
