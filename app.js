@@ -1606,7 +1606,8 @@
       : Object.assign({ spend: 0, leads: 0, daily: [] }, state.metaByPeriod[period] || {}));
     const daily = Array.isArray(meta.daily) ? meta.daily : [];
     if (!daily.length && Number(meta.spend || 0) > 0) return null;
-    const day = daily.find((item) => item.date === dateKey);
+    const day = daily.find((item) => String(item.date || "").slice(0, 10) === dateKey);
+    if (!day && Number(meta.spend || 0) > 0) return null;
     const ads = Number(day ? day.spend || 0 : 0);
     const totalSpend = ads + ads * Number(config.metaTaxRate || 0);
     return Number(revenue || 0) - totalSpend;
