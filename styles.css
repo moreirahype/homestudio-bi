@@ -36,6 +36,12 @@
   font-family: var(--font-ui);
 }
 
+@property --donut-reveal {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 360deg;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -968,16 +974,19 @@ tr:hover .transaction-edit-button,
 }
 
 .product-donut {
+  --donut-reveal: 360deg;
   position: relative;
   width: min(240px, 58vw);
   aspect-ratio: 1;
   border-radius: 50%;
   background: conic-gradient(var(--accent) 0 100%);
+  -webkit-mask: conic-gradient(#000 0 var(--donut-reveal), transparent var(--donut-reveal) 360deg);
+  mask: conic-gradient(#000 0 var(--donut-reveal), transparent var(--donut-reveal) 360deg);
   box-shadow: inset 0 0 0 1px rgba(159, 232, 112, 0.1), 0 18px 34px rgba(0, 0, 0, 0.22);
 }
 
 .product-donut.is-animating {
-  animation: productDonutIn 760ms cubic-bezier(.2,.78,.2,1) both;
+  animation: productDonutSweep 860ms cubic-bezier(.2,.78,.2,1) both;
 }
 
 .product-donut::after {
@@ -1026,14 +1035,14 @@ tr:hover .transaction-edit-button,
   animation-delay: var(--row-delay, 0ms);
 }
 
-@keyframes productDonutIn {
+@keyframes productDonutSweep {
   from {
-    opacity: 0;
-    transform: scale(.86) rotate(-10deg);
+    --donut-reveal: 2deg;
+    opacity: .74;
   }
   to {
+    --donut-reveal: 360deg;
     opacity: 1;
-    transform: scale(1) rotate(0);
   }
 }
 
