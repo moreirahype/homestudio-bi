@@ -1136,7 +1136,7 @@
 
   function addProfitToSeries(series, period) {
     return series.map((point) => Object.assign({}, point, {
-      profit: point.revenue - getTotalSpendForDate(period, point.key)
+      profit: getProfitForDate(period, point.key, point.revenue)
     }));
   }
 
@@ -1156,7 +1156,7 @@
     tooltip.hidden = false;
     tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
     tooltip.style.top = `${Math.max(52, y - 8)}px`;
-    const profitLine = Number.isFinite(Number(point.profit)) ? `<br>Lucro: ${money(point.profit)}` : "";
+    const profitLine = point.profit != null && Number.isFinite(Number(point.profit)) ? `<br>Lucro: ${money(point.profit)}` : "";
     tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}${profitLine}`;
   }
 
@@ -1597,6 +1597,23 @@
     const day = (Array.isArray(meta.daily) ? meta.daily : []).find((item) => item.date === dateKey);
     const ads = Number(day ? day.spend || 0 : 0);
     return ads + ads * Number(config.metaTaxRate || 0);
+  }
+
+  function getProfitForDate(period, dateKey, revenue) {
+    if (hasSalesDimensionFilter()) return null;
+    const meta = applyAccountFilterToMeta(period === "custom"
+      ? Object.assign({ spend: 0, leads: 0, daily: [] }, state.customMeta || {})
+      : Object.assign({ spend: 0, leads: 0, daily: [] }, state.metaByPeriod[period] || {}));
+    const daily = Array.isArray(meta.daily) ? meta.daily : [];
+    if (!daily.length && Number(meta.spend || 0) > 0) return null;
+    const day = daily.find((item) => item.date === dateKey);
+    const ads = Number(day ? day.spend || 0 : 0);
+    const totalSpend = ads + ads * Number(config.metaTaxRate || 0);
+    return Number(revenue || 0) - totalSpend;
+  }
+
+  function hasSalesDimensionFilter() {
+    return state.filters.attendant !== "all" || state.filters.product !== "all";
   }
 
   function applyAccountFilterToMeta(meta) {
