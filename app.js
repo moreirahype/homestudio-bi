@@ -293,13 +293,23 @@
     url.searchParams.set("action", "meta");
     url.searchParams.set("from", toIsoDate(range.start));
     url.searchParams.set("to", toIsoDate(range.end));
-    try {
-      const response = await fetch(url.toString(), { cache: "no-store" });
-      if (!response.ok) throw new Error(`API respondeu ${response.status}`);
-      return response.json();
-    } catch (error) {
-      return fetchJsonp(url);
+    let lastPayload = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(url.toString(), { cache: "no-store" });
+        if (!response.ok) throw new Error(`API respondeu ${response.status}`);
+        lastPayload = await response.json();
+      } catch (error) {
+        try {
+          lastPayload = await fetchJsonp(url);
+        } catch (jsonpError) {
+          lastPayload = { spend: 0, leads: 0, errors: [{ error: jsonpError.message || String(jsonpError) }] };
+        }
+      }
+      if (!Array.isArray(lastPayload.errors) || !lastPayload.errors.length) return lastPayload;
+      await delay(350 * (attempt + 1));
     }
+    return lastPayload || buildEmptyPayload().meta;
   }
 
   async function loadCustomPeriodData() {

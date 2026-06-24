@@ -119,7 +119,7 @@ function doPost(e) {
       appendDebugLog_('push_error', payload, { audience: 'owner', kind: 'sale', error: String(error) });
     }
   }
-  if (inserted && normalizePersonName_(row[8]) === normalizePersonName_('Sheila')) {
+  if (inserted && isSheilaAttendant_(row[8])) {
     try {
       sendPushRequest_({
         audience: 'sheila',
@@ -762,8 +762,7 @@ function normalizeGoalCell_(header, value) {
 }
 
 function getAttendantConfigByName_(name) {
-  const normalizedName = normalizePersonName_(name);
-  return readAttendantConfigs_().find((item) => normalizePersonName_(item.nome) === normalizedName) || null;
+  return readAttendantConfigs_().find((item) => attendantNameMatches_(name, item)) || null;
 }
 
 function getAttendantConfigBySlug_(slug) {
@@ -771,12 +770,26 @@ function getAttendantConfigBySlug_(slug) {
   return readAttendantConfigs_().find((item) => String(item.slug || '').trim() === normalizedSlug) || null;
 }
 
+function attendantNameMatches_(name, config) {
+  const normalizedName = normalizePersonName_(name);
+  const normalizedConfigName = normalizePersonName_(config && config.nome);
+  return Boolean(normalizedName && normalizedConfigName && (
+    normalizedName === normalizedConfigName ||
+    normalizedName.indexOf(normalizedConfigName) > -1
+  ));
+}
+
+function isSheilaAttendant_(name) {
+  const sheila = getAttendantConfigBySlug_('k9v2m7q4') || { nome: 'Sheila' };
+  return attendantNameMatches_(name, sheila);
+}
+
 function readAttendantData_(slug, from, to) {
   const config = getAttendantConfigBySlug_(slug);
   if (!config) return { ok: false, error: 'Atendente não encontrada.', attendant: null, transactions: [] };
   const goals = readGoalsForSlug_(slug);
   const effectiveFrom = getEarliestGoalStart_(goals, from);
-  const transactions = readTransactions_(effectiveFrom, to).filter((item) => normalizePersonName_(item.atendente) === normalizePersonName_(config.nome));
+  const transactions = readTransactions_(effectiveFrom, to).filter((item) => attendantNameMatches_(item.atendente, config));
   return {
     ok: true,
     attendant: config,
@@ -894,36 +907,50 @@ function readMetaInsights_(from, to, includeActions) {
       timeRange +
       '&access_token=' +
       encodeURIComponent(token);
-    try {
-      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-      const data = JSON.parse(response.getContentText());
-      if (response.getResponseCode() >= 400 || data.error) {
-        errors.push({ account: adAccount, error: data.error || response.getContentText() });
-        return;
-      }
-      const first = data.data && data.data[0] ? data.data[0] : {};
-      const accountActions = first.actions || [];
-      result.spend += parseNumber_(first.spend || 0);
-      result.leads += countLeads_(accountActions);
-      if (includeActions) {
-        accountActions.forEach((action) => actions.push({
-          account: adAccount,
-          action_type: action.action_type,
-          value: action.value
-        }));
-      }
-    } catch (error) {
-      errors.push({ account: adAccount, error: String(error) });
+    const payload = fetchMetaAccountInsights_(url, adAccount);
+    if (!payload.ok) {
+      errors.push({ account: adAccount, error: payload.error });
+      return;
+    }
+    const first = payload.data.data && payload.data.data[0] ? payload.data.data[0] : {};
+    const accountActions = first.actions || [];
+    result.spend += parseNumber_(first.spend || 0);
+    result.leads += countLeads_(accountActions);
+    if (includeActions) {
+      accountActions.forEach((action) => actions.push({
+        account: adAccount,
+        action_type: action.action_type,
+        value: action.value
+      }));
     }
   });
 
   result.spend = roundCurrency_(result.spend);
+  result.accounts = accounts;
+  if (errors.length) result.errors = errors;
   if (includeActions) {
     result.actions = actions;
-    result.accounts = accounts;
-    if (errors.length) result.errors = errors;
   }
   return result;
+}
+
+function fetchMetaAccountInsights_(url, adAccount) {
+  let lastError = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      const text = response.getContentText();
+      const data = JSON.parse(text);
+      if (response.getResponseCode() < 400 && !data.error) {
+        return { ok: true, data: data };
+      }
+      lastError = JSON.stringify(data.error || text);
+    } catch (error) {
+      lastError = String(error);
+    }
+    Utilities.sleep(300 * (attempt + 1));
+  }
+  return { ok: false, account: adAccount, error: lastError || 'Falha ao buscar conta Meta.' };
 }
 
 function getMetaAdAccounts_(properties) {
