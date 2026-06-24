@@ -578,6 +578,15 @@ h2 {
   color: var(--text);
 }
 
+.tooltip-line {
+  display: block;
+  white-space: nowrap;
+}
+
+.tooltip-line b {
+  font-weight: var(--weight-bold);
+}
+
 .table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -901,6 +910,40 @@ tr:hover .transaction-edit-button,
   background: linear-gradient(90deg, #9eed6d, #d4ff90);
 }
 
+.bar-row .bar-fill {
+  animation: attendantBarIn 620ms cubic-bezier(.2,.78,.2,1) both;
+  animation-delay: var(--row-delay, 0ms);
+  transform-origin: left center;
+}
+
+.bar-row > strong,
+.bar-row > span {
+  animation: attendantTextIn 520ms ease both;
+  animation-delay: var(--row-delay, 0ms);
+}
+
+@keyframes attendantBarIn {
+  from {
+    opacity: 0;
+    transform: scaleX(.04);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes attendantTextIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .attendants-total-row td {
   color: var(--text);
   font-weight: var(--weight-bold);
@@ -931,6 +974,10 @@ tr:hover .transaction-edit-button,
   border-radius: 50%;
   background: conic-gradient(var(--accent) 0 100%);
   box-shadow: inset 0 0 0 1px rgba(159, 232, 112, 0.1), 0 18px 34px rgba(0, 0, 0, 0.22);
+}
+
+.product-donut.is-animating {
+  animation: productDonutIn 760ms cubic-bezier(.2,.78,.2,1) both;
 }
 
 .product-donut::after {
@@ -972,6 +1019,43 @@ tr:hover .transaction-edit-button,
   font-weight: var(--weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.product-legend-item {
+  animation: productLegendIn 520ms ease both;
+  animation-delay: var(--row-delay, 0ms);
+}
+
+@keyframes productDonutIn {
+  from {
+    opacity: 0;
+    transform: scale(.86) rotate(-10deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes productLegendIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-row .bar-fill,
+  .bar-row > strong,
+  .bar-row > span,
+  .product-donut.is-animating,
+  .product-legend-item {
+    animation: none;
+  }
 }
 
 .notifications-page-title {

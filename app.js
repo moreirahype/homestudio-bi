@@ -1135,8 +1135,10 @@
   }
 
   function addProfitToSeries(series, period) {
+    const totalRevenue = sum(series.map((point) => point.revenue));
+    const fallbackSpend = getTotalSpendForPeriod(period);
     return series.map((point) => Object.assign({}, point, {
-      profit: getProfitForDate(period, point.key, point.revenue)
+      profit: getProfitForDate(period, point.key, point.revenue, totalRevenue, fallbackSpend)
     }));
   }
 
@@ -1156,8 +1158,15 @@
     tooltip.hidden = false;
     tooltip.style.left = `${Math.max(72, Math.min(wrap.width - 72, x))}px`;
     tooltip.style.top = `${Math.max(52, y - 8)}px`;
-    const profitLine = point.profit != null && Number.isFinite(Number(point.profit)) ? `<br>Lucro: ${money(point.profit)}` : "";
-    tooltip.innerHTML = `<strong>${point.fullLabel}</strong>Vendas: ${point.sales}<br>Faturamento: ${money(point.revenue)}${profitLine}`;
+    const profitLine = point.profit != null && Number.isFinite(Number(point.profit))
+      ? `<span class="tooltip-line"><b>Lucro:</b> ${money(point.profit)}</span>`
+      : "";
+    tooltip.innerHTML = `
+      <strong>${point.fullLabel}</strong>
+      <span class="tooltip-line"><b>Vendas:</b> ${integer(point.sales)}</span>
+      <span class="tooltip-line"><b>Faturamento:</b> ${money(point.revenue)}</span>
+      ${profitLine}
+    `;
   }
 
   function hideTooltip(tooltip) {
@@ -1224,10 +1233,10 @@
     const totalRevenue = sum(rows.map((row) => row.revenue));
     chart.innerHTML = rows
       .map(
-        (row) => {
+        (row, index) => {
           const revenueShare = totalRevenue > 0 ? row.revenue / totalRevenue : 0;
           return `
-          <div class="bar-row">
+          <div class="bar-row" style="--row-delay:${Math.min(index * 55, 420)}ms">
             <strong>${escapeHtml(row.name)}</strong>
             <div class="bar-track"><div class="bar-fill" style="--bar-width:${Math.max(4, (row.revenue / max) * 100)}%"></div></div>
             <span>${money(row.revenue)} · ${integer(row.sales)} vendas</span>
@@ -1286,6 +1295,7 @@
     if (!rows.length || totalRevenue <= 0) {
       donut.style.background = "conic-gradient(rgba(159,232,112,.18) 0 100%)";
       legend.innerHTML = `<div class="product-legend-item"><i style="--slice-color:rgba(159,232,112,.28)"></i><strong>Sem produtos</strong><span>0%</span></div>`;
+      restartElementAnimation(donut, "is-animating");
       return;
     }
     let cursor = 0;
@@ -1297,16 +1307,24 @@
       return `${color} ${start}% ${cursor}%`;
     });
     donut.style.background = `conic-gradient(${segments.join(", ")})`;
+    restartElementAnimation(donut, "is-animating");
     legend.innerHTML = rows.slice(0, 7).map((row, index) => {
       const share = row.revenue / totalRevenue;
       const color = productChartColors[index % productChartColors.length];
       return `
-        <div class="product-legend-item">
+        <div class="product-legend-item" style="--row-delay:${Math.min(index * 55, 420)}ms">
           <i style="--slice-color:${color}"></i>
           <strong>${escapeHtml(row.name)}</strong>
           <span>${percent(share)}</span>
         </div>`;
     }).join("");
+  }
+
+  function restartElementAnimation(element, className) {
+    if (!element || !canAnimateDashboard()) return;
+    element.classList.remove(className);
+    void element.offsetWidth;
+    element.classList.add(className);
   }
 
   function renderTransactions() {
@@ -1599,15 +1617,17 @@
     return ads + ads * Number(config.metaTaxRate || 0);
   }
 
-  function getProfitForDate(period, dateKey, revenue) {
+  function getProfitForDate(period, dateKey, revenue, periodRevenue, fallbackSpend) {
     if (hasSalesDimensionFilter()) return null;
     const meta = applyAccountFilterToMeta(period === "custom"
       ? Object.assign({ spend: 0, leads: 0, daily: [] }, state.customMeta || {})
       : Object.assign({ spend: 0, leads: 0, daily: [] }, state.metaByPeriod[period] || {}));
     const daily = Array.isArray(meta.daily) ? meta.daily : [];
-    if (!daily.length && Number(meta.spend || 0) > 0) return null;
     const day = daily.find((item) => String(item.date || "").slice(0, 10) === dateKey);
-    if (!day && Number(meta.spend || 0) > 0) return null;
+    if (!day && Number(meta.spend || 0) > 0) {
+      const share = Number(periodRevenue || 0) > 0 ? Number(revenue || 0) / Number(periodRevenue || 0) : 0;
+      return Number(revenue || 0) - Number(fallbackSpend || 0) * share;
+    }
     const ads = Number(day ? day.spend || 0 : 0);
     const totalSpend = ads + ads * Number(config.metaTaxRate || 0);
     return Number(revenue || 0) - totalSpend;
