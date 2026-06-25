@@ -15,6 +15,8 @@
     customRange: null,
     transactions: [],
     costs: [],
+    attendantConfigs: [],
+    goalConfigs: [],
     metaByPeriod: {},
     customMeta: null,
     meta: { spend: 0, leads: 0 },
@@ -306,6 +308,8 @@
       );
       state.transactions = payload.transactions.map(normalizeTransaction);
       state.costs = normalizeCosts(payload.costs);
+      state.attendantConfigs = normalizeAttendantConfigs(payload.attendants);
+      state.goalConfigs = normalizeGoalConfigs(payload.goals);
       state.manualSaleOptions = normalizeManualSaleOptions(payload.manualSaleOptions);
       state.loadedTransactionRange = range;
       state.metaByPeriod = Object.fromEntries(metaEntries);
@@ -320,6 +324,8 @@
       state.transactions = fallback.transactions.map(normalizeTransaction);
       state.costs = normalizeCosts(fallback.costs);
       state.manualSaleOptions = normalizeManualSaleOptions(fallback.manualSaleOptions);
+      state.attendantConfigs = normalizeAttendantConfigs(fallback.attendants);
+      state.goalConfigs = normalizeGoalConfigs(fallback.goals);
       state.loadedTransactionRange = getPreloadRange();
       state.metaByPeriod = Object.fromEntries(standardPeriods.map((period) => [period, fallback.meta]));
       state.customMeta = null;
@@ -414,7 +420,7 @@
     payload.set("action", "manualSale");
     payload.set("moeda", currency);
     payload.set("valor", String(value).replace(".", ","));
-    payload.set("pagador", els.manualSalePayer.value.trim() || "Venda manual");
+    payload.set("pagador", els.manualSalePayer.value.trim() || "Cliente manual");
     payload.set("atendente", els.manualSaleAttendant.value || "Sem atendente");
     payload.set("produto", els.manualSaleProduct ? els.manualSaleProduct.value || "" : "");
     payload.set("timestamp", saleTimestamp.toISOString());
@@ -463,7 +469,7 @@
     payload.set("id", id);
     payload.set("data", els.transactionEditDate.value);
     payload.set("hora", els.transactionEditTime.value);
-    payload.set("pagador", els.transactionEditPayer.value.trim() || "Sem pagador");
+    payload.set("pagador", els.transactionEditPayer.value.trim() || "Sem cliente");
     payload.set("telefone", els.transactionEditPhone ? els.transactionEditPhone.value.trim() : transaction.telefone || "");
     payload.set("atendente", els.transactionEditAttendant.value.trim() || "Sem atendente");
     payload.set("produto", els.transactionEditProduct ? els.transactionEditProduct.value || "" : transaction.produto || "");
@@ -543,7 +549,7 @@
       closeTransactionEditor();
       return;
     }
-    const label = `${transaction.pagador || "Sem pagador"} - ${money(transaction.valor || 0)}`;
+    const label = `${transaction.pagador || "Sem cliente"} - ${money(transaction.valor || 0)}`;
     if (!window.confirm(`Apagar esta transação?\n\n${label}`)) return;
     const payload = new FormData();
     payload.set("action", "deleteTransaction");
@@ -639,7 +645,7 @@
   }
 
   function buildEmptyPayload() {
-    return { transactions: [], manualSaleOptions: [], costs: [], meta: { spend: 0, leads: 0 } };
+    return { transactions: [], manualSaleOptions: [], costs: [], attendants: [], goals: [], meta: { spend: 0, leads: 0, conversations: 0 } };
   }
 
   function normalizeCosts(costs) {
@@ -654,6 +660,31 @@
       });
     });
     return map;
+  }
+
+  function normalizeAttendantConfigs(attendants) {
+    return (Array.isArray(attendants) ? attendants : [])
+      .map((item) => ({
+        slug: String(item.slug || "").trim(),
+        name: String(item.nome || item.name || "").trim(),
+        commission: parseMoneyValue(item.comissao_percentual || item.commission || 0),
+        salary: parseMoneyValue(item.salario_fixo_mensal || item.salary || 0),
+        start: String(item.inicio_trabalho || item.start || "").trim(),
+        pauses: String(item.pausas || item.pauses || "").trim()
+      }))
+      .filter((item) => item.name || item.slug);
+  }
+
+  function normalizeGoalConfigs(goals) {
+    return (Array.isArray(goals) ? goals : [])
+      .map((item) => ({
+        slug: String(item.slug || "").trim(),
+        title: String(item.meta_titulo || item.title || "Meta").trim(),
+        value: parseMoneyValue(item.meta_valor || item.value || 0),
+        prize: String(item.meta_premio || item.prize || "").trim(),
+        active: item.meta_ativa !== false && String(item.meta_ativa || "true").toLowerCase() !== "false"
+      }))
+      .filter((item) => item.slug || item.title);
   }
 
   function normalizeManualSaleOptions(options) {
@@ -687,7 +718,7 @@
       timestamp,
       data: displayDate || toIsoDate(timestamp),
       hora: displayTime || formatTime(timestamp),
-      pagador: item.pagador || item.payer || "Sem pagador",
+      pagador: item.pagador || item.payer || "Sem cliente",
       telefone: item.telefone || item.phone || "",
       moeda: "BRL",
       moedaOriginal: originalCurrency,
@@ -994,7 +1025,7 @@
     const phone = String(item.telefone || "").replace(/\D/g, "");
     if (phone) return `phone:${phone}`;
     const payer = normalizeSearchText(item.pagador).replace(/\s+/g, " ").trim();
-    return payer && payer !== "sem pagador" ? `payer:${payer}` : "";
+    return payer && payer !== "sem pagador" && payer !== "sem cliente" ? `payer:${payer}` : "";
   }
 
   function normalizeSearchText(value) {
@@ -1016,8 +1047,12 @@
       source.conversations,
       source.conversas,
       source.messaging_conversations,
+      source.messaging_conversation_started,
+      source.messaging_conversation_started_7d,
       source.onsite_conversion_messaging_conversation_started_7d,
-      source.omni_messaging_conversation_started_7d
+      source["onsite_conversion.messaging_conversation_started_7d"],
+      source.omni_messaging_conversation_started_7d,
+      source["omni_messaging_conversation_started_7d"]
     ];
     const value = candidates.find((item) => Number.isFinite(Number(item)) && Number(item) > 0);
     return value == null ? 0 : Number(value);
@@ -1466,7 +1501,7 @@
         ${segments.map((segment, index) => `
           <path
             class="product-slice"
-            d="${describeDonutSlice(50, 50, 44, 27, segment.start * 3.6, segment.end * 3.6)}"
+            d="${describeDonutSlice(50, 50, 44, 23, segment.start * 3.6, segment.end * 3.6)}"
             fill="${segment.color}"
             data-index="${index}"
             tabindex="0"
@@ -1540,9 +1575,29 @@
   }
 
   function renderSettingsPages() {
+    renderGoalSettings();
     renderLeadMetricOptions();
     renderFrontProductsSettings();
     renderManualSalePermissionSettings();
+  }
+
+  function renderGoalSettings() {
+    const list = document.getElementById("goalsSettingsList");
+    if (!list) return;
+    const goals = state.goalConfigs || [];
+    if (!goals.length) {
+      list.innerHTML = `<p class="settings-empty">Nenhuma meta cadastrada ainda.</p>`;
+      return;
+    }
+    list.innerHTML = goals.map((goal) => `
+      <div class="settings-table-row">
+        <span>${escapeHtml(goal.slug || "Sem slug")}</span>
+        <strong>${escapeHtml(goal.title)}</strong>
+        <span>${money(goal.value)}</span>
+        <span>${escapeHtml(goal.prize || "Sem prêmio")}</span>
+        <span class="settings-status ${goal.active ? "is-on" : ""}">${goal.active ? "Ativa" : "Inativa"}</span>
+      </div>
+    `).join("");
   }
 
   function renderLeadMetricOptions() {
@@ -1555,21 +1610,23 @@
 
   function renderFrontProductsSettings() {
     if (!els.frontProductsList) return;
-    const products = getProductSelectOptions("").filter((name) => name && name !== "Sem produto");
+    const products = getConfigProductRows();
     if (!products.length) {
       els.frontProductsList.innerHTML = `<p class="settings-empty">Nenhum produto cadastrado ainda.</p>`;
       return;
     }
     els.frontProductsList.innerHTML = products.map((product) => {
-      const key = normalizeFilterValue(product);
+      const key = normalizeFilterValue(product.name);
       return `
-        <label class="settings-check-row">
-          <span>${escapeHtml(product)}</span>
-          <span class="switch">
+        <div class="settings-table-row settings-product-row">
+          <strong>${escapeHtml(product.name)}</strong>
+          <span>${money(product.fixed)}</span>
+          <span>${percent(product.percent / 100)}</span>
+          <label class="switch" aria-label="Produto de front">
             <input type="checkbox" value="${escapeHtml(key)}" ${state.frontProducts.includes(key) ? "checked" : ""}>
             <span class="slider"></span>
-          </span>
-        </label>`;
+          </label>
+        </div>`;
     }).join("");
     els.frontProductsList.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", () => {
@@ -1583,21 +1640,25 @@
 
   function renderManualSalePermissionSettings() {
     if (!els.manualSaleAttendantsList) return;
-    const attendants = getAttendantSelectOptions("").filter((name) => name && name !== "Sem atendente");
+    const attendants = getConfigAttendantRows();
     if (!attendants.length) {
       els.manualSaleAttendantsList.innerHTML = `<p class="settings-empty">Nenhum atendente cadastrado ainda.</p>`;
       return;
     }
     els.manualSaleAttendantsList.innerHTML = attendants.map((attendant) => {
-      const key = normalizeFilterValue(attendant);
+      const key = normalizeFilterValue(attendant.name);
       return `
-        <label class="settings-check-row">
-          <span>${escapeHtml(attendant)}</span>
-          <span class="switch">
+        <div class="settings-table-row settings-attendant-row">
+          <strong>${escapeHtml(attendant.name)}</strong>
+          <span>${decimal(attendant.commission)}%</span>
+          <span>${money(attendant.salary)}</span>
+          <span>${attendant.start ? formatIsoDateBr(attendant.start) : "N/A"}</span>
+          <span>${escapeHtml(attendant.pauses || "Sem pausas")}</span>
+          <label class="switch" aria-label="Permitir venda manual">
             <input type="checkbox" value="${escapeHtml(key)}" ${state.manualSalePermissions.includes(key) ? "checked" : ""}>
             <span class="slider"></span>
-          </span>
-        </label>`;
+          </label>
+        </div>`;
     }).join("");
     els.manualSaleAttendantsList.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", () => {
@@ -1605,6 +1666,36 @@
         saveStringList("hsbi-manual-sale-attendants", state.manualSalePermissions);
       });
     });
+  }
+
+  function getConfigAttendantRows() {
+    const byName = new Map();
+    (state.attendantConfigs || []).forEach((item) => {
+      const name = item.name || item.slug;
+      if (!name || normalizeFilterValue(name) === "sem-atendente") return;
+      byName.set(normalizeFilterValue(name), Object.assign({ name }, item));
+    });
+    getAttendantSelectOptions("").forEach((name) => {
+      if (!name || name === "Sem atendente") return;
+      const key = normalizeFilterValue(name);
+      if (!byName.has(key)) byName.set(key, { name, commission: 0, salary: 0, start: "", pauses: "" });
+    });
+    return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }
+
+  function getConfigProductRows() {
+    const byName = new Map();
+    getProductSelectOptions("").forEach((name) => {
+      if (!name || name === "Sem produto") return;
+      byName.set(normalizeFilterValue(name), { name, fixed: 0, percent: 0 });
+    });
+    if (state.costs && state.costs.forEach) {
+      state.costs.forEach((cost, key) => {
+        const name = cost.product || key;
+        byName.set(key, { name, fixed: Number(cost.fixed || 0), percent: Number(cost.percent || 0) });
+      });
+    }
+    return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }
 
   function restartElementAnimation(element, className) {

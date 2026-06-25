@@ -288,7 +288,7 @@
       timestamp,
       data: data || toIsoDate(timestamp),
       hora: hora || formatTime(timestamp),
-      pagador: item.pagador || "Sem pagador",
+      pagador: item.pagador || "Sem cliente",
       telefone: item.telefone || item.phone || "",
       gross,
       commissionRate,
@@ -609,7 +609,7 @@
         timestamp,
         data: toIsoDate(timestamp),
         hora: "00:00",
-        pagador: "Lucas Moreira",
+      pagador: "Lucas Moreira",
         value: daily,
         gross: 0,
         commissionRate: 0

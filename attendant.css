@@ -164,8 +164,13 @@
   }
 
   .attendant-main #page-transactions table {
-    min-width: 0;
+    min-width: 560px;
     width: 100%;
+  }
+
+  .attendant-main #page-transactions .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .attendant-main #page-transactions th,
@@ -175,25 +180,31 @@
 
   .attendant-main #page-transactions th:nth-child(1),
   .attendant-main #page-transactions td:nth-child(1) {
-    width: 28%;
+    width: 22%;
   }
 
   .attendant-main #page-transactions th:nth-child(2),
   .attendant-main #page-transactions td:nth-child(2) {
-    width: 15%;
+    width: 14%;
   }
 
   .attendant-main #page-transactions th:nth-child(3),
   .attendant-main #page-transactions td:nth-child(3) {
-    width: 33%;
+    width: 34%;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .attendant-main #page-transactions th:nth-child(4),
   .attendant-main #page-transactions td:nth-child(4) {
-    width: 24%;
+    width: 16%;
+  }
+
+  .attendant-main #page-transactions th:nth-child(5),
+  .attendant-main #page-transactions td:nth-child(5) {
+    width: 14%;
     padding-right: 5px;
+    text-align: right;
   }
 
   .attendant-main #page-transactions th:nth-child(4),

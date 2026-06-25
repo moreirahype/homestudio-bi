@@ -26,6 +26,8 @@ function doGet(e) {
       transactions: readTransactions_(params.from, params.to),
       manualSaleOptions: readManualSaleOptions_(),
       costs: readCosts_(),
+      attendants: readAttendantConfigs_(),
+      goals: readGoalRows_(),
       meta: readMetaInsights_(params.from, params.to)
     }, params.callback);
   }
@@ -1212,9 +1214,14 @@ function countLeads_(actions) {
 function countConversations_(actions) {
   return actions.reduce((total, action) => {
     const type = String(action.action_type || '').toLowerCase();
-    if (type !== 'onsite_conversion.messaging_conversation_started_7d' &&
-        type !== 'omni_messaging_conversation_started_7d' &&
-        type !== 'messaging_conversation_started_7d') {
+    const isConversation =
+      type === 'onsite_conversion.messaging_conversation_started_7d' ||
+      type === 'omni_messaging_conversation_started_7d' ||
+      type === 'messaging_conversation_started_7d' ||
+      type === 'messaging_conversation_started' ||
+      type.indexOf('messaging_conversation_started') > -1 ||
+      type.indexOf('conversation_started') > -1;
+    if (!isConversation) {
       return total;
     }
     return total + parseNumber_(action.value || 0);
