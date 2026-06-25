@@ -1649,14 +1649,17 @@
       return;
     }
     list.innerHTML = goals.map((goal) => `
-      <div class="settings-table-row">
-        <span>${escapeHtml(goal.slug || "Sem slug")}</span>
-        <strong>${escapeHtml(goal.title)}</strong>
-        <span>${money(goal.value)}</span>
-        <span>${escapeHtml(goal.prize || "Sem prêmio")}</span>
-        <span class="settings-status ${goal.active ? "is-on" : ""}">${goal.active ? "Ativa" : "Inativa"}</span>
+      <div class="settings-table-row settings-goal-row">
+        <input data-goal-field="slug" value="${escapeHtml(goal.slug || "")}" aria-label="Slug">
+        <input data-goal-field="title" value="${escapeHtml(goal.title)}" aria-label="Meta">
+        <input data-goal-field="value" value="${escapeHtml(decimal(goal.value || 0))}" inputmode="decimal" aria-label="Valor">
+        <input data-goal-field="prize" value="${escapeHtml(goal.prize || "")}" aria-label="Prêmio">
+        <select data-goal-field="active" aria-label="Status">
+          <option value="TRUE" ${goal.active ? "selected" : ""}>Ativa</option>
+          <option value="FALSE" ${!goal.active ? "selected" : ""}>Inativa</option>
+        </select>
         <button class="settings-edit-button" type="button" data-settings-edit="goal" data-slug="${escapeHtml(goal.slug || "")}" data-title="${escapeHtml(goal.title)}" data-value="${escapeHtml(String(goal.value || 0))}" data-prize="${escapeHtml(goal.prize || "")}" data-active="${goal.active ? "true" : "false"}" aria-label="Editar meta ${escapeHtml(goal.title)}" title="Editar meta">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.8 8.7l-2.5-2.5zm15-11.3a.9.9 0 0 0 0-1.3L17.1 3a.9.9 0 0 0-1.3 0l-1.5 1.5 3.2 3.2z"></path></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path></svg>
         </button>
       </div>
     `).join("");
@@ -1682,21 +1685,21 @@
       const key = normalizeFilterValue(product.name);
       return `
         <div class="settings-table-row settings-product-row">
-          <strong>${escapeHtml(product.name)}</strong>
-          <span>${money(product.fixed)}</span>
-          <span>${percent(product.percent / 100)}</span>
+          <input data-product-field="name" value="${escapeHtml(product.name)}" readonly aria-label="Produto">
+          <input data-product-field="fixed" value="${escapeHtml(decimal(product.fixed || 0))}" inputmode="decimal" aria-label="Custo fixo">
+          <input data-product-field="percent" value="${escapeHtml(decimal(product.percent || 0))}" inputmode="decimal" aria-label="Custo percentual">
           <label class="switch" aria-label="Produto de front">
-            <input type="checkbox" value="${escapeHtml(key)}" ${state.frontProducts.includes(key) ? "checked" : ""}>
+            <input type="checkbox" data-front-toggle value="${escapeHtml(key)}" ${state.frontProducts.includes(key) ? "checked" : ""}>
             <span class="slider"></span>
           </label>
           <button class="settings-edit-button" type="button" data-settings-edit="product" data-name="${escapeHtml(product.name)}" data-fixed="${escapeHtml(String(product.fixed || 0))}" data-percent="${escapeHtml(String(product.percent || 0))}" aria-label="Editar produto ${escapeHtml(product.name)}" title="Editar produto">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.8 8.7l-2.5-2.5zm15-11.3a.9.9 0 0 0 0-1.3L17.1 3a.9.9 0 0 0-1.3 0l-1.5 1.5 3.2 3.2z"></path></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path></svg>
           </button>
         </div>`;
     }).join("");
-    els.frontProductsList.querySelectorAll("input").forEach((input) => {
+    els.frontProductsList.querySelectorAll("input[data-front-toggle]").forEach((input) => {
       input.addEventListener("change", () => {
-        state.frontProducts = Array.from(els.frontProductsList.querySelectorAll("input:checked")).map((node) => node.value);
+        state.frontProducts = Array.from(els.frontProductsList.querySelectorAll("input[data-front-toggle]:checked")).map((node) => node.value);
         saveStringList("hsbi-front-products", state.frontProducts);
         state.animateDashboard = state.page === "dashboard";
         render();
@@ -1715,23 +1718,23 @@
       const key = normalizeFilterValue(attendant.name);
       return `
         <div class="settings-table-row settings-attendant-row">
-          <strong>${escapeHtml(attendant.name)}</strong>
-          <span>${decimal(attendant.commission)}%</span>
-          <span>${money(attendant.salary)}</span>
-          <span>${attendant.start ? formatIsoDateBr(attendant.start) : "N/A"}</span>
-          <span>${escapeHtml(attendant.pauses || "Sem pausas")}</span>
+          <input data-attendant-field="name" value="${escapeHtml(attendant.name)}" aria-label="Nome">
+          <input data-attendant-field="commission" value="${escapeHtml(decimal(attendant.commission || 0))}" inputmode="decimal" aria-label="Comissão">
+          <input data-attendant-field="salary" value="${escapeHtml(decimal(attendant.salary || 0))}" inputmode="decimal" aria-label="Fixo mensal">
+          <input data-attendant-field="start" value="${escapeHtml(attendant.start || "")}" placeholder="aaaa-mm-dd" aria-label="Início">
+          <input data-attendant-field="pauses" value="${escapeHtml(attendant.pauses || "")}" placeholder="Sem pausas" aria-label="Pausas">
           <label class="switch" aria-label="Permitir venda manual">
-            <input type="checkbox" value="${escapeHtml(key)}" ${state.manualSalePermissions.includes(key) ? "checked" : ""}>
+            <input type="checkbox" data-manual-toggle value="${escapeHtml(key)}" ${state.manualSalePermissions.includes(key) ? "checked" : ""}>
             <span class="slider"></span>
           </label>
           <button class="settings-edit-button" type="button" data-settings-edit="attendant" data-slug="${escapeHtml(attendant.slug || "")}" data-name="${escapeHtml(attendant.name)}" data-commission="${escapeHtml(String(attendant.commission || 0))}" data-salary="${escapeHtml(String(attendant.salary || 0))}" data-start="${escapeHtml(attendant.start || "")}" data-pauses="${escapeHtml(attendant.pauses || "")}" aria-label="Editar atendente ${escapeHtml(attendant.name)}" title="Editar atendente">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.8 8.7l-2.5-2.5zm15-11.3a.9.9 0 0 0 0-1.3L17.1 3a.9.9 0 0 0-1.3 0l-1.5 1.5 3.2 3.2z"></path></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path></svg>
           </button>
         </div>`;
     }).join("");
-    els.manualSaleAttendantsList.querySelectorAll("input").forEach((input) => {
+    els.manualSaleAttendantsList.querySelectorAll("input[data-manual-toggle]").forEach((input) => {
       input.addEventListener("change", () => {
-        state.manualSalePermissions = Array.from(els.manualSaleAttendantsList.querySelectorAll("input:checked")).map((node) => node.value);
+        state.manualSalePermissions = Array.from(els.manualSaleAttendantsList.querySelectorAll("input[data-manual-toggle]:checked")).map((node) => node.value);
         saveStringList("hsbi-manual-sale-attendants", state.manualSalePermissions);
       });
     });
@@ -1760,16 +1763,21 @@
   }
 
   async function editGoalFromButton(button) {
+    const row = button.closest(".settings-goal-row");
     const currentTitle = button.dataset.title || "";
-    const slug = prompt("Slug da atendente", button.dataset.slug || "");
-    if (slug === null) return;
-    const title = prompt("Título da meta", currentTitle);
-    if (title === null) return;
-    const value = prompt("Valor da meta", decimal(Number(button.dataset.value || 0)));
-    if (value === null) return;
-    const prize = prompt("Prêmio", button.dataset.prize || "");
-    if (prize === null) return;
-    const active = confirm("Deixar esta meta ativa?");
+    const slug = getSettingsFieldValue(row, "[data-goal-field='slug']", button.dataset.slug || "");
+    const title = getSettingsFieldValue(row, "[data-goal-field='title']", currentTitle);
+    const value = getSettingsFieldValue(row, "[data-goal-field='value']", decimal(Number(button.dataset.value || 0)));
+    const prize = getSettingsFieldValue(row, "[data-goal-field='prize']", button.dataset.prize || "");
+    const active = getSettingsFieldValue(row, "[data-goal-field='active']", button.dataset.active === "true" ? "TRUE" : "FALSE");
+    if (!slug.trim()) {
+      alert("Informe o slug da atendente.");
+      return;
+    }
+    if (!title.trim()) {
+      alert("Informe o título da meta.");
+      return;
+    }
     const payload = new FormData();
     payload.set("action", "updateGoal");
     payload.set("slug", slug.trim());
@@ -1777,7 +1785,7 @@
     payload.set("meta_titulo_original", currentTitle);
     payload.set("meta_valor", value);
     payload.set("meta_premio", prize);
-    payload.set("meta_ativa", active ? "TRUE" : "FALSE");
+    payload.set("meta_ativa", active);
     payload.set("mutation_id", createMutationId("goal"));
     await submitMutation(payload);
     showNotificationSavedToast("Meta salva");
@@ -1785,11 +1793,14 @@
   }
 
   async function editProductCostFromButton(button) {
-    const product = button.dataset.name || "";
-    const fixed = prompt("Custo fixo por venda", decimal(Number(button.dataset.fixed || 0)));
-    if (fixed === null) return;
-    const percentValue = prompt("Custo percentual por venda", decimal(Number(button.dataset.percent || 0)));
-    if (percentValue === null) return;
+    const row = button.closest(".settings-product-row");
+    const product = getSettingsFieldValue(row, "[data-product-field='name']", button.dataset.name || "");
+    const fixed = getSettingsFieldValue(row, "[data-product-field='fixed']", decimal(Number(button.dataset.fixed || 0)));
+    const percentValue = getSettingsFieldValue(row, "[data-product-field='percent']", decimal(Number(button.dataset.percent || 0)));
+    if (!product.trim()) {
+      alert("Produto não informado.");
+      return;
+    }
     const payload = new FormData();
     payload.set("action", "updateProductCost");
     payload.set("produto", product);
@@ -1802,17 +1813,17 @@
   }
 
   async function editAttendantFromButton(button) {
+    const row = button.closest(".settings-attendant-row");
     const currentName = button.dataset.name || "";
-    const name = prompt("Nome do atendente", currentName);
-    if (name === null) return;
-    const commission = prompt("Comissão percentual", decimal(Number(button.dataset.commission || 0)));
-    if (commission === null) return;
-    const salary = prompt("Fixo mensal", decimal(Number(button.dataset.salary || 0)));
-    if (salary === null) return;
-    const start = prompt("Início do trabalho (opcional, ex: 2026-06-01)", button.dataset.start || "");
-    if (start === null) return;
-    const pauses = prompt("Pausas (opcional, ex: 15/06/2026 a 23/06/2026;)", button.dataset.pauses || "");
-    if (pauses === null) return;
+    const name = getSettingsFieldValue(row, "[data-attendant-field='name']", currentName);
+    const commission = getSettingsFieldValue(row, "[data-attendant-field='commission']", decimal(Number(button.dataset.commission || 0)));
+    const salary = getSettingsFieldValue(row, "[data-attendant-field='salary']", decimal(Number(button.dataset.salary || 0)));
+    const start = getSettingsFieldValue(row, "[data-attendant-field='start']", button.dataset.start || "");
+    const pauses = getSettingsFieldValue(row, "[data-attendant-field='pauses']", button.dataset.pauses || "");
+    if (!name.trim()) {
+      alert("Informe o nome do atendente.");
+      return;
+    }
     const payload = new FormData();
     payload.set("action", "updateAttendant");
     payload.set("slug", button.dataset.slug || normalizeFilterValue(currentName).replace(/[^a-z0-9]+/g, "-"));
@@ -1826,6 +1837,12 @@
     await submitMutation(payload);
     showNotificationSavedToast("Atendente salvo");
     await refreshData({ applySelection: true });
+  }
+
+  function getSettingsFieldValue(row, selector, fallback = "") {
+    const field = row ? row.querySelector(selector) : null;
+    if (!field) return fallback;
+    return "value" in field ? field.value : field.textContent || fallback;
   }
 
   function getConfigAttendantRows() {

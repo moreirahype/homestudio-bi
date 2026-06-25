@@ -124,8 +124,8 @@ button {
 
 .brand-wordmark {
   display: block;
-  width: 134px;
-  max-width: min(134px, calc(100vw - 130px));
+  width: 138px;
+  max-width: min(138px, calc(100vw - 130px));
   height: auto;
   flex: 0 1 auto;
 }
@@ -933,7 +933,7 @@ tr:hover .transaction-edit-button,
 
 .manual-sale-form {
   display: grid;
-  grid-template-columns: minmax(150px, .82fr) minmax(116px, .48fr) repeat(2, minmax(190px, 1fr)) minmax(132px, .62fr) minmax(116px, .52fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 14px;
   align-items: end;
   margin-top: 16px;
@@ -945,6 +945,7 @@ tr:hover .transaction-edit-button,
 
 .manual-sale-form label {
   display: grid;
+  min-width: 0;
   gap: 7px;
   color: #cbe8c8;
   font-size: var(--text-xs);
@@ -961,6 +962,7 @@ tr:hover .transaction-edit-button,
 .manual-sale-form button {
   min-height: 44px;
   grid-column: 1 / -1;
+  width: 100%;
   border: 0;
   border-radius: var(--radius);
   background: var(--accent);
@@ -1081,21 +1083,41 @@ tr:hover .transaction-edit-button,
   white-space: nowrap;
 }
 
+.settings-table-row input,
+.settings-table-row select {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: var(--text-sm);
+  background-color: rgba(4, 10, 6, .72);
+}
+
+.settings-table-row input[readonly] {
+  color: var(--text);
+  cursor: default;
+  background: rgba(4, 10, 6, .42);
+}
+
+.settings-table-row input::placeholder {
+  color: rgba(218, 236, 213, .42);
+}
+
 .settings-attendants-table .settings-table-head,
 .settings-attendants-table .settings-table-row {
-  grid-template-columns: minmax(150px, 1.2fr) 88px 118px 98px minmax(140px, 1fr) 72px 40px;
-  min-width: 760px;
+  grid-template-columns: minmax(150px, 1.15fr) 92px 116px 116px minmax(150px, 1fr) 72px 42px;
+  min-width: 830px;
 }
 
 .settings-products-table .settings-table-head,
 .settings-products-table .settings-table-row {
-  grid-template-columns: minmax(240px, 1fr) 112px 96px 72px 40px;
-  min-width: 620px;
+  grid-template-columns: minmax(260px, 1fr) 118px 104px 72px 42px;
+  min-width: 680px;
 }
 
 .settings-goals-table .settings-table-head,
 .settings-goals-table .settings-table-row {
-  grid-template-columns: minmax(96px, .6fr) minmax(150px, 1fr) 112px minmax(140px, 1fr) 84px;
+  grid-template-columns: minmax(100px, .62fr) minmax(160px, 1fr) 112px minmax(150px, 1fr) 112px 42px;
+  min-width: 780px;
 }
 
 .settings-status {
