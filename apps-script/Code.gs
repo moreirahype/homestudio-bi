@@ -2,13 +2,15 @@ const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
 const MANUAL_SALES_SHEET_NAME = 'Vendas Manuais';
+const COSTS_SHEET_NAME = 'Custos';
 const DEBUG_SHEET_NAME = 'Debug';
 const OWNER_PUSH_SENT_LOG_PROPERTY = 'OWNER_PUSH_SENT_LOG';
 const OWNER_PUSH_SENT_LOG_RETENTION_DAYS = 14;
 const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moeda', 'valor', 'atendente', 'produto', 'origem', 'moeda_original', 'valor_original', 'cotacao_brl', 'comissao_percentual'];
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal', 'inicio_trabalho', 'pausas'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
-const MANUAL_SALE_HEADERS = ['atendente'];
+const MANUAL_SALE_HEADERS = ['atendente', 'produto'];
+const COST_HEADERS = ['produto', 'custo_fixo', 'custo_percentual'];
 
 function doGet(e) {
   const params = e.parameter || {};
@@ -19,9 +21,11 @@ function doGet(e) {
     return outputJson_(readMutationResult_(params.mutation_id || params.id), params.callback);
   }
   if (params.action === 'data') {
+    getCostsSheet_();
     return outputJson_({
       transactions: readTransactions_(params.from, params.to),
       manualSaleOptions: readManualSaleOptions_(),
+      costs: readCosts_(),
       meta: readMetaInsights_(params.from, params.to)
     }, params.callback);
   }
@@ -132,8 +136,8 @@ function doPost(e) {
       sendPushRequest_({
         audience: 'owner',
         kind: 'sale',
-        title: '\uD83D\uDCB0 PIX de ' + formatBrl_(row[7]) + ' recebido!',
-        body: String(row[8] || 'Sem atendente'),
+        title: 'Venda realizada!',
+        body: 'Valor: ' + formatBrl_(row[7]) + ' \u2022 ' + String(row[8] || 'Sem atendente'),
         url: getPushProperty_('OWNER_APP_URL') + '#transactions',
         tag: 'hsbi-owner-sale-' + String(row[0])
       });
@@ -146,7 +150,7 @@ function doPost(e) {
     try {
       sendPushRequest_({
         audience: 'sheila',
-        title: '\uD83D\uDCB0 Venda Realizada!',
+        title: 'Venda realizada!',
         body: '',
         url: getPushProperty_('SHEILA_APP_URL'),
         tag: 'hsbi-sheila-sale'
@@ -547,6 +551,7 @@ function updateTransaction_(payload) {
       data: pickValue_(payload, ['data']) || current.data,
       hora: normalizeTimeText_(pickValue_(payload, ['hora']) || current.hora),
       pagador: pickValue_(payload, ['pagador', 'payer']) || current.pagador || 'Sem pagador',
+      telefone: pickValue_(payload, ['telefone', 'phone', 'telephone', 'whatsapp', 'celular', 'mobile']) || current.telefone || '',
       atendente: attendant,
       produto: pickValue_(payload, ['produto', 'product', 'product_name', 'productName']) || current.produto || '',
       moeda: 'BRL',
@@ -670,6 +675,36 @@ function getManualSalesSheet_() {
   return sheet;
 }
 
+function getCostsSheet_() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName(COSTS_SHEET_NAME);
+  if (!sheet) sheet = spreadsheet.insertSheet(COSTS_SHEET_NAME);
+  const currentWidth = Math.max(sheet.getLastColumn(), COST_HEADERS.length);
+  const current = sheet.getRange(1, 1, 1, currentWidth).getValues()[0];
+  const missingHeaders = COST_HEADERS.some((header, index) => current[index] !== header);
+  if (missingHeaders || currentWidth !== COST_HEADERS.length) {
+    sheet.getRange(1, 1, 1, COST_HEADERS.length).setValues([COST_HEADERS]);
+    deleteExtraColumns_(sheet, COST_HEADERS.length);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function readCosts_() {
+  const sheet = getCostsSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  return sheet
+    .getRange(2, 1, lastRow - 1, COST_HEADERS.length)
+    .getValues()
+    .map((row) => ({
+      produto: String(row[0] || '').trim(),
+      custo_fixo: parseNumber_(row[1] || 0),
+      custo_percentual: parseNumber_(row[2] || 0)
+    }))
+    .filter((item) => item.produto);
+}
+
 function migrateManualSalesSheet_(sheet, currentHeaders) {
   const lastRow = sheet.getLastRow();
   const currentWidth = Math.max(sheet.getLastColumn(), currentHeaders.length);
@@ -697,11 +732,15 @@ function readManualSaleOptions_() {
   if (lastRow < 2) return [];
   const unique = {};
   return sheet
-    .getRange(2, 1, lastRow - 1, 1)
+    .getRange(2, 1, lastRow - 1, MANUAL_SALE_HEADERS.length)
     .getValues()
-    .map((row) => String(row[0] || '').trim())
+    .map((row) => ({
+      atendente: String(row[0] || '').trim(),
+      produto: String(row[1] || '').trim()
+    }))
     .filter((value) => {
-      const key = normalizePersonName_(value);
+      if (!value.atendente && !value.produto) return false;
+      const key = normalizePersonName_(value.atendente) + '|' + normalizePersonName_(value.produto);
       if (!key || unique[key]) return false;
       unique[key] = true;
       return true;

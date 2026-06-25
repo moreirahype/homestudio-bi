@@ -14,6 +14,7 @@
     appliedPeriod: "today",
     customRange: null,
     transactions: [],
+    costs: [],
     metaByPeriod: {},
     customMeta: null,
     meta: { spend: 0, leads: 0 },
@@ -26,7 +27,8 @@
     pageIndex: 1,
     lastUpdated: null,
     notifications: loadNotificationPrefs(),
-    animateDashboard: false
+    animateDashboard: false,
+    theme: loadThemePreference()
   };
 
   const els = {
@@ -46,6 +48,7 @@
     manualSaleCurrency: document.getElementById("manualSaleCurrency"),
     manualSalePayer: document.getElementById("manualSalePayer"),
     manualSaleAttendant: document.getElementById("manualSaleAttendant"),
+    manualSaleProduct: document.getElementById("manualSaleProduct"),
     manualSaleDate: document.getElementById("manualSaleDate"),
     manualSaleTime: document.getElementById("manualSaleTime"),
     manualSaleSubmit: document.getElementById("manualSaleSubmit"),
@@ -58,7 +61,9 @@
     transactionEditDate: document.getElementById("transactionEditDate"),
     transactionEditTime: document.getElementById("transactionEditTime"),
     transactionEditPayer: document.getElementById("transactionEditPayer"),
+    transactionEditPhone: document.getElementById("transactionEditPhone"),
     transactionEditAttendant: document.getElementById("transactionEditAttendant"),
+    transactionEditProduct: document.getElementById("transactionEditProduct"),
     transactionEditCurrency: document.getElementById("transactionEditCurrency"),
     transactionEditValue: document.getElementById("transactionEditValue"),
     transactionEditSubmit: document.getElementById("transactionEditSubmit"),
@@ -79,7 +84,8 @@
     reportStyleOptions: document.getElementById("reportStyleOptions"),
     reportPreviewTitle: document.getElementById("reportPreviewTitle"),
     enableAllNotifications: document.getElementById("enableAllNotifications"),
-    testNotification: document.getElementById("testNotification")
+    testNotification: document.getElementById("testNotification"),
+    themeToggle: document.getElementById("themeToggle")
   };
 
   const metricIds = {
@@ -98,13 +104,14 @@
   };
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
-  const productChartColors = ["#9fe870", "#d4ff90", "#7fd85f", "#c8f3b6", "#6fbd55", "#e9ffd0", "#88dd70"];
+  const productChartColors = ["#9fe870", "#7fd8ff", "#f3cf62", "#ff9f7a", "#c59cff", "#7ee2bd", "#f28bc5", "#d4ff90"];
   let notificationToastTimer = null;
   const metricAnimationFrames = new Map();
 
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
+    applyThemePreference();
     applySidebarPreference();
     setDefaultDates();
     bindEvents();
@@ -122,9 +129,13 @@
     els.navItems.forEach((button) => {
       button.addEventListener("click", () => setPage(button.dataset.page));
     });
+    document.querySelectorAll(".settings-shortcut").forEach((button) => {
+      button.addEventListener("click", () => setPage(button.dataset.page));
+    });
 
     els.periodButtons.forEach((button) => {
       button.addEventListener("click", () => {
+        if (state.period === button.dataset.period) return;
         state.period = button.dataset.period;
         state.pageIndex = 1;
         if (state.period !== "custom") state.appliedPeriod = state.period;
@@ -144,6 +155,9 @@
     els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true, buttonLoading: true }));
     if (els.sidebarToggle) {
       els.sidebarToggle.addEventListener("click", toggleSidebar);
+    }
+    if (els.themeToggle) {
+      els.themeToggle.addEventListener("click", toggleTheme);
     }
     els.transactionSearch.addEventListener("input", () => {
       state.pageIndex = 1;
@@ -257,6 +271,24 @@
     requestAnimationFrame(renderSalesChart);
   }
 
+  function applyThemePreference() {
+    document.body.classList.toggle("theme-light", state.theme === "light");
+    if (els.themeToggle) {
+      els.themeToggle.setAttribute("aria-pressed", state.theme === "light" ? "true" : "false");
+      els.themeToggle.title = state.theme === "light" ? "Usar tema escuro" : "Usar tema claro";
+    }
+  }
+
+  function toggleTheme() {
+    state.theme = state.theme === "light" ? "dark" : "light";
+    localStorage.setItem("hsbi-theme", state.theme);
+    applyThemePreference();
+    requestAnimationFrame(() => {
+      renderSalesChart();
+      renderProductsDonut(getProductRows());
+    });
+  }
+
   function updateSidebarToggle(isCollapsed) {
     if (!els.sidebarToggle) return;
     els.sidebarToggle.setAttribute("aria-expanded", String(!isCollapsed));
@@ -280,6 +312,7 @@
         standardPeriods.map(async (period) => [period, await fetchMetaPayload(getDateRange(period))])
       );
       state.transactions = payload.transactions.map(normalizeTransaction);
+      state.costs = normalizeCosts(payload.costs);
       state.manualSaleOptions = normalizeManualSaleOptions(payload.manualSaleOptions);
       state.loadedTransactionRange = range;
       state.metaByPeriod = Object.fromEntries(metaEntries);
@@ -292,6 +325,7 @@
       console.error(error);
       const fallback = buildEmptyPayload();
       state.transactions = fallback.transactions.map(normalizeTransaction);
+      state.costs = normalizeCosts(fallback.costs);
       state.manualSaleOptions = normalizeManualSaleOptions(fallback.manualSaleOptions);
       state.loadedTransactionRange = getPreloadRange();
       state.metaByPeriod = Object.fromEntries(standardPeriods.map((period) => [period, fallback.meta]));
@@ -354,6 +388,7 @@
       if (!isRangeLoaded(range)) {
         payload = await fetchTransactionsPayload(range);
         mergeTransactions(payload.transactions.map(normalizeTransaction));
+        if (payload.costs) state.costs = normalizeCosts(payload.costs);
       }
       state.customMeta = payload && payload.meta ? payload.meta : await fetchMetaPayload(range);
     } catch (error) {
@@ -388,6 +423,7 @@
     payload.set("valor", String(value).replace(".", ","));
     payload.set("pagador", els.manualSalePayer.value.trim() || "Venda manual");
     payload.set("atendente", els.manualSaleAttendant.value || "Sem atendente");
+    payload.set("produto", els.manualSaleProduct ? els.manualSaleProduct.value || "" : "");
     payload.set("timestamp", saleTimestamp.toISOString());
     payload.set("transaction_id", `manual-${saleTimestamp.getTime()}-${Math.random().toString(36).slice(2, 8)}`);
     payload.set("mutation_id", createMutationId("manual"));
@@ -435,7 +471,9 @@
     payload.set("data", els.transactionEditDate.value);
     payload.set("hora", els.transactionEditTime.value);
     payload.set("pagador", els.transactionEditPayer.value.trim() || "Sem pagador");
+    payload.set("telefone", els.transactionEditPhone ? els.transactionEditPhone.value.trim() : transaction.telefone || "");
     payload.set("atendente", els.transactionEditAttendant.value.trim() || "Sem atendente");
+    payload.set("produto", els.transactionEditProduct ? els.transactionEditProduct.value || "" : transaction.produto || "");
     payload.set("moeda_original", currency);
     payload.set("valor_original", String(value).replace(".", ","));
     payload.set("moeda", "BRL");
@@ -486,7 +524,9 @@
     els.transactionEditDate.value = transaction.data || toIsoDate(transaction.timestamp);
     els.transactionEditTime.value = normalizeTimeValue(transaction.hora || formatTime(transaction.timestamp));
     els.transactionEditPayer.value = transaction.pagador || "";
+    if (els.transactionEditPhone) els.transactionEditPhone.value = formatPhone(transaction.telefone || "");
     renderTransactionEditAttendantOptions(transaction.atendente || "Sem atendente");
+    renderTransactionEditProductOptions(transaction.produto || "");
     els.transactionEditCurrency.value = transaction.moedaOriginal || "BRL";
     els.transactionEditValue.value = decimal(transaction.valorOriginal || transaction.valor || 0);
     updateCurrencyPlaceholder(els.transactionEditValue, els.transactionEditCurrency.value);
@@ -606,16 +646,38 @@
   }
 
   function buildEmptyPayload() {
-    return { transactions: [], manualSaleOptions: [], meta: { spend: 0, leads: 0 } };
+    return { transactions: [], manualSaleOptions: [], costs: [], meta: { spend: 0, leads: 0 } };
+  }
+
+  function normalizeCosts(costs) {
+    const map = new Map();
+    (Array.isArray(costs) ? costs : []).forEach((item) => {
+      const product = String(item.produto || item.product || "").trim();
+      if (!product) return;
+      map.set(normalizeFilterValue(product), {
+        product,
+        fixed: parseMoneyValue(item.custo_fixo || item.fixed || 0),
+        percent: parseMoneyValue(item.custo_percentual || item.percent || 0)
+      });
+    });
+    return map;
   }
 
   function normalizeManualSaleOptions(options) {
-    const unique = new Set(["Sem atendente"]);
-    (Array.isArray(options) ? options : []).forEach((option) => {
-      const value = String(option || "").trim();
-      if (value) unique.add(value);
+    const rows = Array.isArray(options) ? options : [];
+    const normalized = rows.map((option) => {
+      if (option && typeof option === "object") {
+        return {
+          attendant: String(option.atendente || option.attendant || option.nome || option.name || "").trim(),
+          product: String(option.produto || option.product || "").trim()
+        };
+      }
+      return { attendant: String(option || "").trim(), product: "" };
     });
-    return Array.from(unique);
+    if (!normalized.some((option) => option.attendant === "Sem atendente")) {
+      normalized.unshift({ attendant: "Sem atendente", product: "" });
+    }
+    return normalized;
   }
 
   function normalizeTransaction(item) {
@@ -706,15 +768,36 @@
   function renderManualSaleOptions() {
     if (!els.manualSaleAttendant) return;
     const current = els.manualSaleAttendant.value || "Sem atendente";
-    const options = normalizeManualSaleOptions(state.manualSaleOptions);
-    els.manualSaleAttendant.innerHTML = options
+    const attendants = uniqueManualOptionValues("attendant", "Sem atendente");
+    els.manualSaleAttendant.innerHTML = attendants
       .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
       .join("");
-    els.manualSaleAttendant.value = options.includes(current) ? current : options[0];
+    els.manualSaleAttendant.value = attendants.includes(current) ? current : attendants[0];
+    renderManualSaleProducts();
+  }
+
+  function renderManualSaleProducts() {
+    if (!els.manualSaleProduct) return;
+    const current = els.manualSaleProduct.value || "";
+    const products = uniqueManualOptionValues("product", "Sem produto");
+    els.manualSaleProduct.innerHTML = products
+      .map((option) => `<option value="${escapeHtml(option === "Sem produto" ? "" : option)}">${escapeHtml(option)}</option>`)
+      .join("");
+    const values = products.map((option) => option === "Sem produto" ? "" : option);
+    els.manualSaleProduct.value = values.includes(current) ? current : values[0];
+  }
+
+  function uniqueManualOptionValues(field, fallback) {
+    const unique = new Set([fallback]);
+    normalizeManualSaleOptions(state.manualSaleOptions).forEach((option) => {
+      const value = String(option[field] || "").trim();
+      if (value) unique.add(value);
+    });
+    return Array.from(unique);
   }
 
   function getAttendantSelectOptions(extraValue) {
-    const unique = new Set(normalizeManualSaleOptions(state.manualSaleOptions));
+    const unique = new Set(uniqueManualOptionValues("attendant", "Sem atendente"));
     state.transactions.forEach((item) => {
       const value = String(item.atendente || "").trim();
       if (value) unique.add(value);
@@ -731,6 +814,27 @@
       .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
       .join("");
     els.transactionEditAttendant.value = options.includes(currentValue) ? currentValue : options[0];
+  }
+
+  function getProductSelectOptions(extraValue) {
+    const unique = new Set(uniqueManualOptionValues("product", "Sem produto"));
+    state.transactions.forEach((item) => {
+      const value = String(item.produto || "").trim();
+      if (value) unique.add(value);
+    });
+    const extra = String(extraValue || "").trim();
+    if (extra) unique.add(extra);
+    return Array.from(unique);
+  }
+
+  function renderTransactionEditProductOptions(currentValue) {
+    if (!els.transactionEditProduct) return;
+    const labelValue = currentValue || "Sem produto";
+    const options = getProductSelectOptions(labelValue);
+    els.transactionEditProduct.innerHTML = options
+      .map((option) => `<option value="${escapeHtml(option === "Sem produto" ? "" : option)}">${escapeHtml(option)}</option>`)
+      .join("");
+    els.transactionEditProduct.value = currentValue || "";
   }
 
   function updateCurrencyPlaceholder(input, currency) {
@@ -804,7 +908,8 @@
   }
 
   function setPage(page) {
-    if (!["dashboard", "attendants", "products", "transactions", "notifications"].includes(page)) return;
+    if (!["dashboard", "attendants", "products", "transactions", "goals", "settings-attendants", "settings-products", "integrations", "notifications", "settings"].includes(page)) return;
+    if (state.page === page) return;
     state.page = page;
     els.pages.forEach((section) => section.classList.toggle("is-active", section.dataset.page === page));
     els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.page === page));
@@ -842,7 +947,8 @@
     const ads = Number(state.meta.spend || 0);
     const tax = ads * Number(config.metaTaxRate || 0);
     const totalSpend = ads + tax;
-    const profit = revenue - totalSpend;
+    const productCosts = sum(transactions.map(getTransactionProductCost));
+    const profit = revenue - totalSpend - productCosts;
     const leads = getLeadBase(state.meta);
     const conversionSales = countFrontConversionSales(transactions, state.transactions);
     return {
@@ -1145,7 +1251,8 @@
         label: label.short,
         fullLabel: label.full,
         sales: sales.length,
-        revenue: sum(sales.map((item) => item.valor))
+        revenue: sum(sales.map((item) => item.valor)),
+        productCost: sum(sales.map(getTransactionProductCost))
       };
     });
     return series;
@@ -1163,6 +1270,7 @@
       });
       return {
         index,
+        key: label.key,
         label: label.short,
         fullLabel: label.full,
         sales: sales.length,
@@ -1176,7 +1284,7 @@
     const totalRevenue = sum(series.map((point) => point.revenue));
     const fallbackSpend = getTotalSpendForPeriod(period);
     return series.map((point) => Object.assign({}, point, {
-      profit: getProfitForDate(period, point.key, point.revenue, totalRevenue, fallbackSpend)
+      profit: getProfitForDate(period, point.key, point.revenue, totalRevenue, fallbackSpend, point.productCost)
     }));
   }
 
@@ -1331,7 +1439,7 @@
     if (!donut || !legend) return;
     const totalRevenue = sum(rows.map((row) => row.revenue));
     if (!rows.length || totalRevenue <= 0) {
-      donut.style.background = "conic-gradient(rgba(159,232,112,.18) 0 100%)";
+      donut.style.setProperty("--donut-gradient", "conic-gradient(rgba(159,232,112,.18) 0 100%)");
       legend.innerHTML = `<div class="product-legend-item"><i style="--slice-color:rgba(159,232,112,.28)"></i><strong>Sem produtos</strong><span>0%</span></div>`;
       restartElementAnimation(donut, "is-animating");
       return;
@@ -1344,7 +1452,7 @@
       const color = productChartColors[index % productChartColors.length];
       return `${color} ${start}% ${cursor}%`;
     });
-    donut.style.background = `conic-gradient(${segments.join(", ")})`;
+    donut.style.setProperty("--donut-gradient", `conic-gradient(${segments.join(", ")})`);
     restartElementAnimation(donut, "is-animating");
     legend.innerHTML = rows.slice(0, 7).map((row, index) => {
       const share = row.revenue / totalRevenue;
@@ -1368,7 +1476,8 @@
   function renderTransactions() {
     const query = els.transactionSearch.value.trim().toLowerCase();
     const rows = state.filteredTransactions.filter((item) => {
-      const haystack = `${item.pagador} ${item.atendente} ${item.produto} ${item.valor} ${money(item.valor)} ${item.moedaOriginal} ${formatOriginalValue(item)}`.toLowerCase();
+      const phone = formatPhone(item.telefone);
+      const haystack = `${item.pagador} ${phone} ${digitsOnly(phone)} ${item.atendente} ${item.produto} ${item.valor} ${money(item.valor)} ${item.moedaOriginal} ${formatOriginalValue(item)}`.toLowerCase();
       return haystack.includes(query);
     });
     const tbody = document.getElementById("transactionsBody");
@@ -1380,7 +1489,7 @@
 
     if (!visible.length) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="6">Nenhuma transação encontrada.</td>`;
+      tr.innerHTML = `<td colspan="8">Nenhuma transa??o encontrada.</td>`;
       tbody.append(tr);
     } else {
       visible.forEach((item) => {
@@ -1389,11 +1498,13 @@
           <td>${formatIsoDateBr(item.data)}</td>
           <td>${escapeHtml(item.hora)}</td>
           <td class="payer-cell">${escapeHtml(item.pagador)}<small>${escapeHtml(item.atendente)}</small></td>
+          <td>${escapeHtml(formatPhone(item.telefone))}</td>
           <td>${escapeHtml(item.atendente)}</td>
+          <td>${escapeHtml(item.produto || "Sem produto")}</td>
           <td>${escapeHtml(item.moedaOriginal)}</td>
           <td class="transaction-value-cell">
             <span>${formatOriginalValue(item)}</span>
-            <button class="transaction-edit-button" type="button" data-id="${escapeHtml(item.id)}" aria-label="Editar transação">
+            <button class="transaction-edit-button" type="button" data-id="${escapeHtml(item.id)}" aria-label="Editar transa??o">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.25V20h2.75L17.8 8.95l-2.75-2.75L4 17.25zm15.92-11.17a1 1 0 0 0 0-1.42l-.58-.58a1 1 0 0 0-1.42 0l-1.16 1.16 2.75 2.75 1.41-1.41z"></path></svg>
             </button>
           </td>
@@ -1405,7 +1516,7 @@
       });
     }
 
-    els.pageInfo.textContent = `Página ${state.pageIndex} de ${totalPages}`;
+    els.pageInfo.textContent = `P?gina ${state.pageIndex} de ${totalPages}`;
     els.prevPage.disabled = state.pageIndex <= 1;
     els.nextPage.disabled = state.pageIndex >= totalPages;
   }
@@ -1413,7 +1524,7 @@
   function getTotalPages() {
     const query = els.transactionSearch.value.trim().toLowerCase();
     const rows = state.filteredTransactions.filter((item) =>
-      `${item.pagador} ${item.atendente} ${item.produto} ${item.valor} ${money(item.valor)} ${item.moedaOriginal} ${formatOriginalValue(item)}`.toLowerCase().includes(query)
+      `${item.pagador} ${formatPhone(item.telefone)} ${digitsOnly(item.telefone)} ${item.atendente} ${item.produto} ${item.valor} ${money(item.valor)} ${item.moedaOriginal} ${formatOriginalValue(item)}`.toLowerCase().includes(query)
     );
     return Math.max(1, Math.ceil(rows.length / config.rowsPerPage));
   }
@@ -1618,6 +1729,10 @@
     }
   }
 
+  function loadThemePreference() {
+    return localStorage.getItem("hsbi-theme") === "light" ? "light" : "dark";
+  }
+
   function saveNotificationPrefs() {
     localStorage.setItem("hsbi-notifications", JSON.stringify(state.notifications));
   }
@@ -1655,7 +1770,7 @@
     return ads + ads * Number(config.metaTaxRate || 0);
   }
 
-  function getProfitForDate(period, dateKey, revenue, periodRevenue, fallbackSpend) {
+  function getProfitForDate(period, dateKey, revenue, periodRevenue, fallbackSpend, productCost = 0) {
     if (hasSalesDimensionFilter()) return null;
     const meta = applyAccountFilterToMeta(period === "custom"
       ? Object.assign({ spend: 0, leads: 0, daily: [] }, state.customMeta || {})
@@ -1664,15 +1779,22 @@
     const day = daily.find((item) => String(item.date || "").slice(0, 10) === dateKey);
     if (!day && Number(meta.spend || 0) > 0) {
       const share = Number(periodRevenue || 0) > 0 ? Number(revenue || 0) / Number(periodRevenue || 0) : 0;
-      return Number(revenue || 0) - Number(fallbackSpend || 0) * share;
+      return Number(revenue || 0) - Number(productCost || 0) - Number(fallbackSpend || 0) * share;
     }
     const ads = Number(day ? day.spend || 0 : 0);
     const totalSpend = ads + ads * Number(config.metaTaxRate || 0);
-    return Number(revenue || 0) - totalSpend;
+    return Number(revenue || 0) - Number(productCost || 0) - totalSpend;
   }
 
   function hasSalesDimensionFilter() {
     return state.filters.attendant !== "all" || state.filters.product !== "all";
+  }
+
+  function getTransactionProductCost(item) {
+    const key = normalizeFilterValue(item && item.produto ? item.produto : "Sem produto");
+    const cost = state.costs && state.costs.get ? state.costs.get(key) : null;
+    if (!cost) return 0;
+    return Number(cost.fixed || 0) + Number(item.valor || 0) * (Number(cost.percent || 0) / 100);
   }
 
   function applyAccountFilterToMeta(meta) {
@@ -1849,6 +1971,23 @@
     } catch {
       return `${currency} ${decimal(value)}`;
     }
+  }
+
+  function digitsOnly(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  function formatPhone(value) {
+    let digits = digitsOnly(value);
+    if (!digits) return "";
+    if (digits.startsWith("55") && digits.length > 11) digits = digits.slice(2);
+    if (digits.length === 10) digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
+    if (digits.length > 11) digits = digits.slice(-11);
+    if (digits.length < 10) return digits;
+    const ddd = digits.slice(0, 2);
+    const first = digits.length === 11 ? digits.slice(2, 7) : digits.slice(2, 6);
+    const second = digits.length === 11 ? digits.slice(7, 11) : digits.slice(6, 10);
+    return `(${ddd}) ${first}-${second}`;
   }
 
   function decimal(value) {

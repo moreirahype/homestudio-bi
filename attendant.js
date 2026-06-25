@@ -76,6 +76,7 @@
     els.navItems.forEach((button) => button.addEventListener("click", () => setPage(button.dataset.page)));
     els.periodButtons.forEach((button) => {
       button.addEventListener("click", () => {
+        if (state.period === button.dataset.period) return;
         state.period = button.dataset.period;
         state.pageIndex = 1;
         if (state.period !== "custom") state.appliedPeriod = state.period;
@@ -288,6 +289,7 @@
       data: data || toIsoDate(timestamp),
       hora: hora || formatTime(timestamp),
       pagador: item.pagador || "Sem pagador",
+      telefone: item.telefone || item.phone || "",
       gross,
       commissionRate,
       value: gross * (commissionRate / 100)
@@ -553,7 +555,7 @@
   function renderTransactions() {
     const query = els.search.value.trim().toLowerCase();
     const rows = state.displayTransactions
-      .filter((item) => `${item.pagador} ${item.value} ${money(item.value)}`.toLowerCase().includes(query))
+      .filter((item) => `${item.pagador} ${formatPhone(item.telefone)} ${digitsOnly(item.telefone)} ${item.value} ${money(item.value)}`.toLowerCase().includes(query))
       .sort((a, b) => b.timestamp - a.timestamp);
     const tbody = document.getElementById("transactionsBody");
     const totalPages = Math.max(1, Math.ceil(rows.length / baseConfig.rowsPerPage));
@@ -561,7 +563,7 @@
     const visible = rows.slice((state.pageIndex - 1) * baseConfig.rowsPerPage, state.pageIndex * baseConfig.rowsPerPage);
     tbody.innerHTML = "";
     if (!visible.length) {
-      tbody.innerHTML = `<tr><td colspan="4">Nenhuma transação encontrada.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5">Nenhuma transação encontrada.</td></tr>`;
     } else {
       visible.forEach((item) => {
         const tr = document.createElement("tr");
@@ -569,6 +571,7 @@
           <td>${formatIsoDateBr(item.data)}</td>
           <td>${escapeHtml(item.hora)}</td>
           <td>${escapeHtml(item.pagador)}</td>
+          <td>${escapeHtml(formatPhone(item.telefone))}</td>
           <td>${money(item.value)}</td>
         `;
         tbody.append(tr);
@@ -711,6 +714,7 @@
 
   function setPage(page) {
     if (!["dashboard", "transactions", "notifications"].includes(page)) return;
+    if (state.page === page) return;
     state.page = page;
     els.pages.forEach((section) => section.classList.toggle("is-active", section.dataset.page === page));
     els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.page === page));
@@ -966,6 +970,23 @@
 
   function money(value) {
     return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  function digitsOnly(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  function formatPhone(value) {
+    let digits = digitsOnly(value);
+    if (!digits) return "";
+    if (digits.startsWith("55") && digits.length > 11) digits = digits.slice(2);
+    if (digits.length === 10) digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
+    if (digits.length > 11) digits = digits.slice(-11);
+    if (digits.length < 10) return digits;
+    const ddd = digits.slice(0, 2);
+    const first = digits.length === 11 ? digits.slice(2, 7) : digits.slice(2, 6);
+    const second = digits.length === 11 ? digits.slice(7, 11) : digits.slice(6, 10);
+    return `(${ddd}) ${first}-${second}`;
   }
 
   function integer(value) {

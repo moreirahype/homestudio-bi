@@ -64,6 +64,18 @@ body {
   overscroll-behavior: none;
 }
 
+body.theme-light {
+  --bg: #f5f7f0;
+  --bg-deep: #eef3ea;
+  --panel: #ffffff;
+  --panel-soft: #edf5e9;
+  --line: #c6d9bd;
+  --line-soft: rgba(86, 143, 61, 0.2);
+  --text: #132014;
+  --muted: #5e6b5c;
+  background: radial-gradient(circle at 45% -20%, rgba(127, 216, 95, 0.12), transparent 34%), var(--bg);
+}
+
 button,
 input,
 select {
@@ -305,11 +317,45 @@ body[data-current-page="notifications"] .control-panel {
 
 .control-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  grid-template-columns: minmax(0, 1fr) 62px 180px;
   gap: 14px;
   align-items: end;
   margin: 16px 0 18px;
   padding: 20px 16px 16px;
+}
+
+.theme-toggle {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  width: 62px;
+  min-height: 44px;
+  padding: 5px;
+  align-self: end;
+  border: 1px solid rgba(159, 232, 112, 0.24);
+  border-radius: var(--radius);
+  background: rgba(7, 16, 9, 0.72);
+  color: var(--muted);
+}
+
+.theme-toggle span {
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+
+.theme-toggle .sun-icon::before {
+  content: "☀";
+}
+
+.theme-toggle .moon-icon::before {
+  content: "☾";
+}
+
+body:not(.theme-light) .theme-toggle .moon-icon,
+body.theme-light .theme-toggle .sun-icon {
+  background: var(--accent);
+  color: #071009;
 }
 
 .period-grid {
@@ -815,7 +861,7 @@ tr:hover .transaction-edit-button,
 
 .manual-sale-form {
   display: grid;
-  grid-template-columns: minmax(130px, 0.75fr) minmax(96px, 0.45fr) minmax(180px, 1fr) minmax(160px, 0.85fr) minmax(130px, 0.55fr) minmax(120px, 0.5fr) 170px;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(92px, 0.42fr) minmax(160px, 0.9fr) minmax(140px, 0.72fr) minmax(140px, 0.72fr) minmax(120px, 0.5fr) minmax(110px, 0.48fr) 160px;
   gap: 12px;
   align-items: end;
   margin-bottom: 18px;
@@ -852,6 +898,41 @@ tr:hover .transaction-edit-button,
 .manual-sale-form button:disabled {
   cursor: wait;
   opacity: 0.74;
+}
+
+.settings-copy {
+  margin-top: 12px;
+  max-width: 720px;
+  color: var(--muted);
+}
+
+.settings-grid,
+.settings-menu-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.settings-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-grid > div,
+.settings-shortcut {
+  padding: 16px;
+  border: 1px solid rgba(159, 232, 112, 0.16);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.024);
+}
+
+.settings-grid p {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.settings-shortcut {
+  color: var(--text);
+  text-align: left;
 }
 
 .pager {
@@ -981,19 +1062,35 @@ tr:hover .transaction-edit-button,
   background: rgba(255, 255, 255, 0.022);
 }
 
+.product-chart-title {
+  justify-self: stretch;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
 .product-donut {
   --donut-reveal: 360deg;
+  --donut-gradient: conic-gradient(var(--accent) 0 100%);
   position: relative;
   width: min(240px, 58vw);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: conic-gradient(var(--accent) 0 100%);
-  -webkit-mask: conic-gradient(#000 0 var(--donut-reveal), transparent var(--donut-reveal) 360deg);
-  mask: conic-gradient(#000 0 var(--donut-reveal), transparent var(--donut-reveal) 360deg);
-  box-shadow: inset 0 0 0 1px rgba(159, 232, 112, 0.1), 0 18px 34px rgba(0, 0, 0, 0.22);
+  background: rgba(159, 232, 112, 0.06);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.22);
 }
 
-.product-donut.is-animating {
+.product-donut::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--donut-gradient);
+  -webkit-mask: conic-gradient(#000 0 var(--donut-reveal), transparent var(--donut-reveal) 360deg);
+  mask: conic-gradient(#000 0 var(--donut-reveal), transparent var(--donut-reveal) 360deg);
+}
+
+.product-donut.is-animating::before {
   animation: productDonutSweep 860ms cubic-bezier(.2,.78,.2,1) both;
 }
 
@@ -1069,7 +1166,7 @@ tr:hover .transaction-edit-button,
   .bar-row .bar-fill,
   .bar-row > strong,
   .bar-row > span,
-  .product-donut.is-animating,
+  .product-donut.is-animating::before,
   .product-legend-item {
     animation: none;
   }
@@ -1415,7 +1512,7 @@ tr:hover .transaction-edit-button,
 
 @media (max-width: 1120px) {
   .control-panel {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 62px 180px;
   }
 
   .period-grid {
@@ -1516,6 +1613,10 @@ tr:hover .transaction-edit-button,
     grid-template-columns: 1fr;
     gap: 16px;
     padding: 20px;
+  }
+
+  .theme-toggle {
+    width: 100%;
   }
 
   .period-grid {
@@ -1664,6 +1765,10 @@ tr:hover .transaction-edit-button,
   .manual-sale-form {
     grid-template-columns: 1fr;
     padding: 14px;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
   }
 
   .manual-sale-note {
