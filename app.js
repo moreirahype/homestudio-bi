@@ -23,12 +23,14 @@
     manualSaleOptions: [],
     loadedTransactionRange: null,
     filters: { attendant: "all", product: "all", account: "all" },
+    leadMetricSource: loadLeadMetricSource(),
+    frontProducts: loadStringList("hsbi-front-products"),
+    manualSalePermissions: loadStringList("hsbi-manual-sale-attendants"),
     metrics: {},
     pageIndex: 1,
     lastUpdated: null,
     notifications: loadNotificationPrefs(),
-    animateDashboard: false,
-    theme: loadThemePreference()
+    animateDashboard: false
   };
 
   const els = {
@@ -83,9 +85,11 @@
     saleNotificationList: document.getElementById("saleNotificationList"),
     reportStyleOptions: document.getElementById("reportStyleOptions"),
     reportPreviewTitle: document.getElementById("reportPreviewTitle"),
+    leadMetricOptions: document.getElementById("leadMetricOptions"),
+    frontProductsList: document.getElementById("frontProductsList"),
+    manualSaleAttendantsList: document.getElementById("manualSaleAttendantsList"),
     enableAllNotifications: document.getElementById("enableAllNotifications"),
-    testNotification: document.getElementById("testNotification"),
-    themeToggle: document.getElementById("themeToggle")
+    testNotification: document.getElementById("testNotification")
   };
 
   const metricIds = {
@@ -104,14 +108,13 @@
   };
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
-  const productChartColors = ["#9fe870", "#7fd8ff", "#f3cf62", "#ff9f7a", "#c59cff", "#7ee2bd", "#f28bc5", "#d4ff90"];
+  const productChartColors = ["#9fe870", "#22c55e", "#38bdf8", "#f97316", "#f59e0b", "#e879f9", "#a78bfa", "#f43f5e", "#14b8a6"];
   let notificationToastTimer = null;
   const metricAnimationFrames = new Map();
 
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
-    applyThemePreference();
     applySidebarPreference();
     setDefaultDates();
     bindEvents();
@@ -156,9 +159,6 @@
     if (els.sidebarToggle) {
       els.sidebarToggle.addEventListener("click", toggleSidebar);
     }
-    if (els.themeToggle) {
-      els.themeToggle.addEventListener("click", toggleTheme);
-    }
     els.transactionSearch.addEventListener("input", () => {
       state.pageIndex = 1;
       renderTransactions();
@@ -182,6 +182,17 @@
         updateCurrencyPlaceholder(els.manualSaleValue, els.manualSaleCurrency.value);
       }
     }
+    if (els.leadMetricOptions) {
+      els.leadMetricOptions.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-lead-source]");
+        if (!button || button.dataset.leadSource === state.leadMetricSource) return;
+        state.leadMetricSource = button.dataset.leadSource === "leads" ? "leads" : "conversations";
+        localStorage.setItem("hsbi-lead-metric-source", state.leadMetricSource);
+        state.animateDashboard = state.page === "dashboard";
+        render();
+      });
+    }
+
     if (els.transactionEditForm) {
       els.transactionEditForm.addEventListener("submit", submitTransactionEdit);
       if (els.transactionEditCurrency) {
@@ -269,24 +280,6 @@
     localStorage.setItem("hsbi-sidebar-collapsed", String(isCollapsed));
     updateSidebarToggle(isCollapsed);
     requestAnimationFrame(renderSalesChart);
-  }
-
-  function applyThemePreference() {
-    document.body.classList.toggle("theme-light", state.theme === "light");
-    if (els.themeToggle) {
-      els.themeToggle.setAttribute("aria-pressed", state.theme === "light" ? "true" : "false");
-      els.themeToggle.title = state.theme === "light" ? "Usar tema escuro" : "Usar tema claro";
-    }
-  }
-
-  function toggleTheme() {
-    state.theme = state.theme === "light" ? "dark" : "light";
-    localStorage.setItem("hsbi-theme", state.theme);
-    applyThemePreference();
-    requestAnimationFrame(() => {
-      renderSalesChart();
-      renderProductsDonut(getProductRows());
-    });
   }
 
   function updateSidebarToggle(isCollapsed) {
@@ -746,6 +739,7 @@
     }
     renderAttendants();
     renderProducts();
+    renderSettingsPages();
     renderTransactions();
     renderNotificationSummary();
   }
@@ -894,7 +888,7 @@
     const map = new Map();
     (meta && Array.isArray(meta.accountBreakdown) ? meta.accountBreakdown : []).forEach((account) => {
       const id = String(account.id || account.account || "").trim();
-      if (!id || (Number(account.spend || 0) <= 0 && Number(account.leads || 0) <= 0)) return;
+      if (!id || (Number(account.spend || 0) <= 0 && Number(account.leads || 0) <= 0 && Number(account.conversations || 0) <= 0)) return;
       map.set(id, { value: id, label: account.label || account.name || id });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
@@ -972,8 +966,10 @@
   function countFrontConversionSales(periodTransactions, allTransactions) {
     const periodIds = new Set(periodTransactions.map((item) => item.id));
     const seenBuyers = new Set();
+    const frontProducts = new Set(state.frontProducts || []);
     return (allTransactions || [])
       .filter((item) => !isGalleryTransaction(item))
+      .filter((item) => !frontProducts.size || frontProducts.has(normalizeFilterValue(item.produto || "Sem produto")))
       .slice()
       .sort((a, b) => a.timestamp - b.timestamp)
       .reduce((total, item) => {
@@ -1014,8 +1010,9 @@
 
   function getLeadBase(meta) {
     const source = meta || {};
-    const candidates = [
-      source.leads,
+    const candidates = state.leadMetricSource === "leads" ? [
+      source.leads
+    ] : [
       source.conversations,
       source.conversas,
       source.messaging_conversations,
@@ -1028,6 +1025,10 @@
 
   function renderMetrics() {
     const animate = state.page === "dashboard" && state.animateDashboard && canAnimateDashboard();
+    const leadLabel = document.getElementById("metricLeadLabel");
+    const cplLabel = document.getElementById("metricCplLabel");
+    if (leadLabel) leadLabel.textContent = state.leadMetricSource === "leads" ? "Leads" : "Conversas";
+    if (cplLabel) cplLabel.textContent = state.leadMetricSource === "leads" ? "Custo por Lead" : "Custo por conversa";
     setMetric("revenue", state.metrics.revenue, null, { animate, formatter: money });
     setMetric("ads", state.metrics.ads, null, { animate, formatter: money });
     setMetric("tax", state.metrics.tax, null, { animate, formatter: money });
@@ -1466,6 +1467,74 @@
     }).join("");
   }
 
+  function renderSettingsPages() {
+    renderLeadMetricOptions();
+    renderFrontProductsSettings();
+    renderManualSalePermissionSettings();
+  }
+
+  function renderLeadMetricOptions() {
+    if (!els.leadMetricOptions) return;
+    els.leadMetricOptions.querySelectorAll("[data-lead-source]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.leadSource === state.leadMetricSource);
+      button.setAttribute("aria-pressed", button.dataset.leadSource === state.leadMetricSource ? "true" : "false");
+    });
+  }
+
+  function renderFrontProductsSettings() {
+    if (!els.frontProductsList) return;
+    const products = getProductSelectOptions("").filter((name) => name && name !== "Sem produto");
+    if (!products.length) {
+      els.frontProductsList.innerHTML = `<p class="settings-empty">Nenhum produto cadastrado ainda.</p>`;
+      return;
+    }
+    els.frontProductsList.innerHTML = products.map((product) => {
+      const key = normalizeFilterValue(product);
+      return `
+        <label class="settings-check-row">
+          <span>${escapeHtml(product)}</span>
+          <span class="switch">
+            <input type="checkbox" value="${escapeHtml(key)}" ${state.frontProducts.includes(key) ? "checked" : ""}>
+            <span class="slider"></span>
+          </span>
+        </label>`;
+    }).join("");
+    els.frontProductsList.querySelectorAll("input").forEach((input) => {
+      input.addEventListener("change", () => {
+        state.frontProducts = Array.from(els.frontProductsList.querySelectorAll("input:checked")).map((node) => node.value);
+        saveStringList("hsbi-front-products", state.frontProducts);
+        state.animateDashboard = state.page === "dashboard";
+        render();
+      });
+    });
+  }
+
+  function renderManualSalePermissionSettings() {
+    if (!els.manualSaleAttendantsList) return;
+    const attendants = getAttendantSelectOptions("").filter((name) => name && name !== "Sem atendente");
+    if (!attendants.length) {
+      els.manualSaleAttendantsList.innerHTML = `<p class="settings-empty">Nenhum atendente cadastrado ainda.</p>`;
+      return;
+    }
+    els.manualSaleAttendantsList.innerHTML = attendants.map((attendant) => {
+      const key = normalizeFilterValue(attendant);
+      return `
+        <label class="settings-check-row">
+          <span>${escapeHtml(attendant)}</span>
+          <span class="switch">
+            <input type="checkbox" value="${escapeHtml(key)}" ${state.manualSalePermissions.includes(key) ? "checked" : ""}>
+            <span class="slider"></span>
+          </span>
+        </label>`;
+    }).join("");
+    els.manualSaleAttendantsList.querySelectorAll("input").forEach((input) => {
+      input.addEventListener("change", () => {
+        state.manualSalePermissions = Array.from(els.manualSaleAttendantsList.querySelectorAll("input:checked")).map((node) => node.value);
+        saveStringList("hsbi-manual-sale-attendants", state.manualSalePermissions);
+      });
+    });
+  }
+
   function restartElementAnimation(element, className) {
     if (!element || !canAnimateDashboard()) return;
     element.classList.remove(className);
@@ -1489,7 +1558,7 @@
 
     if (!visible.length) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="8">Nenhuma transa??o encontrada.</td>`;
+      tr.innerHTML = `<td colspan="8">Nenhuma transação encontrada.</td>`;
       tbody.append(tr);
     } else {
       visible.forEach((item) => {
@@ -1504,7 +1573,7 @@
           <td>${escapeHtml(item.moedaOriginal)}</td>
           <td class="transaction-value-cell">
             <span>${formatOriginalValue(item)}</span>
-            <button class="transaction-edit-button" type="button" data-id="${escapeHtml(item.id)}" aria-label="Editar transa??o">
+            <button class="transaction-edit-button" type="button" data-id="${escapeHtml(item.id)}" aria-label="Editar transação">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.25V20h2.75L17.8 8.95l-2.75-2.75L4 17.25zm15.92-11.17a1 1 0 0 0 0-1.42l-.58-.58a1 1 0 0 0-1.42 0l-1.16 1.16 2.75 2.75 1.41-1.41z"></path></svg>
             </button>
           </td>
@@ -1531,6 +1600,7 @@
 
   function renderNotificationSummary() {
     const summary = document.getElementById("notificationSummary");
+    updateSaleNotificationPreview();
     if (!summary) return;
     const preview = buildReportPreview();
     summary.textContent = preview.body;
@@ -1547,8 +1617,16 @@
             <input type="checkbox" data-notification="sales" ${isSaleNotificationsEnabled() ? "checked" : ""}>
             <span class="slider"></span>
           </span>
+        </label>
+        <label class="notification-row sale-notification-row">
+          <span>Mostrar atendente</span>
+          <span class="switch">
+            <input type="checkbox" data-notification="sale-attendant" ${state.notifications.saleShowAttendant !== false ? "checked" : ""}>
+            <span class="slider"></span>
+          </span>
         </label>`;
-      const saleInput = els.saleNotificationList.querySelector("input");
+      const saleInput = els.saleNotificationList.querySelector('[data-notification="sales"]');
+      const saleAttendantInput = els.saleNotificationList.querySelector('[data-notification="sale-attendant"]');
       saleInput.addEventListener("change", async () => {
         const previous = state.notifications.salesEnabled;
         state.notifications.salesEnabled = saleInput.checked;
@@ -1560,6 +1638,23 @@
           state.notifications.salesEnabled = previous;
           saveNotificationPrefs();
           renderNotifications();
+          alert(error.message);
+        }
+      });
+      saleAttendantInput.addEventListener("change", async () => {
+        const previous = state.notifications.saleShowAttendant;
+        state.notifications.saleShowAttendant = saleAttendantInput.checked;
+        saveNotificationPrefs();
+        renderNotifications();
+        updateSaleNotificationPreview();
+        try {
+          await syncOwnerPush();
+          showNotificationSavedToast();
+        } catch (error) {
+          state.notifications.saleShowAttendant = previous;
+          saveNotificationPrefs();
+          renderNotifications();
+          updateSaleNotificationPreview();
           alert(error.message);
         }
       });
@@ -1635,6 +1730,15 @@
     return state.notifications.salesEnabled !== false;
   }
 
+  function updateSaleNotificationPreview() {
+    const body = document.getElementById("saleNotificationPreviewBody");
+    if (!body) return;
+    body.textContent = state.notifications.saleShowAttendant === false
+      ? "Valor: R$ 99,90"
+      : "Valor: R$ 99,90 • Nome do atendente";
+    body.hidden = false;
+  }
+
   function getReportStyle() {
     return ["profit_status", "detailed", "creative"].includes(state.notifications.reportStyle)
       ? state.notifications.reportStyle
@@ -1648,6 +1752,7 @@
       enabled: isSaleNotificationsEnabled() || times.length > 0,
       times,
       salesEnabled: isSaleNotificationsEnabled(),
+      saleShowAttendant: state.notifications.saleShowAttendant !== false,
       reportStyle: getReportStyle()
     };
     return force
@@ -1723,14 +1828,27 @@
 
   function loadNotificationPrefs() {
     try {
-      return Object.assign({ salesEnabled: true, reportStyle: "detailed" }, JSON.parse(localStorage.getItem("hsbi-notifications") || "{}"));
+      return Object.assign({ salesEnabled: true, saleShowAttendant: true, reportStyle: "detailed" }, JSON.parse(localStorage.getItem("hsbi-notifications") || "{}"));
     } catch {
       return {};
     }
   }
 
-  function loadThemePreference() {
-    return localStorage.getItem("hsbi-theme") === "light" ? "light" : "dark";
+  function loadLeadMetricSource() {
+    return localStorage.getItem("hsbi-lead-metric-source") === "leads" ? "leads" : "conversations";
+  }
+
+  function loadStringList(key) {
+    try {
+      const list = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(list) ? list.map((item) => String(item)) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveStringList(key, list) {
+    localStorage.setItem(key, JSON.stringify(Array.isArray(list) ? list : []));
   }
 
   function saveNotificationPrefs() {

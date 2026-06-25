@@ -28,9 +28,12 @@ module.exports = async function handler(req, res) {
     const variant = audience === "owner" && body.kind === "report"
       ? body.variants?.[style] || body.variants?.detailed
       : null;
+    const notificationBody = audience === "owner" && body.kind === "sale" && record.preferences?.saleShowAttendant === false
+      ? String(body.body || "").split(" • ")[0]
+      : (variant?.body || body.body || "");
     return sendToRecord(record, {
       title: variant?.title || body.title,
-      body: variant?.body || body.body || "",
+      body: notificationBody,
       url: body.url || "/",
       tag: body.tag || `hsbi-${audience}`
     });

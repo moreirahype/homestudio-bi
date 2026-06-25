@@ -1066,14 +1066,14 @@ function readMetaInsights_(from, to, includeActions) {
   const properties = PropertiesService.getScriptProperties();
   const token = properties.getProperty('META_ACCESS_TOKEN');
   const accounts = getMetaAdAccounts_(properties);
-  if (!token || !accounts.length) return { spend: 0, leads: 0 };
+  if (!token || !accounts.length) return { spend: 0, leads: 0, conversations: 0 };
 
   const version = properties.getProperty('META_API_VERSION') || 'v25.0';
   const timeRange = encodeURIComponent(JSON.stringify({
     since: from || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
     until: to || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd')
   }));
-  const result = { spend: 0, leads: 0 };
+  const result = { spend: 0, leads: 0, conversations: 0 };
   const actions = [];
   const errors = [];
   const accountBreakdown = [];
@@ -1099,23 +1099,28 @@ function readMetaInsights_(from, to, includeActions) {
     const rows = payload.data.data || [];
     let accountSpend = 0;
     let accountLeads = 0;
+    let accountConversations = 0;
     const accountDaily = [];
     rows.forEach((row) => {
       const date = row.date_start || row.date_stop || '';
       const rowActions = row.actions || [];
       const rowSpend = parseNumber_(row.spend || 0);
       const rowLeads = countLeads_(rowActions);
+      const rowConversations = countConversations_(rowActions);
       accountSpend += rowSpend;
       accountLeads += rowLeads;
+      accountConversations += rowConversations;
       if (date) {
         accountDaily.push({
           date: date,
           spend: roundCurrency_(rowSpend),
-          leads: rowLeads
+          leads: rowLeads,
+          conversations: rowConversations
         });
-        const total = dailyTotals[date] || { date: date, spend: 0, leads: 0 };
+        const total = dailyTotals[date] || { date: date, spend: 0, leads: 0, conversations: 0 };
         total.spend += rowSpend;
         total.leads += rowLeads;
+        total.conversations += rowConversations;
         dailyTotals[date] = total;
       }
       if (includeActions) {
@@ -1129,12 +1134,14 @@ function readMetaInsights_(from, to, includeActions) {
     });
     result.spend += accountSpend;
     result.leads += accountLeads;
+    result.conversations += accountConversations;
     accountBreakdown.push({
       id: adAccount,
       account: adAccount,
       label: adAccount,
       spend: roundCurrency_(accountSpend),
       leads: accountLeads,
+      conversations: accountConversations,
       daily: accountDaily
     });
   });
@@ -1147,7 +1154,8 @@ function readMetaInsights_(from, to, includeActions) {
     .map((date) => ({
       date: date,
       spend: roundCurrency_(dailyTotals[date].spend),
-      leads: dailyTotals[date].leads
+      leads: dailyTotals[date].leads,
+      conversations: dailyTotals[date].conversations
     }));
   if (errors.length) result.errors = errors;
   if (includeActions) {
@@ -1197,6 +1205,18 @@ function countLeads_(actions) {
     const type = String(action.action_type || '').toLowerCase();
     const shouldCount = matchers.some((matcher) => type === matcher);
     if (!shouldCount) return total;
+    return total + parseNumber_(action.value || 0);
+  }, 0);
+}
+
+function countConversations_(actions) {
+  return actions.reduce((total, action) => {
+    const type = String(action.action_type || '').toLowerCase();
+    if (type !== 'onsite_conversion.messaging_conversation_started_7d' &&
+        type !== 'omni_messaging_conversation_started_7d' &&
+        type !== 'messaging_conversation_started_7d') {
+      return total;
+    }
     return total + parseNumber_(action.value || 0);
   }, 0);
 }

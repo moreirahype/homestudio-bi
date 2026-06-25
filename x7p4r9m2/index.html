@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=75">
+    <link rel="stylesheet" href="../styles.css?v=78">
   </head>
   <body>
     <div class="app-shell">
@@ -44,6 +44,22 @@
           <button class="nav-item" data-page="transactions" type="button" aria-label="Transações">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h14v2H5zm0 5h14v2H5z"></path></svg>
             <span>Transações</span>
+          </button>
+          <button class="nav-item" data-page="goals" type="button" aria-label="Definir metas">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.5 6.7H22l-6 4.4 2.3 6.9L12 15.8 5.7 20 8 13.1 2 8.7h7.5z"></path></svg>
+            <span>Definir metas</span>
+          </button>
+          <button class="nav-item" data-page="settings-attendants" type="button" aria-label="Configurar atendentes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zm-12 9a8 8 0 0 1 16 0zm15-12h3v2h-3zm0 4h3v2h-3z"></path></svg>
+            <span>Configurar atendentes</span>
+          </button>
+          <button class="nav-item" data-page="settings-products" type="button" aria-label="Configurar produtos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v4H4zm0 6h7v4H4zm9 0h7v4h-7z"></path></svg>
+            <span>Configurar produtos</span>
+          </button>
+          <button class="nav-item" data-page="integrations" type="button" aria-label="Integrações">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h4v2H7a3 3 0 0 0 0 6h4v2H7A5 5 0 0 1 7 7zm6 0h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 0 0 0-6h-4zm-4 4h6v2H9z"></path></svg>
+            <span>Integrações</span>
           </button>
           <button class="nav-item" data-page="notifications" type="button" aria-label="Notificações">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-5-2-2v-5a5 5 0 0 0-10 0v5l-2 2v1h14z"></path></svg>
@@ -100,10 +116,6 @@
               <select id="dashboardAccountFilter"></select>
             </label>
           </div>
-          <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar tema" aria-pressed="false">
-            <span class="sun-icon" aria-hidden="true"></span>
-            <span class="moon-icon" aria-hidden="true"></span>
-          </button>
           <button class="refresh-button" id="refreshButton" type="button">Atualizar</button>
         </section>
 
@@ -130,7 +142,7 @@
               <strong id="metricMargin">N/A</strong>
             </article>
             <article class="metric metric-roas">
-              <span>ROAS</span>
+              <span>ROI</span>
               <strong id="metricRoas">0,00</strong>
             </article>
             <article class="metric metric-sales">
@@ -146,11 +158,11 @@
               <strong id="metricAverageTicket">N/A</strong>
             </article>
             <article class="metric metric-leads">
-              <span>Leads</span>
+              <span id="metricLeadLabel">Conversas</span>
               <strong id="metricLeads">0</strong>
             </article>
             <article class="metric metric-cpl">
-              <span>Custo por Lead</span>
+              <span id="metricCplLabel">Custo por conversa</span>
               <strong id="metricCpl">N/A</strong>
             </article>
             <article class="metric metric-conversion-rate">
@@ -378,13 +390,17 @@
           <article class="panel settings-panel">
             <div class="panel-header"><h1>Configurar atendentes</h1></div>
             <p class="settings-copy">Configure nome, comissão, salário fixo, início e pausas dos atendentes sem precisar abrir a planilha.</p>
-          </article>
+                      <div class="settings-list" id="manualSaleAttendantsList"></div>
+</article>
         </section>
 
         <section class="page" id="page-settings-products" data-page="settings-products">
           <article class="panel settings-panel">
             <div class="panel-header"><h1>Configurar produtos</h1></div>
             <p class="settings-copy">Cadastre produtos, custos fixos e custos percentuais para o lucro considerar o custo de cada venda.</p>
+            <h2 class="settings-subtitle">Produtos de Front</h2>
+            <p class="settings-copy is-compact">Selecione quais produtos entram no cálculo de Conversão Front.</p>
+            <div class="settings-list" id="frontProductsList"></div>
           </article>
         </section>
 
@@ -396,7 +412,13 @@
               <div><h2>Lançamento manual</h2><p>Se a venda ainda não roda no automático, lance em segundos pela aba Transações.</p></div>
               <div><h2>Meta Ads</h2><p>Conecte suas contas de anúncio para acompanhar gastos, imposto, leads ou conversas e lucro real.</p></div>
             </div>
-          </article>
+                      <h2 class="settings-subtitle">Indicador do dashboard</h2>
+            <p class="settings-copy is-compact">Escolha se o dashboard usa conversas iniciadas ou leads vindos do Meta Ads.</p>
+            <div class="segmented-options" id="leadMetricOptions" role="group" aria-label="Indicador do dashboard">
+              <button class="is-active" data-lead-source="conversations" type="button" aria-pressed="true">Conversas</button>
+              <button data-lead-source="leads" type="button" aria-pressed="false">Leads</button>
+            </div>
+</article>
         </section>
 
         <section class="page" id="page-settings" data-page="settings">
@@ -428,11 +450,10 @@
                   <div class="notification-preview">
                     <img src="../assets/icon-192.png?v=55" alt="">
                     <div>
-                      <strong>💰 PIX de R$ 99,90 recebido!</strong>
-                      <span>Nome do atendente</span>
+                      <strong>Venda realizada!</strong>
+                      <span id="saleNotificationPreviewBody">Valor: R$ 99,90 • Nome do atendente</span>
                       <small>High Sales</small>
-                    </div>
-                  </div>
+                    </div></div>
                 </div>
               </article>
 
@@ -490,7 +511,7 @@
     </div>
     <script src="../config.js?v=55"></script>
     <script src="../push-client.js?v=63"></script>
-    <script src="../app.js?v=86"></script>
+    <script src="../app.js?v=87"></script>
   </body>
 </html>
 

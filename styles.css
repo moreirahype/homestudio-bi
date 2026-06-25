@@ -49,6 +49,7 @@
 html {
   background: var(--bg);
   min-height: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -62,19 +63,9 @@ body {
   font-size: var(--text-base);
   line-height: 1.45;
   overscroll-behavior: none;
+  overflow-x: hidden;
 }
 
-body.theme-light {
-  --bg: #f5f7f0;
-  --bg-deep: #eef3ea;
-  --panel: #ffffff;
-  --panel-soft: #edf5e9;
-  --line: #c6d9bd;
-  --line-soft: rgba(86, 143, 61, 0.2);
-  --text: #132014;
-  --muted: #5e6b5c;
-  background: radial-gradient(circle at 45% -20%, rgba(127, 216, 95, 0.12), transparent 34%), var(--bg);
-}
 
 button,
 input,
@@ -89,6 +80,8 @@ button {
 .app-shell {
   min-height: 100vh;
   min-height: 100dvh;
+  max-width: 100vw;
+  overflow-x: hidden;
   background-color: var(--bg);
   background: radial-gradient(circle at 45% -20%, rgba(159, 232, 112, 0.08), transparent 34%), var(--bg);
 }
@@ -101,6 +94,8 @@ button {
   border-right: 1px solid rgba(159, 232, 112, 0.14);
   background: rgba(14, 18, 13, 0.94);
   transition: width 180ms ease, padding 180ms ease;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .brand {
@@ -311,52 +306,24 @@ body.sidebar-collapsed .sidebar-toggle {
   box-shadow: var(--shadow);
 }
 
-body[data-current-page="notifications"] .control-panel {
+body[data-current-page="notifications"] .control-panel,
+body[data-current-page="goals"] .control-panel,
+body[data-current-page="settings-attendants"] .control-panel,
+body[data-current-page="settings-products"] .control-panel,
+body[data-current-page="integrations"] .control-panel,
+body[data-current-page="settings"] .control-panel {
   display: none;
 }
 
 .control-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 62px 180px;
+  grid-template-columns: minmax(0, 1fr) 180px;
   gap: 14px;
   align-items: end;
   margin: 16px 0 18px;
   padding: 20px 16px 16px;
 }
 
-.theme-toggle {
-  display: inline-grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  width: 62px;
-  min-height: 44px;
-  padding: 5px;
-  align-self: end;
-  border: 1px solid rgba(159, 232, 112, 0.24);
-  border-radius: var(--radius);
-  background: rgba(7, 16, 9, 0.72);
-  color: var(--muted);
-}
-
-.theme-toggle span {
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-}
-
-.theme-toggle .sun-icon::before {
-  content: "☀";
-}
-
-.theme-toggle .moon-icon::before {
-  content: "☾";
-}
-
-body:not(.theme-light) .theme-toggle .moon-icon,
-body.theme-light .theme-toggle .sun-icon {
-  background: var(--accent);
-  color: #071009;
-}
 
 .period-grid {
   display: flex;
@@ -906,6 +873,16 @@ tr:hover .transaction-edit-button,
   color: var(--muted);
 }
 
+.settings-copy.is-compact {
+  margin-top: 4px;
+}
+
+.settings-subtitle {
+  margin: 22px 0 0;
+  color: var(--text);
+  font-size: var(--text-lg);
+}
+
 .settings-grid,
 .settings-menu-grid {
   display: grid;
@@ -933,6 +910,57 @@ tr:hover .transaction-edit-button,
 .settings-shortcut {
   color: var(--text);
   text-align: left;
+}
+
+.settings-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  max-width: 620px;
+}
+
+.settings-check-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 54px;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid rgba(159, 232, 112, 0.16);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.024);
+  color: var(--text);
+}
+
+.settings-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.segmented-options {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 4px;
+  border: 1px solid rgba(159, 232, 112, 0.16);
+  border-radius: var(--radius);
+  background: rgba(7, 16, 9, 0.56);
+}
+
+.segmented-options button {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.segmented-options button.is-active {
+  border-color: var(--accent);
+  background: rgba(159, 232, 112, 0.12);
+  color: var(--accent);
 }
 
 .pager {
@@ -1512,7 +1540,7 @@ tr:hover .transaction-edit-button,
 
 @media (max-width: 1120px) {
   .control-panel {
-    grid-template-columns: 1fr 62px 180px;
+    grid-template-columns: 1fr 180px;
   }
 
   .period-grid {
@@ -1560,8 +1588,22 @@ tr:hover .transaction-edit-button,
   }
 
   .main {
+    width: 100vw;
+    max-width: 100vw;
+    overflow-x: hidden;
     margin-left: 0;
     padding: calc(42px + env(safe-area-inset-top)) 12px calc(134px + env(safe-area-inset-bottom));
+  }
+
+  .control-panel,
+  .panel,
+  .mobile-header,
+  .bottom-nav {
+    max-width: calc(100vw - 24px);
+  }
+
+  .bottom-nav {
+    max-width: 100vw;
   }
 
   body.sidebar-collapsed .main {
@@ -1588,7 +1630,15 @@ tr:hover .transaction-edit-button,
   }
 
   .mobile-header .brand {
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: clamp(18px, 5.2vw, var(--text-mobile-brand));
+  }
+
+  .mobile-header .brand span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .mobile-header .brand-mark {
@@ -1604,6 +1654,11 @@ tr:hover .transaction-edit-button,
   }
 
   .sync-pill {
+    flex: 0 0 auto;
+    max-width: 138px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     min-height: 36px;
     padding: 0 12px;
     font-size: var(--text-xs);
@@ -1613,10 +1668,6 @@ tr:hover .transaction-edit-button,
     grid-template-columns: 1fr;
     gap: 16px;
     padding: 20px;
-  }
-
-  .theme-toggle {
-    width: 100%;
   }
 
   .period-grid {
@@ -1678,6 +1729,18 @@ tr:hover .transaction-edit-button,
     height: 52px;
     max-width: 100%;
     opacity: 0;
+  }
+
+  .manual-sale-form input[type="date"],
+  .manual-sale-form input[type="time"] {
+    min-height: 52px;
+    padding: 0 14px;
+    border-radius: var(--radius);
+    text-align: center;
+    color: var(--text);
+    background: var(--bg);
+    appearance: none;
+    -webkit-appearance: none;
   }
 
   .dashboard-filters {
@@ -1981,11 +2044,21 @@ tr:hover .transaction-edit-button,
     display: grid;
     gap: 4px;
     place-items: center;
+    min-width: 0;
     min-height: 64px;
     border: 0;
     background: transparent;
     color: #c9d5c5;
     font-size: var(--text-bottom-nav);
+  }
+
+  .bottom-item span {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .bottom-item svg {

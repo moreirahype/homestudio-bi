@@ -19,6 +19,7 @@ module.exports = async function handler(req, res) {
     enabled: body.preferences?.enabled !== false,
     times: Array.isArray(body.preferences?.times) ? body.preferences.times : [],
     salesEnabled: body.preferences?.salesEnabled !== false,
+    saleShowAttendant: body.preferences?.saleShowAttendant !== false,
     reportStyle: ["profit_status", "detailed", "creative"].includes(body.preferences?.reportStyle)
       ? body.preferences.reportStyle
       : "detailed"
