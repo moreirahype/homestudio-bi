@@ -1807,7 +1807,7 @@
       });
     }
 
-    els.pageInfo.textContent = `P?gina ${state.pageIndex} de ${totalPages}`;
+    els.pageInfo.textContent = `Página ${state.pageIndex} de ${totalPages}`;
     els.prevPage.disabled = state.pageIndex <= 1;
     els.nextPage.disabled = state.pageIndex >= totalPages;
   }
