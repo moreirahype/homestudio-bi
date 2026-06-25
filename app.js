@@ -257,7 +257,8 @@
     });
 
     document.addEventListener("pointerdown", (event) => {
-      if (!event.target.closest(".chart-point")) hideTooltips();
+      if (event.target.closest(".chart-point") || event.target.closest(".product-donut")) return;
+      hideTooltips();
     });
 
     window.addEventListener("resize", debounce(() => {
@@ -1360,6 +1361,9 @@
     [els.hourlyTooltip, els.dailyTooltip, els.legacyTooltip].filter(Boolean).forEach((tooltip) => {
       if (tooltip !== except) hideTooltip(tooltip);
     });
+    document.querySelectorAll(".product-donut-tooltip").forEach((tooltip) => {
+      if (tooltip !== except) hideTooltip(tooltip);
+    });
   }
 
   function renderAttendants() {
@@ -1504,7 +1508,6 @@
             d="${describeDonutSlice(50, 50, 44, 23, segment.start * 3.6, segment.end * 3.6)}"
             fill="${segment.color}"
             data-index="${index}"
-            tabindex="0"
             aria-label="${escapeHtml(segment.row.name)}: ${integer(segment.row.sales)} vendas, ${money(segment.row.revenue)}"
           ></path>
         `).join("")}
@@ -1518,9 +1521,13 @@
       const show = (event) => showProductTooltip(event, segment, donut, tooltip);
       slice.addEventListener("mouseenter", show);
       slice.addEventListener("mousemove", show);
-      slice.addEventListener("focus", show);
+      slice.addEventListener("pointerdown", (event) => {
+        if (isFinePointer()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        show(event);
+      });
       slice.addEventListener("mouseleave", () => hideTooltip(tooltip));
-      slice.addEventListener("blur", () => hideTooltip(tooltip));
     });
     legend.innerHTML = rows.slice(0, 7).map((row, index) => {
       const share = row.revenue / totalRevenue;
@@ -1539,6 +1546,7 @@
     const rect = donut.getBoundingClientRect();
     const x = event.clientX ? event.clientX - rect.left : rect.width / 2;
     const y = event.clientY ? event.clientY - rect.top : rect.height / 2;
+    hideTooltips(tooltip);
     tooltip.hidden = false;
     tooltip.style.left = `${Math.max(78, Math.min(rect.width - 78, x))}px`;
     tooltip.style.top = `${Math.max(54, Math.min(rect.height - 20, y - 8))}px`;
@@ -1548,6 +1556,10 @@
       <span class="tooltip-line"><b>Faturamento:</b> ${money(segment.row.revenue)}</span>
       <span class="tooltip-line"><b>Participação:</b> ${percent(segment.share)}</span>
     `;
+  }
+
+  function isFinePointer() {
+    return window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   }
 
   function describeDonutSlice(cx, cy, outerRadius, innerRadius, startAngle, endAngle) {

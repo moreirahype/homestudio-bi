@@ -1211,7 +1211,7 @@ tr:hover .transaction-edit-button,
 }
 
 .product-slice {
-  cursor: pointer;
+  cursor: default;
   opacity: .9;
   outline: none;
   transform-box: fill-box;
