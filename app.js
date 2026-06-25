@@ -1275,7 +1275,8 @@
         label: label.short,
         fullLabel: label.full,
         sales: sales.length,
-        revenue: sum(sales.map((item) => item.valor))
+        revenue: sum(sales.map((item) => item.valor)),
+        productCost: sum(sales.map(getTransactionProductCost))
       };
     });
     return addProfitToSeries(series, period);
@@ -1441,6 +1442,7 @@
     const totalRevenue = sum(rows.map((row) => row.revenue));
     if (!rows.length || totalRevenue <= 0) {
       donut.style.setProperty("--donut-gradient", "conic-gradient(rgba(159,232,112,.18) 0 100%)");
+      donut.innerHTML = `<div class="product-donut-empty"></div>`;
       legend.innerHTML = `<div class="product-legend-item"><i style="--slice-color:rgba(159,232,112,.28)"></i><strong>Sem produtos</strong><span>0%</span></div>`;
       restartElementAnimation(donut, "is-animating");
       return;
@@ -1451,10 +1453,40 @@
       const size = (row.revenue / totalRevenue) * 100;
       cursor += size;
       const color = productChartColors[index % productChartColors.length];
-      return `${color} ${start}% ${cursor}%`;
+      return {
+        row,
+        color,
+        start,
+        end: cursor,
+        share: row.revenue / totalRevenue
+      };
     });
-    donut.style.setProperty("--donut-gradient", `conic-gradient(${segments.join(", ")})`);
+    donut.innerHTML = `
+      <svg class="product-donut-svg" viewBox="0 0 100 100" role="img" aria-label="Receita por produto">
+        ${segments.map((segment, index) => `
+          <path
+            class="product-slice"
+            d="${describeDonutSlice(50, 50, 44, 27, segment.start * 3.6, segment.end * 3.6)}"
+            fill="${segment.color}"
+            data-index="${index}"
+            tabindex="0"
+            aria-label="${escapeHtml(segment.row.name)}: ${integer(segment.row.sales)} vendas, ${money(segment.row.revenue)}"
+          ></path>
+        `).join("")}
+      </svg>
+      <div class="chart-tooltip product-donut-tooltip" hidden></div>
+    `;
     restartElementAnimation(donut, "is-animating");
+    const tooltip = donut.querySelector(".product-donut-tooltip");
+    donut.querySelectorAll(".product-slice").forEach((slice) => {
+      const segment = segments[Number(slice.dataset.index)];
+      const show = (event) => showProductTooltip(event, segment, donut, tooltip);
+      slice.addEventListener("mouseenter", show);
+      slice.addEventListener("mousemove", show);
+      slice.addEventListener("focus", show);
+      slice.addEventListener("mouseleave", () => hideTooltip(tooltip));
+      slice.addEventListener("blur", () => hideTooltip(tooltip));
+    });
     legend.innerHTML = rows.slice(0, 7).map((row, index) => {
       const share = row.revenue / totalRevenue;
       const color = productChartColors[index % productChartColors.length];
@@ -1465,6 +1497,46 @@
           <span>${percent(share)}</span>
         </div>`;
     }).join("");
+  }
+
+  function showProductTooltip(event, segment, donut, tooltip) {
+    if (!segment || !tooltip) return;
+    const rect = donut.getBoundingClientRect();
+    const x = event.clientX ? event.clientX - rect.left : rect.width / 2;
+    const y = event.clientY ? event.clientY - rect.top : rect.height / 2;
+    tooltip.hidden = false;
+    tooltip.style.left = `${Math.max(78, Math.min(rect.width - 78, x))}px`;
+    tooltip.style.top = `${Math.max(54, Math.min(rect.height - 20, y - 8))}px`;
+    tooltip.innerHTML = `
+      <strong>${escapeHtml(segment.row.name)}</strong>
+      <span class="tooltip-line"><b>Vendas:</b> ${integer(segment.row.sales)}</span>
+      <span class="tooltip-line"><b>Faturamento:</b> ${money(segment.row.revenue)}</span>
+      <span class="tooltip-line"><b>Participação:</b> ${percent(segment.share)}</span>
+    `;
+  }
+
+  function describeDonutSlice(cx, cy, outerRadius, innerRadius, startAngle, endAngle) {
+    const safeEnd = Math.min(endAngle, startAngle + 359.99);
+    const outerStart = polarToCartesian(cx, cy, outerRadius, safeEnd);
+    const outerEnd = polarToCartesian(cx, cy, outerRadius, startAngle);
+    const innerStart = polarToCartesian(cx, cy, innerRadius, startAngle);
+    const innerEnd = polarToCartesian(cx, cy, innerRadius, safeEnd);
+    const largeArcFlag = safeEnd - startAngle <= 180 ? "0" : "1";
+    return [
+      "M", outerStart.x, outerStart.y,
+      "A", outerRadius, outerRadius, 0, largeArcFlag, 0, outerEnd.x, outerEnd.y,
+      "L", innerStart.x, innerStart.y,
+      "A", innerRadius, innerRadius, 0, largeArcFlag, 1, innerEnd.x, innerEnd.y,
+      "Z"
+    ].join(" ");
+  }
+
+  function polarToCartesian(cx, cy, radius, angle) {
+    const radians = (angle - 90) * Math.PI / 180;
+    return {
+      x: cx + radius * Math.cos(radians),
+      y: cy + radius * Math.sin(radians)
+    };
   }
 
   function renderSettingsPages() {
@@ -1911,7 +1983,11 @@
     const key = normalizeFilterValue(item && item.produto ? item.produto : "Sem produto");
     const cost = state.costs && state.costs.get ? state.costs.get(key) : null;
     if (!cost) return 0;
-    return Number(cost.fixed || 0) + Number(item.valor || 0) * (Number(cost.percent || 0) / 100);
+    const fixed = Number(cost.fixed || 0);
+    const percent = Number(cost.percent || 0);
+    const value = Number(item && item.valor || 0);
+    const total = (Number.isFinite(fixed) ? fixed : 0) + value * ((Number.isFinite(percent) ? percent : 0) / 100);
+    return Number.isFinite(total) ? total : 0;
   }
 
   function applyAccountFilterToMeta(meta) {

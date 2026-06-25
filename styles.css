@@ -50,6 +50,7 @@ html {
   background: var(--bg);
   min-height: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
@@ -64,6 +65,7 @@ body {
   line-height: 1.45;
   overscroll-behavior: none;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 
@@ -82,6 +84,7 @@ button {
   min-height: 100dvh;
   max-width: 100vw;
   overflow-x: hidden;
+  overflow-y: visible;
   background-color: var(--bg);
   background: radial-gradient(circle at 45% -20%, rgba(159, 232, 112, 0.08), transparent 34%), var(--bg);
 }
@@ -1106,7 +1109,6 @@ tr:hover .transaction-edit-button,
 
 .product-donut {
   --donut-reveal: 360deg;
-  --donut-gradient: conic-gradient(var(--accent) 0 100%);
   position: relative;
   width: min(240px, 58vw);
   aspect-ratio: 1;
@@ -1115,27 +1117,50 @@ tr:hover .transaction-edit-button,
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.22);
 }
 
-.product-donut::before {
-  content: "";
+.product-donut-empty {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--donut-gradient);
+  background: conic-gradient(rgba(159,232,112,.18) 0 100%);
+  -webkit-mask: radial-gradient(circle, transparent 0 58%, #000 59% 100%);
+  mask: radial-gradient(circle, transparent 0 58%, #000 59% 100%);
+}
+
+.product-donut-svg {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   -webkit-mask: conic-gradient(#000 0 var(--donut-reveal), transparent var(--donut-reveal) 360deg);
   mask: conic-gradient(#000 0 var(--donut-reveal), transparent var(--donut-reveal) 360deg);
 }
 
-.product-donut.is-animating::before {
+.product-slice {
+  cursor: pointer;
+  opacity: .9;
+  outline: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: opacity 150ms ease, transform 150ms ease, filter 150ms ease;
+}
+
+.product-slice:hover,
+.product-slice:focus {
+  opacity: 1;
+  transform: scale(1.035);
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.26));
+}
+
+.product-donut.is-animating .product-donut-svg {
   animation: productDonutSweep 860ms cubic-bezier(.2,.78,.2,1) both;
 }
 
-.product-donut::after {
-  content: "";
-  position: absolute;
-  inset: 25%;
-  border-radius: inherit;
-  background: var(--panel);
-  box-shadow: inset 0 0 0 1px rgba(159, 232, 112, 0.14);
+.product-donut-tooltip {
+  z-index: 4;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
 }
 
 .product-legend {
@@ -1201,7 +1226,7 @@ tr:hover .transaction-edit-button,
   .bar-row .bar-fill,
   .bar-row > strong,
   .bar-row > span,
-  .product-donut.is-animating::before,
+  .product-donut.is-animating .product-donut-svg,
   .product-legend-item {
     animation: none;
   }
