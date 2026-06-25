@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=83">
+    <link rel="stylesheet" href="../styles.css?v=84">
   </head>
   <body>
     <div class="app-shell">
@@ -92,6 +92,17 @@
             <button class="period-button" data-period="lastMonth" type="button">Mês passado</button>
             <button class="period-button" data-period="custom" type="button">Personalizado</button>
           </div>
+          <label class="mobile-period-control">
+            <span>Período</span>
+            <select id="mobilePeriodSelect" aria-label="Selecionar período">
+              <option value="today">Hoje</option>
+              <option value="yesterday">Ontem</option>
+              <option value="last7">Últimos 7 dias</option>
+              <option value="month">Este mês</option>
+              <option value="lastMonth">Mês passado</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </label>
           <div class="custom-fields" id="customFields">
             <label>
               <span>Início</span>
@@ -403,6 +414,22 @@
           <article class="panel settings-panel">
             <div class="panel-header"><h1>Atendentes</h1></div>
             <p class="settings-copy">Espelho da aba Atendentes: nome, comissão, fixo mensal, início, pausas e permissão de venda manual.</p>
+            <div class="settings-toggle-grid" id="attendantCostOptions" aria-label="Custos de atendentes no lucro">
+              <label class="settings-check-row">
+                <span>Subtrair comissão no lucro</span>
+                <span class="switch">
+                  <input type="checkbox" data-attendant-cost="commission">
+                  <span class="slider"></span>
+                </span>
+              </label>
+              <label class="settings-check-row">
+                <span>Subtrair fixo mensal no lucro</span>
+                <span class="switch">
+                  <input type="checkbox" data-attendant-cost="fixed">
+                  <span class="slider"></span>
+                </span>
+              </label>
+            </div>
             <div class="settings-table settings-attendants-table">
               <div class="settings-table-head">
                 <span>Nome</span>
@@ -416,6 +443,7 @@
               <div id="manualSaleAttendantsList"></div>
             </div>
             <p class="settings-help">O fixo mensal é distribuído ao longo de 30 dias para aparecer como ganho fixo diário no app do atendente. O dia 31 é sempre desconsiderado nessa divisão.</p>
+            <p class="settings-help">Os seletores de comissão e fixo definem se esses custos entram no cálculo do lucro do dashboard.</p>
             <p class="settings-help">Manual habilita ou bloqueia lançamentos manuais no app do atendente. Use apenas para pessoas em que você confia para registrar vendas por conta própria.</p>
           </article>
         </section>
@@ -545,7 +573,7 @@
     </div>
     <script src="../config.js?v=55"></script>
     <script src="../push-client.js?v=63"></script>
-    <script src="../app.js?v=92"></script>
+    <script src="../app.js?v=93"></script>
   </body>
 </html>
 

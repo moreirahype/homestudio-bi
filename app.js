@@ -28,6 +28,7 @@
     leadMetricSource: loadLeadMetricSource(),
     frontProducts: loadStringList("hsbi-front-products"),
     manualSalePermissions: loadStringList("hsbi-manual-sale-attendants"),
+    attendantCostOptions: loadAttendantCostOptions(),
     metrics: {},
     pageIndex: 1,
     lastUpdated: null,
@@ -39,6 +40,7 @@
     pages: document.querySelectorAll(".page"),
     navItems: document.querySelectorAll(".nav-item, .bottom-item"),
     periodButtons: document.querySelectorAll(".period-button"),
+    mobilePeriodSelect: document.getElementById("mobilePeriodSelect"),
     customFields: document.getElementById("customFields"),
     startDate: document.getElementById("startDate"),
     endDate: document.getElementById("endDate"),
@@ -88,6 +90,7 @@
     reportStyleOptions: document.getElementById("reportStyleOptions"),
     reportPreviewTitle: document.getElementById("reportPreviewTitle"),
     leadMetricOptions: document.getElementById("leadMetricOptions"),
+    attendantCostOptions: document.getElementById("attendantCostOptions"),
     frontProductsList: document.getElementById("frontProductsList"),
     manualSaleAttendantsList: document.getElementById("manualSaleAttendantsList"),
     enableAllNotifications: document.getElementById("enableAllNotifications"),
@@ -139,15 +142,11 @@
     });
 
     els.periodButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        if (state.period === button.dataset.period) return;
-        state.period = button.dataset.period;
-        state.pageIndex = 1;
-        if (state.period !== "custom") state.appliedPeriod = state.period;
-        if (state.page === "dashboard" && state.period !== "custom") state.animateDashboard = true;
-        render();
-      });
+      button.addEventListener("click", () => setPeriod(button.dataset.period));
     });
+    if (els.mobilePeriodSelect) {
+      els.mobilePeriodSelect.addEventListener("change", () => setPeriod(els.mobilePeriodSelect.value));
+    }
 
     [els.startDate, els.endDate].forEach((input) => {
       input.addEventListener("change", () => {
@@ -190,6 +189,16 @@
         if (!button || button.dataset.leadSource === state.leadMetricSource) return;
         state.leadMetricSource = button.dataset.leadSource === "leads" ? "leads" : "conversations";
         localStorage.setItem("hsbi-lead-metric-source", state.leadMetricSource);
+        state.animateDashboard = state.page === "dashboard";
+        render();
+      });
+    }
+    if (els.attendantCostOptions) {
+      els.attendantCostOptions.addEventListener("change", (event) => {
+        const input = event.target.closest("[data-attendant-cost]");
+        if (!input) return;
+        state.attendantCostOptions[input.dataset.attendantCost] = input.checked;
+        saveAttendantCostOptions();
         state.animateDashboard = state.page === "dashboard";
         render();
       });
@@ -269,6 +278,15 @@
       const page = location.hash.replace("#", "");
       if (page) setPage(page);
     });
+  }
+
+  function setPeriod(period) {
+    if (!period || state.period === period) return;
+    state.period = period;
+    state.pageIndex = 1;
+    if (state.period !== "custom") state.appliedPeriod = state.period;
+    if (state.page === "dashboard" && state.period !== "custom") state.animateDashboard = true;
+    render();
   }
 
   function applySidebarPreference() {
@@ -780,6 +798,7 @@
     els.periodButtons.forEach((button) => {
       button.classList.toggle("is-active", button.dataset.period === state.period);
     });
+    if (els.mobilePeriodSelect) els.mobilePeriodSelect.value = state.period;
     els.customFields.classList.toggle("is-visible", state.period === "custom");
     const hourlyPeriod = document.getElementById("hourlySalesChartPeriod") || document.getElementById("salesChartPeriod");
     const dailyPeriod = document.getElementById("dailySalesChartPeriod");
@@ -974,7 +993,8 @@
     const tax = ads * Number(config.metaTaxRate || 0);
     const totalSpend = ads + tax;
     const productCosts = sum(transactions.map(getTransactionProductCost));
-    const profit = revenue - totalSpend - productCosts;
+    const attendantCosts = getAttendantCosts(transactions);
+    const profit = revenue - totalSpend - productCosts - attendantCosts;
     const leads = getLeadBase(state.meta);
     const conversionSales = countFrontConversionSales(transactions, state.transactions);
     return {
@@ -982,6 +1002,7 @@
       ads,
       tax,
       totalSpend,
+      attendantCosts,
       profit,
       margin: revenue > 0 ? profit / revenue : null,
       roas: totalSpend > 0 ? revenue / totalSpend : null,
@@ -1312,7 +1333,8 @@
         fullLabel: label.full,
         sales: sales.length,
         revenue: sum(sales.map((item) => item.valor)),
-        productCost: sum(sales.map(getTransactionProductCost))
+        productCost: sum(sales.map(getTransactionProductCost)),
+        attendantCost: getAttendantCostsForDate(sales, label.key)
       };
     });
     return addProfitToSeries(series, period);
@@ -1322,7 +1344,7 @@
     const totalRevenue = sum(series.map((point) => point.revenue));
     const fallbackSpend = getTotalSpendForPeriod(period);
     return series.map((point) => Object.assign({}, point, {
-      profit: getProfitForDate(period, point.key, point.revenue, totalRevenue, fallbackSpend, point.productCost)
+      profit: getProfitForDate(period, point.key, point.revenue, totalRevenue, fallbackSpend, point.productCost, point.attendantCost)
     }));
   }
 
@@ -1589,9 +1611,17 @@
   function renderSettingsPages() {
     renderGoalSettings();
     renderLeadMetricOptions();
+    renderAttendantCostOptions();
     renderFrontProductsSettings();
     renderManualSalePermissionSettings();
     bindSettingsMirrorEditButtons();
+  }
+
+  function renderAttendantCostOptions() {
+    if (!els.attendantCostOptions) return;
+    els.attendantCostOptions.querySelectorAll("[data-attendant-cost]").forEach((input) => {
+      input.checked = Boolean(state.attendantCostOptions && state.attendantCostOptions[input.dataset.attendantCost]);
+    });
   }
 
   function renderGoalSettings() {
@@ -2045,6 +2075,18 @@
     localStorage.setItem(key, JSON.stringify(Array.isArray(list) ? list : []));
   }
 
+  function loadAttendantCostOptions() {
+    try {
+      return Object.assign({ commission: false, fixed: false }, JSON.parse(localStorage.getItem("hsbi-attendant-cost-options") || "{}"));
+    } catch {
+      return { commission: false, fixed: false };
+    }
+  }
+
+  function saveAttendantCostOptions() {
+    localStorage.setItem("hsbi-attendant-cost-options", JSON.stringify(state.attendantCostOptions || {}));
+  }
+
   function saveNotificationPrefs() {
     localStorage.setItem("hsbi-notifications", JSON.stringify(state.notifications));
   }
@@ -2082,7 +2124,7 @@
     return ads + ads * Number(config.metaTaxRate || 0);
   }
 
-  function getProfitForDate(period, dateKey, revenue, periodRevenue, fallbackSpend, productCost = 0) {
+  function getProfitForDate(period, dateKey, revenue, periodRevenue, fallbackSpend, productCost = 0, attendantCost = 0) {
     if (hasSalesDimensionFilter()) return null;
     const meta = applyAccountFilterToMeta(period === "custom"
       ? Object.assign({ spend: 0, leads: 0, daily: [] }, state.customMeta || {})
@@ -2091,11 +2133,11 @@
     const day = daily.find((item) => String(item.date || "").slice(0, 10) === dateKey);
     if (!day && Number(meta.spend || 0) > 0) {
       const share = Number(periodRevenue || 0) > 0 ? Number(revenue || 0) / Number(periodRevenue || 0) : 0;
-      return Number(revenue || 0) - Number(productCost || 0) - Number(fallbackSpend || 0) * share;
+      return Number(revenue || 0) - Number(productCost || 0) - Number(attendantCost || 0) - Number(fallbackSpend || 0) * share;
     }
     const ads = Number(day ? day.spend || 0 : 0);
     const totalSpend = ads + ads * Number(config.metaTaxRate || 0);
-    return Number(revenue || 0) - Number(productCost || 0) - totalSpend;
+    return Number(revenue || 0) - Number(productCost || 0) - Number(attendantCost || 0) - totalSpend;
   }
 
   function hasSalesDimensionFilter() {
@@ -2111,6 +2153,102 @@
     const value = Number(item && item.valor || 0);
     const total = (Number.isFinite(fixed) ? fixed : 0) + value * ((Number.isFinite(percent) ? percent : 0) / 100);
     return Number.isFinite(total) ? total : 0;
+  }
+
+  function getAttendantCosts(transactions) {
+    const options = state.attendantCostOptions || {};
+    if (!options.commission && !options.fixed) return 0;
+    const configs = buildAttendantConfigMap();
+    let total = 0;
+    if (options.commission) {
+      total += sum(transactions.map((item) => {
+        const config = configs.get(normalizeFilterValue(item.atendente || "Sem atendente"));
+        const commission = Number(config && config.commission || 0);
+        return Number(item.valor || 0) * (Number.isFinite(commission) ? commission / 100 : 0);
+      }));
+    }
+    if (options.fixed) {
+      const range = getDateRange();
+      total += Array.from(configs.values()).reduce((cost, config) => {
+        const salary = Number(config.salary || 0);
+        if (!Number.isFinite(salary) || salary <= 0) return cost;
+        return cost + (salary / 30) * countAttendantCostDays(range.start, range.end, config);
+      }, 0);
+    }
+    return Number.isFinite(total) ? total : 0;
+  }
+
+  function getAttendantCostsForDate(transactions, dateKey) {
+    const options = state.attendantCostOptions || {};
+    if (!options.commission && !options.fixed) return 0;
+    const configs = buildAttendantConfigMap();
+    let total = 0;
+    if (options.commission) {
+      total += sum(transactions.map((item) => {
+        const config = configs.get(normalizeFilterValue(item.atendente || "Sem atendente"));
+        const commission = Number(config && config.commission || 0);
+        return Number(item.valor || 0) * (Number.isFinite(commission) ? commission / 100 : 0);
+      }));
+    }
+    if (options.fixed) {
+      const day = parseMaybeDate(dateKey);
+      if (day && day.getDate() !== 31) {
+        total += Array.from(configs.values()).reduce((cost, config) => {
+          const salary = Number(config.salary || 0);
+          if (!Number.isFinite(salary) || salary <= 0) return cost;
+          return countAttendantCostDays(day, day, config) ? cost + salary / 30 : cost;
+        }, 0);
+      }
+    }
+    return Number.isFinite(total) ? total : 0;
+  }
+
+  function buildAttendantConfigMap() {
+    const map = new Map();
+    (state.attendantConfigs || []).forEach((config) => {
+      const name = config.name || config.slug;
+      if (name) map.set(normalizeFilterValue(name), config);
+    });
+    return map;
+  }
+
+  function countAttendantCostDays(start, end, config) {
+    const first = startOfDay(start);
+    const last = endOfDay(end);
+    const startDate = parseMaybeDate(config.start);
+    const pauses = parsePauseRanges(config.pauses);
+    let days = 0;
+    for (let cursor = startOfDay(first); cursor <= last; cursor = addDays(cursor, 1)) {
+      if (cursor.getDate() === 31) continue;
+      if (startDate && cursor < startOfDay(startDate)) continue;
+      if (pauses.some((pause) => cursor >= startOfDay(pause.start) && cursor <= endOfDay(pause.end))) continue;
+      days += 1;
+    }
+    return days;
+  }
+
+  function parsePauseRanges(value) {
+    return String(value || "")
+      .split(";")
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const parts = entry.split(/\s+a\s+/i);
+        const start = parseMaybeDate(parts[0]);
+        const end = parseMaybeDate(parts[1] || parts[0]);
+        return start && end ? { start, end } : null;
+      })
+      .filter(Boolean);
+  }
+
+  function parseMaybeDate(value) {
+    const text = String(value || "").trim();
+    if (!text) return null;
+    const br = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (br) return new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+    const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return null;
   }
 
   function applyAccountFilterToMeta(meta) {
