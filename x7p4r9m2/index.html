@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=84">
+    <link rel="stylesheet" href="../styles.css?v=85">
   </head>
   <body>
     <div class="app-shell">
@@ -23,7 +23,7 @@
           <span class="brand-mark" aria-hidden="true">
             <img src="../assets/icon-192.png?v=55" alt="">
           </span>
-          <span>High Sales</span>
+          <img class="brand-wordmark" src="../assets/high-sales-wordmark.svg?v=1" alt="High Sales">
         </a>
         <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher barra lateral" aria-expanded="true" title="Recolher barra lateral">
           <span aria-hidden="true"></span>
@@ -74,7 +74,7 @@
             <span class="brand-mark" aria-hidden="true">
               <img src="../assets/icon-192.png?v=55" alt="">
             </span>
-            <span>High Sales</span>
+            <img class="brand-wordmark" src="../assets/high-sales-wordmark.svg?v=1" alt="High Sales">
           </a>
           <span class="sync-pill" id="syncStatus">Carregando</span>
         </header>
@@ -396,7 +396,7 @@
         <section class="page" id="page-goals" data-page="goals">
           <article class="panel settings-panel">
             <div class="panel-header"><h1>Definir metas</h1></div>
-            <p class="settings-copy">Espelho das metas cadastradas na planilha. Use título, valor, prêmio e status para controlar o que aparece no app da atendente.</p>
+            <p class="settings-copy">Cadastre título, valor, prêmio e status das metas que aparecem no app da atendente.</p>
             <div class="settings-table settings-goals-table">
               <div class="settings-table-head">
                 <span>Slug</span>
@@ -404,6 +404,7 @@
                 <span>Valor</span>
                 <span>Prêmio</span>
                 <span>Status</span>
+                <span>Ação</span>
               </div>
               <div id="goalsSettingsList"></div>
             </div>
@@ -413,7 +414,7 @@
         <section class="page" id="page-settings-attendants" data-page="settings-attendants">
           <article class="panel settings-panel">
             <div class="panel-header"><h1>Atendentes</h1></div>
-            <p class="settings-copy">Espelho da aba Atendentes: nome, comissão, fixo mensal, início, pausas e permissão de venda manual.</p>
+            <p class="settings-copy">Gerencie nome, comissão, fixo mensal, início, pausas e permissão de venda manual dos atendentes.</p>
             <div class="settings-toggle-grid" id="attendantCostOptions" aria-label="Custos de atendentes no lucro">
               <label class="settings-check-row">
                 <span>Subtrair comissão no lucro</span>
@@ -451,7 +452,7 @@
         <section class="page" id="page-settings-products" data-page="settings-products">
           <article class="panel settings-panel">
             <div class="panel-header"><h1>Produtos</h1></div>
-            <p class="settings-copy">Espelho dos produtos vendidos e dos custos configurados na planilha. Marque quais produtos entram no cálculo de Conversão Front.</p>
+            <p class="settings-copy">Gerencie produtos vendidos, custos e quais produtos entram no cálculo de Conversão Front.</p>
             <div class="settings-table settings-products-table">
               <div class="settings-table-head">
                 <span>Produto</span>
@@ -573,7 +574,7 @@
     </div>
     <script src="../config.js?v=55"></script>
     <script src="../push-client.js?v=63"></script>
-    <script src="../app.js?v=94"></script>
+    <script src="../app.js?v=95"></script>
   </body>
 </html>
 

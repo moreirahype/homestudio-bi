@@ -97,6 +97,24 @@ function doPost(e) {
     recordMutationResult_(mutationId, result);
     return outputJson_(result);
   }
+  if (String(pickValue_(payload, ['action']) || '') === 'updateAttendant') {
+    const result = updateAttendant_(payload);
+    appendDebugLog_(result.ok ? 'attendant_updated' : 'attendant_update_error', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
+  }
+  if (String(pickValue_(payload, ['action']) || '') === 'updateProductCost') {
+    const result = updateProductCost_(payload);
+    appendDebugLog_(result.ok ? 'product_cost_updated' : 'product_cost_update_error', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
+  }
+  if (String(pickValue_(payload, ['action']) || '') === 'updateGoal') {
+    const result = updateGoal_(payload);
+    appendDebugLog_(result.ok ? 'goal_updated' : 'goal_update_error', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
+  }
   const validation = validateWebhook_(payload);
   if (!validation.ok) {
     console.log('Webhook rejeitado: ' + JSON.stringify(validation));
@@ -372,7 +390,7 @@ function buildCreativeReport_(profit) {
         { title: 'Dois reais ou um lucro misterioso?', body: 'Parabéns! Você teve ' + amount + ' de lucro até agora... 🤑 🤑 🤑' },
         { title: 'O caixa sorriu.', body: amount + ' de lucro e a operação respirando bonito. 🚀' },
         { title: 'Hoje o tráfego veio educado.', body: 'Até agora, ' + amount + ' de lucro. A máquina está girando. 🔥' },
-        { title: 'Pix caiu, planilha nem abriu.', body: amount + ' de lucro até agora. É sobre isso. 💸' },
+        { title: 'Pix caiu, lucro apareceu.', body: amount + ' de lucro até agora. É sobre isso. 💸' },
         { title: 'A conta fechou no verde.', body: 'Seu lucro chegou a ' + amount + '. Pode comemorar, mas sem tirar o pé dos dados. 📈' },
         { title: 'O anúncio trabalhou bonito.', body: amount + ' de lucro até agora. Hoje a campanha fez o dever de casa. 😎' },
         { title: 'Tem cheiro de escala no ar.', body: 'A operação já acumula ' + amount + ' de lucro. Olho nos números e vamos em frente. ⚡' },
@@ -585,6 +603,130 @@ function deleteTransaction_(payload) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function updateAttendant_(payload) {
+  const name = String(pickValue_(payload, ['nome', 'name']) || '').trim();
+  if (!name) return { ok: false, error: 'Nome do atendente não informado.' };
+  const slug = String(pickValue_(payload, ['slug']) || normalizePersonName_(name).replace(/\s+/g, '-')).trim();
+  const originalName = String(pickValue_(payload, ['nome_original', 'original_name']) || '').trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getAttendantsSheet_();
+    const rowNumber = findAttendantRow_(sheet, slug, originalName || name);
+    const row = [
+      slug || Utilities.getUuid().slice(0, 8),
+      name,
+      parseNumber_(pickValue_(payload, ['comissao_percentual', 'commission']) || 0),
+      parseNumber_(pickValue_(payload, ['salario_fixo_mensal', 'salary']) || 0),
+      String(pickValue_(payload, ['inicio_trabalho', 'start']) || '').trim(),
+      String(pickValue_(payload, ['pausas', 'pauses']) || '').trim()
+    ];
+    if (rowNumber) {
+      sheet.getRange(rowNumber, 1, 1, ATTENDANT_HEADERS.length).setValues([row]);
+    } else {
+      sheet.appendRow(row);
+    }
+    return { ok: true, slug: row[0], name: name };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function findAttendantRow_(sheet, slug, name) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const values = sheet.getRange(2, 1, lastRow - 1, ATTENDANT_HEADERS.length).getValues();
+  const slugKey = String(slug || '').trim();
+  const nameKey = normalizePersonName_(name || '');
+  for (let index = 0; index < values.length; index++) {
+    const rowSlug = String(values[index][0] || '').trim();
+    const rowName = normalizePersonName_(values[index][1] || '');
+    if ((slugKey && rowSlug === slugKey) || (nameKey && rowName === nameKey)) {
+      return index + 2;
+    }
+  }
+  return 0;
+}
+
+function updateProductCost_(payload) {
+  const product = String(pickValue_(payload, ['produto', 'product']) || '').trim();
+  if (!product) return { ok: false, error: 'Produto não informado.' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getCostsSheet_();
+    const rowNumber = findProductCostRow_(sheet, product);
+    const row = [
+      product,
+      parseNumber_(pickValue_(payload, ['custo_fixo', 'fixed']) || 0),
+      parseNumber_(pickValue_(payload, ['custo_percentual', 'percent']) || 0)
+    ];
+    if (rowNumber) {
+      sheet.getRange(rowNumber, 1, 1, COST_HEADERS.length).setValues([row]);
+    } else {
+      sheet.appendRow(row);
+    }
+    return { ok: true, product: product };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function findProductCostRow_(sheet, product) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const target = normalizePersonName_(product);
+  const values = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let index = 0; index < values.length; index++) {
+    if (normalizePersonName_(values[index][0] || '') === target) return index + 2;
+  }
+  return 0;
+}
+
+function updateGoal_(payload) {
+  const slug = String(pickValue_(payload, ['slug']) || '').trim();
+  const title = String(pickValue_(payload, ['meta_titulo', 'title']) || '').trim();
+  if (!slug) return { ok: false, error: 'Slug da atendente não informado.' };
+  if (!title) return { ok: false, error: 'Título da meta não informado.' };
+  const originalTitle = String(pickValue_(payload, ['meta_titulo_original', 'original_title']) || '').trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getGoalsSheet_();
+    const rowNumber = findGoalRow_(sheet, slug, originalTitle || title);
+    const activeValue = pickValue_(payload, ['meta_ativa', 'active']);
+    const row = [
+      slug,
+      title,
+      parseNumber_(pickValue_(payload, ['meta_valor', 'value']) || 0),
+      String(pickValue_(payload, ['meta_premio', 'prize']) || '').trim(),
+      normalizeGoalCell_('meta_ativa', activeValue)
+    ];
+    if (rowNumber) {
+      sheet.getRange(rowNumber, 1, 1, GOAL_HEADERS.length).setValues([row]);
+    } else {
+      sheet.appendRow(row);
+    }
+    return { ok: true, slug: slug, title: title };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function findGoalRow_(sheet, slug, title) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const slugKey = String(slug || '').trim();
+  const titleKey = normalizePersonName_(title || '');
+  const values = sheet.getRange(2, 1, lastRow - 1, GOAL_HEADERS.length).getValues();
+  for (let index = 0; index < values.length; index++) {
+    const rowSlug = String(values[index][0] || '').trim();
+    const rowTitle = normalizePersonName_(values[index][1] || '');
+    if (slugKey && rowSlug === slugKey && (!titleKey || rowTitle === titleKey)) return index + 2;
+  }
+  return 0;
 }
 
 function findTransactionRowById_(sheet, id) {

@@ -117,8 +117,17 @@ button {
 }
 
 .brand span:last-child,
+.brand-wordmark,
 .nav-item span {
   transition: opacity 160ms ease;
+}
+
+.brand-wordmark {
+  display: block;
+  width: 134px;
+  max-width: min(134px, calc(100vw - 130px));
+  height: auto;
+  flex: 0 1 auto;
 }
 
 .brand-mark {
@@ -242,7 +251,8 @@ body.sidebar-collapsed .sidebar .brand {
   justify-content: center;
 }
 
-body.sidebar-collapsed .sidebar .brand span:last-child {
+body.sidebar-collapsed .sidebar .brand span:last-child,
+body.sidebar-collapsed .sidebar .brand-wordmark {
   width: 0;
   opacity: 0;
   overflow: hidden;
@@ -884,14 +894,14 @@ tr:hover .transaction-edit-button,
 
 .manual-sale-form {
   display: grid;
-  grid-template-columns: minmax(140px, .7fr) minmax(110px, .45fr) repeat(3, minmax(150px, 1fr)) minmax(120px, .55fr) minmax(110px, .5fr);
-  gap: 12px;
+  grid-template-columns: minmax(150px, .82fr) minmax(116px, .48fr) repeat(2, minmax(190px, 1fr)) minmax(132px, .62fr) minmax(116px, .52fr);
+  gap: 14px;
   align-items: end;
-  margin-bottom: 18px;
-  padding: 14px;
+  margin-top: 16px;
+  padding: 18px;
   border: 1px solid rgba(159, 232, 112, 0.16);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.025);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .026), rgba(255, 255, 255, .012));
 }
 
 .manual-sale-form label {
@@ -902,10 +912,10 @@ tr:hover .transaction-edit-button,
 }
 
 .manual-sale-note {
-  grid-column: 1 / -2;
-  margin: 0;
+  grid-column: 1 / -1;
+  margin: -2px 0 0;
   align-self: center;
-  color: var(--muted);
+  color: #d8efd2;
   font-size: var(--text-xs);
 }
 
@@ -1296,16 +1306,18 @@ tr:hover .transaction-edit-button,
 
 .product-slice {
   cursor: pointer;
-  opacity: .88;
+  opacity: .92;
   outline: none;
   transform-box: fill-box;
   transform-origin: center;
-  transition: opacity 120ms ease, filter 120ms ease;
+  transition: opacity 120ms ease, filter 120ms ease, stroke-width 120ms ease;
 }
 
 .product-slice:hover {
   opacity: 1;
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, .22)) drop-shadow(0 0 10px rgba(159, 232, 112, .22));
+  filter: brightness(1.16) saturate(1.08);
+  stroke: rgba(255, 255, 255, .28);
+  stroke-width: .65;
 }
 
 .manual-sale-panel {
@@ -1812,7 +1824,8 @@ tr:hover .transaction-edit-button,
     justify-content: flex-start;
   }
 
-  body.sidebar-collapsed .mobile-header .brand span:last-child {
+  body.sidebar-collapsed .mobile-header .brand span:last-child,
+  body.sidebar-collapsed .mobile-header .brand-wordmark {
     width: auto;
     opacity: 1;
     overflow: visible;
@@ -1833,10 +1846,15 @@ tr:hover .transaction-edit-button,
     font-size: clamp(18px, 5.2vw, var(--text-mobile-brand));
   }
 
-  .mobile-header .brand span:last-child {
+  .mobile-header .brand span:last-child,
+  .mobile-header .brand-wordmark {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .mobile-header .brand-wordmark {
+    width: min(148px, calc(100vw - 188px));
   }
 
   .mobile-header .brand-mark {
@@ -2329,6 +2347,10 @@ tr:hover .transaction-edit-button,
     width: 44px;
     height: 44px;
     flex-basis: 44px;
+  }
+
+  .mobile-header .brand-wordmark {
+    width: min(132px, calc(100vw - 172px));
   }
 
   .period-button {

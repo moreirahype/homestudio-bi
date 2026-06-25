@@ -1639,8 +1639,12 @@
         <span>${money(goal.value)}</span>
         <span>${escapeHtml(goal.prize || "Sem prêmio")}</span>
         <span class="settings-status ${goal.active ? "is-on" : ""}">${goal.active ? "Ativa" : "Inativa"}</span>
+        <button class="settings-edit-button" type="button" data-settings-edit="goal" data-slug="${escapeHtml(goal.slug || "")}" data-title="${escapeHtml(goal.title)}" data-value="${escapeHtml(String(goal.value || 0))}" data-prize="${escapeHtml(goal.prize || "")}" data-active="${goal.active ? "true" : "false"}" aria-label="Editar meta ${escapeHtml(goal.title)}" title="Editar meta">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.8 8.7l-2.5-2.5zm15-11.3a.9.9 0 0 0 0-1.3L17.1 3a.9.9 0 0 0-1.3 0l-1.5 1.5 3.2 3.2z"></path></svg>
+        </button>
       </div>
     `).join("");
+    bindSettingsMirrorEditButtons();
   }
 
   function renderLeadMetricOptions() {
@@ -1669,7 +1673,7 @@
             <input type="checkbox" value="${escapeHtml(key)}" ${state.frontProducts.includes(key) ? "checked" : ""}>
             <span class="slider"></span>
           </label>
-          <button class="settings-edit-button" type="button" data-settings-edit="product" data-name="${escapeHtml(product.name)}" aria-label="Editar produto ${escapeHtml(product.name)}" title="Editar produto">
+          <button class="settings-edit-button" type="button" data-settings-edit="product" data-name="${escapeHtml(product.name)}" data-fixed="${escapeHtml(String(product.fixed || 0))}" data-percent="${escapeHtml(String(product.percent || 0))}" aria-label="Editar produto ${escapeHtml(product.name)}" title="Editar produto">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.8 8.7l-2.5-2.5zm15-11.3a.9.9 0 0 0 0-1.3L17.1 3a.9.9 0 0 0-1.3 0l-1.5 1.5 3.2 3.2z"></path></svg>
           </button>
         </div>`;
@@ -1704,7 +1708,7 @@
             <input type="checkbox" value="${escapeHtml(key)}" ${state.manualSalePermissions.includes(key) ? "checked" : ""}>
             <span class="slider"></span>
           </label>
-          <button class="settings-edit-button" type="button" data-settings-edit="attendant" data-name="${escapeHtml(attendant.name)}" aria-label="Editar atendente ${escapeHtml(attendant.name)}" title="Editar atendente">
+          <button class="settings-edit-button" type="button" data-settings-edit="attendant" data-slug="${escapeHtml(attendant.slug || "")}" data-name="${escapeHtml(attendant.name)}" data-commission="${escapeHtml(String(attendant.commission || 0))}" data-salary="${escapeHtml(String(attendant.salary || 0))}" data-start="${escapeHtml(attendant.start || "")}" data-pauses="${escapeHtml(attendant.pauses || "")}" aria-label="Editar atendente ${escapeHtml(attendant.name)}" title="Editar atendente">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.8 8.7l-2.5-2.5zm15-11.3a.9.9 0 0 0 0-1.3L17.1 3a.9.9 0 0 0-1.3 0l-1.5 1.5 3.2 3.2z"></path></svg>
           </button>
         </div>`;
@@ -1722,10 +1726,90 @@
     document.querySelectorAll("[data-settings-edit]").forEach((button) => {
       if (button.dataset.bound === "1") return;
       button.dataset.bound = "1";
-      button.addEventListener("click", () => {
-        showNotificationSavedToast("Edite este item na planilha por enquanto");
+      button.addEventListener("click", async () => {
+        try {
+          if (button.dataset.settingsEdit === "product") {
+            await editProductCostFromButton(button);
+          } else if (button.dataset.settingsEdit === "goal") {
+            await editGoalFromButton(button);
+          } else {
+            await editAttendantFromButton(button);
+          }
+        } catch (error) {
+          if (error && error.name === "AbortError") return;
+          alert(error && error.message ? error.message : "Não foi possível salvar agora.");
+        }
       });
     });
+  }
+
+  async function editGoalFromButton(button) {
+    const currentTitle = button.dataset.title || "";
+    const slug = prompt("Slug da atendente", button.dataset.slug || "");
+    if (slug === null) return;
+    const title = prompt("Título da meta", currentTitle);
+    if (title === null) return;
+    const value = prompt("Valor da meta", decimal(Number(button.dataset.value || 0)));
+    if (value === null) return;
+    const prize = prompt("Prêmio", button.dataset.prize || "");
+    if (prize === null) return;
+    const active = confirm("Deixar esta meta ativa?");
+    const payload = new FormData();
+    payload.set("action", "updateGoal");
+    payload.set("slug", slug.trim());
+    payload.set("meta_titulo", title.trim() || currentTitle || "Meta");
+    payload.set("meta_titulo_original", currentTitle);
+    payload.set("meta_valor", value);
+    payload.set("meta_premio", prize);
+    payload.set("meta_ativa", active ? "TRUE" : "FALSE");
+    payload.set("mutation_id", createMutationId("goal"));
+    await submitMutation(payload);
+    showNotificationSavedToast("Meta salva");
+    await refreshData({ applySelection: true });
+  }
+
+  async function editProductCostFromButton(button) {
+    const product = button.dataset.name || "";
+    const fixed = prompt("Custo fixo por venda", decimal(Number(button.dataset.fixed || 0)));
+    if (fixed === null) return;
+    const percentValue = prompt("Custo percentual por venda", decimal(Number(button.dataset.percent || 0)));
+    if (percentValue === null) return;
+    const payload = new FormData();
+    payload.set("action", "updateProductCost");
+    payload.set("produto", product);
+    payload.set("custo_fixo", fixed);
+    payload.set("custo_percentual", percentValue);
+    payload.set("mutation_id", createMutationId("product-cost"));
+    await submitMutation(payload);
+    showNotificationSavedToast("Produto salvo");
+    await refreshData({ applySelection: true });
+  }
+
+  async function editAttendantFromButton(button) {
+    const currentName = button.dataset.name || "";
+    const name = prompt("Nome do atendente", currentName);
+    if (name === null) return;
+    const commission = prompt("Comissão percentual", decimal(Number(button.dataset.commission || 0)));
+    if (commission === null) return;
+    const salary = prompt("Fixo mensal", decimal(Number(button.dataset.salary || 0)));
+    if (salary === null) return;
+    const start = prompt("Início do trabalho (opcional, ex: 2026-06-01)", button.dataset.start || "");
+    if (start === null) return;
+    const pauses = prompt("Pausas (opcional, ex: 15/06/2026 a 23/06/2026;)", button.dataset.pauses || "");
+    if (pauses === null) return;
+    const payload = new FormData();
+    payload.set("action", "updateAttendant");
+    payload.set("slug", button.dataset.slug || normalizeFilterValue(currentName).replace(/[^a-z0-9]+/g, "-"));
+    payload.set("nome", name.trim() || currentName);
+    payload.set("nome_original", currentName);
+    payload.set("comissao_percentual", commission);
+    payload.set("salario_fixo_mensal", salary);
+    payload.set("inicio_trabalho", start);
+    payload.set("pausas", pauses);
+    payload.set("mutation_id", createMutationId("attendant"));
+    await submitMutation(payload);
+    showNotificationSavedToast("Atendente salvo");
+    await refreshData({ applySelection: true });
   }
 
   function getConfigAttendantRows() {
