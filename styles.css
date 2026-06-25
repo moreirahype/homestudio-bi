@@ -656,6 +656,9 @@ th:last-child {
   margin-top: 3px;
   color: var(--muted);
   font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .transaction-value-cell {
@@ -920,6 +923,14 @@ tr:hover .transaction-edit-button,
   color: var(--muted);
 }
 
+.settings-help {
+  max-width: 760px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
 .settings-shortcut {
   color: var(--text);
   text-align: left;
@@ -974,13 +985,13 @@ tr:hover .transaction-edit-button,
 
 .settings-attendants-table .settings-table-head,
 .settings-attendants-table .settings-table-row {
-  grid-template-columns: minmax(130px, 1.2fr) 88px 108px 98px minmax(130px, 1fr) 72px;
+  grid-template-columns: minmax(150px, 1.2fr) 88px 118px 98px minmax(140px, 1fr) 72px 40px;
 }
 
 .settings-products-table .settings-table-head,
 .settings-products-table .settings-table-row {
-  grid-template-columns: minmax(190px, 1fr) 112px 96px 72px;
-  min-width: 520px;
+  grid-template-columns: minmax(240px, 1fr) 112px 96px 72px 40px;
+  min-width: 620px;
 }
 
 .settings-goals-table .settings-table-head,
@@ -1014,6 +1025,29 @@ tr:hover .transaction-edit-button,
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.024);
   color: var(--text);
+}
+
+.settings-edit-button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(159, 232, 112, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.026);
+  color: var(--muted);
+}
+
+.settings-edit-button:hover,
+.settings-edit-button:focus-visible {
+  border-color: rgba(159, 232, 112, 0.44);
+  color: var(--accent);
+}
+
+.settings-edit-button svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
 }
 
 .settings-empty {
@@ -1211,18 +1245,21 @@ tr:hover .transaction-edit-button,
 }
 
 .product-slice {
-  cursor: default;
-  opacity: .9;
+  cursor: pointer;
+  opacity: .88;
   outline: none;
   transform-box: fill-box;
   transform-origin: center;
-  transition: opacity 150ms ease, transform 150ms ease, filter 150ms ease;
+  transition: opacity 120ms ease, filter 120ms ease;
 }
 
-.product-slice:hover,
-.product-slice:focus {
+.product-slice:hover {
   opacity: 1;
-  transform: scale(1.025);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, .22)) drop-shadow(0 0 10px rgba(159, 232, 112, .22));
+}
+
+.manual-sale-panel {
+  margin-top: 18px;
 }
 
 .product-donut.is-animating .product-donut-svg {
@@ -1986,12 +2023,12 @@ tr:hover .transaction-edit-button,
 
   .attendants-panel th:nth-child(1),
   .attendants-panel td:nth-child(1) {
-    width: 31%;
+    width: 30%;
   }
 
   .attendants-panel th:nth-child(2),
   .attendants-panel td:nth-child(2) {
-    width: 15%;
+    width: 14%;
     text-align: center;
   }
 
@@ -2003,7 +2040,7 @@ tr:hover .transaction-edit-button,
 
   .attendants-panel th:nth-child(4),
   .attendants-panel td:nth-child(4) {
-    width: 26%;
+    width: 28%;
     text-align: right;
   }
 
@@ -2029,26 +2066,30 @@ tr:hover .transaction-edit-button,
   }
 
   .products-panel .table-wrap {
-    overflow-x: hidden;
-    scrollbar-width: none;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
   }
 
   .products-panel .table-wrap::-webkit-scrollbar {
-    display: none;
+    display: block;
+    height: 6px;
   }
 
   .products-panel table {
-    table-layout: fixed;
+    min-width: 780px;
+    table-layout: auto;
   }
 
   .products-panel th,
   .products-panel td {
-    min-width: 0;
+    min-width: auto;
     padding-right: 4px;
     padding-left: 4px;
-    overflow: hidden;
+    overflow: visible;
     font-size: 11px;
-    text-overflow: ellipsis;
+    text-overflow: clip;
+    white-space: nowrap;
   }
 
   .products-panel th {
@@ -2057,7 +2098,8 @@ tr:hover .transaction-edit-button,
 
   .products-panel th:nth-child(1),
   .products-panel td:nth-child(1) {
-    width: 31%;
+    min-width: 240px;
+    width: auto;
   }
 
   .products-panel th:nth-child(2),

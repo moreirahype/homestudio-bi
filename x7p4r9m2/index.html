@@ -14,7 +14,7 @@
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=82">
+    <link rel="stylesheet" href="../styles.css?v=83">
   </head>
   <body>
     <div class="app-shell">
@@ -49,13 +49,13 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8zm0 4a6 6 0 1 0 6 6h-2a4 4 0 1 1-4-4zm0 4a2 2 0 1 0 2 2h-2zM20.7 3.3 22 2v4h-4l1.3-1.3-5.6 5.6-1.4-1.4z"></path></svg>
             <span>Definir metas</span>
           </button>
-          <button class="nav-item" data-page="settings-attendants" type="button" aria-label="Configurar atendentes">
+          <button class="nav-item" data-page="settings-attendants" type="button" aria-label="Atendentes">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zm-12 9a8 8 0 0 1 16 0zm15-12h3v2h-3zm0 4h3v2h-3z"></path></svg>
-            <span>Configurar atendentes</span>
+            <span>Atendentes</span>
           </button>
-          <button class="nav-item" data-page="settings-products" type="button" aria-label="Configurar produtos">
+          <button class="nav-item" data-page="settings-products" type="button" aria-label="Produtos">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v4H4zm0 6h7v4H4zm9 0h7v4h-7z"></path></svg>
-            <span>Configurar produtos</span>
+            <span>Produtos</span>
           </button>
           <button class="nav-item" data-page="integrations" type="button" aria-label="Integrações">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h4v2H7a3 3 0 0 0 0 6h4v2H7A5 5 0 0 1 7 7zm6 0h4a5 5 0 0 1 0 10h-4v-2h4a3 3 0 0 0 0-6h-4zm-4 4h6v2H9z"></path></svg>
@@ -207,7 +207,7 @@
                     <th>Atendente</th>
                     <th>Vendas</th>
                     <th>Faturamento</th>
-                    <th><span class="desktop-label">Ticket médio</span><span class="mobile-label">Ticket</span></th>
+                    <th><span class="desktop-label">Ticket médio</span><span class="mobile-label">Ticket médio</span></th>
                   </tr>
                 </thead>
                 <tbody id="attendantsBody"></tbody>
@@ -255,48 +255,6 @@
               <h1>Transações</h1>
               <input id="transactionSearch" type="search" placeholder="Buscar por cliente, telefone, atendente ou valor" aria-label="Buscar transações">
             </div>
-            <form class="manual-sale-form" id="manualSaleForm">
-              <label>
-                <span>Valor</span>
-                <input id="manualSaleValue" type="text" inputmode="decimal" placeholder="R$ 0,00" autocomplete="off" required>
-              </label>
-              <label>
-                <span>Moeda</span>
-                <select id="manualSaleCurrency">
-                  <option value="BRL">BRL</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="CHF">CHF</option>
-                </select>
-              </label>
-              <label>
-                <span>Cliente</span>
-                <input id="manualSalePayer" type="text" placeholder="Nome do cliente" autocomplete="off">
-              </label>
-              <label>
-                <span>Atendente</span>
-                <select id="manualSaleAttendant">
-                  <option value="Sem atendente">Sem atendente</option>
-                </select>
-              </label>
-              <label>
-                <span>Produto</span>
-                <select id="manualSaleProduct">
-                  <option value="">Sem produto</option>
-                </select>
-              </label>
-              <label>
-                <span>Data</span>
-                <input id="manualSaleDate" type="date">
-              </label>
-              <label>
-                <span>Hora</span>
-                <input id="manualSaleTime" type="time">
-              </label>
-              <p class="manual-sale-note">Data e hora são opcionais. Se ficarem vazias, usamos o momento do lançamento.</p>
-              <button id="manualSaleSubmit" type="submit">Adicionar venda</button>
-            </form>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -377,6 +335,51 @@
               <button id="nextPage" type="button">Próxima</button>
             </div>
           </article>
+          <article class="panel manual-sale-panel">
+            <div class="panel-header"><h1>Lançamentos manuais</h1></div>
+            <form class="manual-sale-form" id="manualSaleForm">
+              <label>
+                <span>Valor</span>
+                <input id="manualSaleValue" type="text" inputmode="decimal" placeholder="R$ 0,00" autocomplete="off" required>
+              </label>
+              <label>
+                <span>Moeda</span>
+                <select id="manualSaleCurrency">
+                  <option value="BRL">BRL</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="CHF">CHF</option>
+                </select>
+              </label>
+              <label>
+                <span>Cliente</span>
+                <input id="manualSalePayer" type="text" placeholder="Nome do cliente" autocomplete="off">
+              </label>
+              <label>
+                <span>Atendente</span>
+                <select id="manualSaleAttendant">
+                  <option value="Sem atendente">Sem atendente</option>
+                </select>
+              </label>
+              <label>
+                <span>Produto</span>
+                <select id="manualSaleProduct">
+                  <option value="">Sem produto</option>
+                </select>
+              </label>
+              <label>
+                <span>Data</span>
+                <input id="manualSaleDate" type="date">
+              </label>
+              <label>
+                <span>Hora</span>
+                <input id="manualSaleTime" type="time">
+              </label>
+              <p class="manual-sale-note">Data e hora são opcionais. Se ficarem vazias, usamos o momento do lançamento.</p>
+              <button id="manualSaleSubmit" type="submit">Adicionar venda</button>
+            </form>
+          </article>
         </section>
 
         <section class="page" id="page-goals" data-page="goals">
@@ -398,25 +401,28 @@
 
         <section class="page" id="page-settings-attendants" data-page="settings-attendants">
           <article class="panel settings-panel">
-            <div class="panel-header"><h1>Configurar atendentes</h1></div>
-            <p class="settings-copy">Espelho da aba Atendentes: nome, comissão, salário fixo, início, pausas e permissão de venda manual.</p>
+            <div class="panel-header"><h1>Atendentes</h1></div>
+            <p class="settings-copy">Espelho da aba Atendentes: nome, comissão, fixo mensal, início, pausas e permissão de venda manual.</p>
             <div class="settings-table settings-attendants-table">
               <div class="settings-table-head">
                 <span>Nome</span>
                 <span>Comissão</span>
-                <span>Fixo</span>
+                <span>Fixo mensal</span>
                 <span>Início</span>
                 <span>Pausas</span>
                 <span>Manual</span>
+                <span></span>
               </div>
               <div id="manualSaleAttendantsList"></div>
             </div>
-</article>
+            <p class="settings-help">O fixo mensal é distribuído ao longo de 30 dias para aparecer como ganho fixo diário no app do atendente. O dia 31 é sempre desconsiderado nessa divisão.</p>
+            <p class="settings-help">Manual habilita ou bloqueia lançamentos manuais no app do atendente. Use apenas para pessoas em que você confia para registrar vendas por conta própria.</p>
+          </article>
         </section>
 
         <section class="page" id="page-settings-products" data-page="settings-products">
           <article class="panel settings-panel">
-            <div class="panel-header"><h1>Configurar produtos</h1></div>
+            <div class="panel-header"><h1>Produtos</h1></div>
             <p class="settings-copy">Espelho dos produtos vendidos e dos custos configurados na planilha. Marque quais produtos entram no cálculo de Conversão Front.</p>
             <div class="settings-table settings-products-table">
               <div class="settings-table-head">
@@ -424,9 +430,11 @@
                 <span>Custo fixo</span>
                 <span>Custo %</span>
                 <span>Front</span>
+                <span></span>
               </div>
               <div id="frontProductsList"></div>
             </div>
+            <p class="settings-help">Para evitar nomes diferentes, o ideal é fazer pelo menos uma venda real do produto. Depois disso, ele aparece aqui como produto vendido nos últimos 90 dias e você só seleciona, sem precisar digitar.</p>
           </article>
         </section>
 
@@ -449,11 +457,11 @@
 
         <section class="page" id="page-settings" data-page="settings">
           <article class="panel settings-panel">
-            <div class="panel-header"><h1>Configurações</h1></div>
+            <div class="panel-header"><h1>Ajustes</h1></div>
             <div class="settings-menu-grid">
               <button class="settings-shortcut" data-page="goals" type="button">Definir metas</button>
-              <button class="settings-shortcut" data-page="settings-attendants" type="button">Configurar atendentes</button>
-              <button class="settings-shortcut" data-page="settings-products" type="button">Configurar produtos</button>
+              <button class="settings-shortcut" data-page="settings-attendants" type="button">Atendentes</button>
+              <button class="settings-shortcut" data-page="settings-products" type="button">Produtos</button>
               <button class="settings-shortcut" data-page="integrations" type="button">Integrações</button>
               <button class="settings-shortcut" data-page="notifications" type="button">Notificações</button>
             </div>
@@ -529,15 +537,15 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v2H5zm0 5h14v2H5zm0 5h14v2H5z"></path></svg>
           <span>Transações</span>
         </button>
-        <button class="bottom-item" data-page="settings" type="button" aria-label="Configurações">
+        <button class="bottom-item" data-page="settings" type="button" aria-label="Ajustes">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13.5a7.9 7.9 0 0 0 0-3l2-1.5-2-3.4-2.4 1a7.7 7.7 0 0 0-2.6-1.5L14 2h-4l-.4 3.1A7.7 7.7 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.9 7.9 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a7.7 7.7 0 0 0 2.6 1.5L10 22h4l.4-3.1a7.7 7.7 0 0 0 2.6-1.5l2.4 1 2-3.4zM12 15.2A3.2 3.2 0 1 1 12 8.8a3.2 3.2 0 0 1 0 6.4z"></path></svg>
-          <span>Configurações</span>
+          <span>Ajustes</span>
         </button>
       </nav>
     </div>
     <script src="../config.js?v=55"></script>
     <script src="../push-client.js?v=63"></script>
-    <script src="../app.js?v=91"></script>
+    <script src="../app.js?v=92"></script>
   </body>
 </html>
 

@@ -1214,13 +1214,12 @@ function countLeads_(actions) {
 function countConversations_(actions) {
   return actions.reduce((total, action) => {
     const type = String(action.action_type || '').toLowerCase();
+    const normalized = type
+      .replace(/^onsite_conversion\./, '')
+      .replace(/^offsite_conversion\./, '');
     const isConversation =
-      type === 'onsite_conversion.messaging_conversation_started_7d' ||
-      type === 'omni_messaging_conversation_started_7d' ||
-      type === 'messaging_conversation_started_7d' ||
-      type === 'messaging_conversation_started' ||
-      type.indexOf('messaging_conversation_started') > -1 ||
-      type.indexOf('conversation_started') > -1;
+      normalized.indexOf('messaging_conversation_started') > -1 ||
+      normalized.indexOf('omni_messaging_conversation_started') > -1;
     if (!isConversation) {
       return total;
     }

@@ -1591,6 +1591,7 @@
     renderLeadMetricOptions();
     renderFrontProductsSettings();
     renderManualSalePermissionSettings();
+    bindSettingsMirrorEditButtons();
   }
 
   function renderGoalSettings() {
@@ -1638,6 +1639,9 @@
             <input type="checkbox" value="${escapeHtml(key)}" ${state.frontProducts.includes(key) ? "checked" : ""}>
             <span class="slider"></span>
           </label>
+          <button class="settings-edit-button" type="button" data-settings-edit="product" data-name="${escapeHtml(product.name)}" aria-label="Editar produto ${escapeHtml(product.name)}" title="Editar produto">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.8 8.7l-2.5-2.5zm15-11.3a.9.9 0 0 0 0-1.3L17.1 3a.9.9 0 0 0-1.3 0l-1.5 1.5 3.2 3.2z"></path></svg>
+          </button>
         </div>`;
     }).join("");
     els.frontProductsList.querySelectorAll("input").forEach((input) => {
@@ -1670,12 +1674,26 @@
             <input type="checkbox" value="${escapeHtml(key)}" ${state.manualSalePermissions.includes(key) ? "checked" : ""}>
             <span class="slider"></span>
           </label>
+          <button class="settings-edit-button" type="button" data-settings-edit="attendant" data-name="${escapeHtml(attendant.name)}" aria-label="Editar atendente ${escapeHtml(attendant.name)}" title="Editar atendente">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.8 8.7l-2.5-2.5zm15-11.3a.9.9 0 0 0 0-1.3L17.1 3a.9.9 0 0 0-1.3 0l-1.5 1.5 3.2 3.2z"></path></svg>
+          </button>
         </div>`;
     }).join("");
     els.manualSaleAttendantsList.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", () => {
         state.manualSalePermissions = Array.from(els.manualSaleAttendantsList.querySelectorAll("input:checked")).map((node) => node.value);
         saveStringList("hsbi-manual-sale-attendants", state.manualSalePermissions);
+      });
+    });
+    bindSettingsMirrorEditButtons();
+  }
+
+  function bindSettingsMirrorEditButtons() {
+    document.querySelectorAll("[data-settings-edit]").forEach((button) => {
+      if (button.dataset.bound === "1") return;
+      button.dataset.bound = "1";
+      button.addEventListener("click", () => {
+        showNotificationSavedToast("Edite este item na planilha por enquanto");
       });
     });
   }
@@ -1934,7 +1952,7 @@
       : pushClient.update("owner", preferences);
   }
 
-  function showNotificationSavedToast() {
+  function showNotificationSavedToast(message = "Alteração salva") {
     let toast = document.getElementById("notificationSaveToast");
     if (!toast) {
       toast = document.createElement("div");
@@ -1946,11 +1964,13 @@
       icon.textContent = "\u2713";
 
       const text = document.createElement("strong");
-      text.textContent = "Alteração salva";
+      text.textContent = message;
 
       toast.append(icon, text);
       document.body.appendChild(toast);
     }
+    const text = toast.querySelector("strong");
+    if (text) text.textContent = message;
 
     window.clearTimeout(notificationToastTimer);
     toast.classList.add("is-visible");
