@@ -646,6 +646,13 @@ th:last-child {
   display: none;
 }
 
+.attendant-cell small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
 .transaction-value-cell {
   position: relative;
   padding-right: 48px;

@@ -1558,7 +1558,7 @@
 
     if (!visible.length) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td colspan="8">Nenhuma transação encontrada.</td>`;
+      tr.innerHTML = `<td colspan="7">Nenhuma transação encontrada.</td>`;
       tbody.append(tr);
     } else {
       visible.forEach((item) => {
@@ -1566,10 +1566,9 @@
         tr.innerHTML = `
           <td>${formatIsoDateBr(item.data)}</td>
           <td>${escapeHtml(item.hora)}</td>
-          <td class="payer-cell">${escapeHtml(item.pagador)}<small>${escapeHtml(item.atendente)}</small></td>
+          <td class="payer-cell">${escapeHtml(item.pagador)}</td>
           <td>${escapeHtml(formatPhone(item.telefone))}</td>
-          <td>${escapeHtml(item.atendente)}</td>
-          <td>${escapeHtml(item.produto || "Sem produto")}</td>
+          <td class="attendant-cell">${escapeHtml(item.atendente)}<small>${escapeHtml(item.produto || "Sem produto")}</small></td>
           <td>${escapeHtml(item.moedaOriginal)}</td>
           <td class="transaction-value-cell">
             <span>${formatOriginalValue(item)}</span>
