@@ -64,7 +64,9 @@
     transactionEditor: document.getElementById("transactionEditor"),
     transactionEditForm: document.getElementById("transactionEditForm"),
     transactionEditId: document.getElementById("transactionEditId"),
+    transactionEditDateLabel: document.getElementById("transactionEditDateLabel"),
     transactionEditDate: document.getElementById("transactionEditDate"),
+    transactionEditTimeLabel: document.getElementById("transactionEditTimeLabel"),
     transactionEditTime: document.getElementById("transactionEditTime"),
     transactionEditPayer: document.getElementById("transactionEditPayer"),
     transactionEditPhone: document.getElementById("transactionEditPhone"),
@@ -209,6 +211,10 @@
       if (els.transactionEditCurrency) {
         els.transactionEditCurrency.addEventListener("change", () => updateCurrencyPlaceholder(els.transactionEditValue, els.transactionEditCurrency.value));
       }
+      [els.transactionEditDate, els.transactionEditTime].filter(Boolean).forEach((input) => {
+        input.addEventListener("input", updateTransactionEditorDateTimeDisplays);
+        input.addEventListener("change", updateTransactionEditorDateTimeDisplays);
+      });
       [els.transactionEditCancel, els.transactionEditCancelBottom].filter(Boolean).forEach((button) => {
         button.addEventListener("click", closeTransactionEditor);
       });
@@ -541,6 +547,7 @@
     els.transactionEditId.value = transaction.id;
     els.transactionEditDate.value = transaction.data || toIsoDate(transaction.timestamp);
     els.transactionEditTime.value = normalizeTimeValue(transaction.hora || formatTime(transaction.timestamp));
+    updateTransactionEditorDateTimeDisplays();
     els.transactionEditPayer.value = transaction.pagador || "";
     if (els.transactionEditPhone) els.transactionEditPhone.value = formatPhone(transaction.telefone || "");
     renderTransactionEditAttendantOptions(transaction.atendente || "Sem atendente");
@@ -665,6 +672,15 @@
 
   function buildEmptyPayload() {
     return { transactions: [], manualSaleOptions: [], costs: [], attendants: [], goals: [], meta: { spend: 0, leads: 0, conversations: 0 } };
+  }
+
+  function updateTransactionEditorDateTimeDisplays() {
+    if (els.transactionEditDateLabel && els.transactionEditDate) {
+      els.transactionEditDateLabel.dataset.display = formatDateInputValue(els.transactionEditDate.value);
+    }
+    if (els.transactionEditTimeLabel && els.transactionEditTime) {
+      els.transactionEditTimeLabel.dataset.display = normalizeTimeValue(els.transactionEditTime.value) || "--:--";
+    }
   }
 
   function normalizeCosts(costs) {
