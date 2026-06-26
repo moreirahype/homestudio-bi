@@ -6,24 +6,24 @@
     <meta name="theme-color" content="#0e120d">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="High Sales">
-    <title>High Sales</title>
-    <link rel="manifest" href="../manifest.webmanifest?v=58">
+    <meta name="apple-mobile-web-app-title" content="HS Metrics">
+    <title>HS Metrics</title>
+    <link rel="manifest" href="../manifest.webmanifest?v=97">
     <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png?v=55">
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png?v=55">
     <link rel="apple-touch-icon" sizes="192x192" href="../assets/icon-192.png?v=55">
     <link rel="apple-touch-icon" sizes="512x512" href="../assets/icon-512.png?v=55">
     <link rel="icon" href="../assets/icon-192.png?v=55" type="image/png">
-    <link rel="stylesheet" href="../styles.css?v=86">
+    <link rel="stylesheet" href="../styles.css?v=97">
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Navegação principal">
-        <a class="brand" href="#dashboard" aria-label="High Sales">
+        <a class="brand" href="#dashboard" aria-label="HS Metrics">
           <span class="brand-mark" aria-hidden="true">
             <img src="../assets/icon-192.png?v=55" alt="">
           </span>
-          <img class="brand-wordmark" src="../assets/high-sales-wordmark.png?v=1" alt="High Sales">
+          <img class="brand-wordmark" src="../assets/hs-metrics-written-logo.webp?v=97" alt="HS Metrics">
         </a>
         <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher barra lateral" aria-expanded="true" title="Recolher barra lateral">
           <span aria-hidden="true"></span>
@@ -70,11 +70,11 @@
 
       <main class="main">
         <header class="mobile-header">
-          <a class="brand" href="#dashboard" aria-label="High Sales">
+          <a class="brand" href="#dashboard" aria-label="HS Metrics">
             <span class="brand-mark" aria-hidden="true">
               <img src="../assets/icon-192.png?v=55" alt="">
             </span>
-            <img class="brand-wordmark" src="../assets/high-sales-wordmark.png?v=1" alt="High Sales">
+            <img class="brand-wordmark" src="../assets/hs-metrics-written-logo.webp?v=97" alt="HS Metrics">
           </a>
           <span class="sync-pill" id="syncStatus">Carregando</span>
         </header>
@@ -368,6 +368,10 @@
                 <input id="manualSalePayer" type="text" placeholder="Nome do cliente" autocomplete="off">
               </label>
               <label>
+                <span>Telefone</span>
+                <input id="manualSalePhone" type="text" inputmode="tel" placeholder="(00) 00000-0000" autocomplete="off">
+              </label>
+              <label>
                 <span>Atendente</span>
                 <select id="manualSaleAttendant">
                   <option value="Sem atendente">Sem atendente</option>
@@ -397,14 +401,21 @@
           <article class="panel settings-panel">
             <div class="panel-header"><h1>Definir metas</h1></div>
             <p class="settings-copy">Cadastre título, valor, prêmio e status das metas que aparecem no app da atendente.</p>
+            <form class="settings-add-form" id="addGoalForm">
+              <input id="addGoalAttendant" type="text" placeholder="Atendente">
+              <input id="addGoalTitle" type="text" placeholder="Título da meta">
+              <input id="addGoalValue" type="text" inputmode="decimal" placeholder="Valor">
+              <input id="addGoalPrize" type="text" placeholder="Prêmio">
+              <button type="submit">Adicionar meta</button>
+            </form>
             <div class="settings-table settings-goals-table">
               <div class="settings-table-head">
-                <span>Slug</span>
+                <span>Atendente</span>
                 <span>Meta</span>
                 <span>Valor</span>
                 <span>Prêmio</span>
                 <span>Status</span>
-                <span>Ação</span>
+                <span></span>
               </div>
               <div id="goalsSettingsList"></div>
             </div>
@@ -413,8 +424,12 @@
 
         <section class="page" id="page-settings-attendants" data-page="settings-attendants">
           <article class="panel settings-panel">
-            <div class="panel-header"><h1>Atendentes</h1></div>
+            <div class="panel-header"><h1>Configurar atendentes</h1></div>
             <p class="settings-copy">Gerencie nome, comissão, fixo mensal, início, pausas e permissão de venda manual dos atendentes.</p>
+            <form class="settings-add-form compact" id="addAttendantForm">
+              <input id="addAttendantName" type="text" placeholder="Nome do atendente">
+              <button type="submit">Adicionar atendente</button>
+            </form>
             <div class="settings-toggle-grid" id="attendantCostOptions" aria-label="Custos de atendentes no lucro">
               <label class="settings-check-row">
                 <span>Subtrair comissão no lucro</span>
@@ -438,21 +453,27 @@
                 <span>Fixo mensal</span>
                 <span>Início</span>
                 <span>Pausas</span>
-                <span>Manual</span>
+                <span>Lançar vendas</span>
                 <span></span>
               </div>
               <div id="manualSaleAttendantsList"></div>
             </div>
             <p class="settings-help">O fixo mensal é distribuído ao longo de 30 dias para aparecer como ganho fixo diário no app do atendente. O dia 31 é sempre desconsiderado nessa divisão.</p>
             <p class="settings-help">Os seletores de comissão e fixo definem se esses custos entram no cálculo do lucro do dashboard.</p>
-            <p class="settings-help">Manual habilita ou bloqueia lançamentos manuais no app do atendente. Use apenas para pessoas em que você confia para registrar vendas por conta própria.</p>
+            <p class="settings-help">Lançar vendas habilita ou bloqueia lançamentos manuais no app do atendente. Use apenas para pessoas em que você confia para registrar vendas por conta própria.</p>
           </article>
         </section>
 
         <section class="page" id="page-settings-products" data-page="settings-products">
           <article class="panel settings-panel">
-            <div class="panel-header"><h1>Produtos</h1></div>
+            <div class="panel-header"><h1>Configurar produtos</h1></div>
             <p class="settings-copy">Gerencie produtos vendidos, custos e quais produtos entram no cálculo de Conversão Front.</p>
+            <form class="settings-add-form compact" id="addProductForm">
+              <select id="addProductName">
+                <option value="">Selecione um produto vendido</option>
+              </select>
+              <button type="submit">Adicionar produto</button>
+            </form>
             <div class="settings-table settings-products-table">
               <div class="settings-table-head">
                 <span>Produto</span>
@@ -463,7 +484,7 @@
               </div>
               <div id="frontProductsList"></div>
             </div>
-            <p class="settings-help">Para evitar nomes diferentes, o ideal é fazer pelo menos uma venda real do produto. Depois disso, ele aparece aqui como produto vendido nos últimos 90 dias e você só seleciona, sem precisar digitar.</p>
+            <p class="settings-help">Para evitar nomes diferentes, é obrigatório que o produto tenha pelo menos uma venda registrada. Depois disso, ele aparece aqui como produto vendido nos últimos 90 dias e você só seleciona, sem precisar digitar.</p>
           </article>
         </section>
 
@@ -515,7 +536,7 @@
                     <div>
                       <strong>Venda realizada!</strong>
                       <span id="saleNotificationPreviewBody">Valor: R$ 99,90 • Nome do atendente</span>
-                      <small>High Sales</small>
+                      <small>HS Metrics</small>
                     </div></div>
                 </div>
               </article>
@@ -539,7 +560,7 @@
                     <div>
                       <strong id="reportPreviewTitle">Resumo das Campanhas!</strong>
                       <span id="notificationSummary">Seu investimento está em R$ 0,00, com faturamento em R$ 0,00, com um CPA de N/A e um ROI de 0,00.</span>
-                      <small>High Sales</small>
+                      <small>HS Metrics</small>
                     </div>
                   </div>
                 </div>

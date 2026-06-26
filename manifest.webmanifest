@@ -1,6 +1,6 @@
-{
-  "name": "High Sales",
-  "short_name": "High Sales",
+﻿{
+  "name": "HS Metrics",
+  "short_name": "HS Metrics",
   "description": "Dashboard de vendas, anúncios, atendentes e notificações.",
   "scope": "./",
   "display": "standalone",

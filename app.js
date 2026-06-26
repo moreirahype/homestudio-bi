@@ -23,6 +23,7 @@
     filteredTransactions: [],
     dashboardTransactions: [],
     manualSaleOptions: [],
+    transactionDrafts: {},
     loadedTransactionRange: null,
     filters: { attendant: "all", product: "all", account: "all" },
     leadMetricSource: loadLeadMetricSource(),
@@ -53,6 +54,7 @@
     manualSaleValue: document.getElementById("manualSaleValue"),
     manualSaleCurrency: document.getElementById("manualSaleCurrency"),
     manualSalePayer: document.getElementById("manualSalePayer"),
+    manualSalePhone: document.getElementById("manualSalePhone"),
     manualSaleAttendant: document.getElementById("manualSaleAttendant"),
     manualSaleProduct: document.getElementById("manualSaleProduct"),
     manualSaleDate: document.getElementById("manualSaleDate"),
@@ -94,6 +96,15 @@
     leadMetricOptions: document.getElementById("leadMetricOptions"),
     attendantCostOptions: document.getElementById("attendantCostOptions"),
     frontProductsList: document.getElementById("frontProductsList"),
+    addGoalForm: document.getElementById("addGoalForm"),
+    addGoalAttendant: document.getElementById("addGoalAttendant"),
+    addGoalTitle: document.getElementById("addGoalTitle"),
+    addGoalValue: document.getElementById("addGoalValue"),
+    addGoalPrize: document.getElementById("addGoalPrize"),
+    addAttendantForm: document.getElementById("addAttendantForm"),
+    addAttendantName: document.getElementById("addAttendantName"),
+    addProductForm: document.getElementById("addProductForm"),
+    addProductName: document.getElementById("addProductName"),
     manualSaleAttendantsList: document.getElementById("manualSaleAttendantsList"),
     enableAllNotifications: document.getElementById("enableAllNotifications"),
     testNotification: document.getElementById("testNotification")
@@ -158,7 +169,13 @@
       });
     });
 
-    els.refreshButton.addEventListener("click", () => refreshData({ applySelection: true, buttonLoading: true }));
+    els.refreshButton.addEventListener("click", () => {
+      if (hasTransactionDrafts()) {
+        savePendingTransactionDrafts();
+      } else {
+        refreshData({ applySelection: true, buttonLoading: true });
+      }
+    });
     if (els.sidebarToggle) {
       els.sidebarToggle.addEventListener("click", toggleSidebar);
     }
@@ -184,6 +201,11 @@
         els.manualSaleCurrency.addEventListener("change", () => updateCurrencyPlaceholder(els.manualSaleValue, els.manualSaleCurrency.value));
         updateCurrencyPlaceholder(els.manualSaleValue, els.manualSaleCurrency.value);
       }
+      if (els.manualSalePhone) {
+        els.manualSalePhone.addEventListener("input", () => {
+          els.manualSalePhone.value = formatPhone(els.manualSalePhone.value);
+        });
+      }
     }
     if (els.leadMetricOptions) {
       els.leadMetricOptions.addEventListener("click", (event) => {
@@ -205,11 +227,19 @@
         render();
       });
     }
+    if (els.addGoalForm) els.addGoalForm.addEventListener("submit", addGoalFromForm);
+    if (els.addAttendantForm) els.addAttendantForm.addEventListener("submit", addAttendantFromForm);
+    if (els.addProductForm) els.addProductForm.addEventListener("submit", addProductFromForm);
 
     if (els.transactionEditForm) {
       els.transactionEditForm.addEventListener("submit", submitTransactionEdit);
       if (els.transactionEditCurrency) {
         els.transactionEditCurrency.addEventListener("change", () => updateCurrencyPlaceholder(els.transactionEditValue, els.transactionEditCurrency.value));
+      }
+      if (els.transactionEditPhone) {
+        els.transactionEditPhone.addEventListener("input", () => {
+          els.transactionEditPhone.value = formatPhone(els.transactionEditPhone.value);
+        });
       }
       [els.transactionEditDate, els.transactionEditTime].filter(Boolean).forEach((input) => {
         input.addEventListener("input", updateTransactionEditorDateTimeDisplays);
@@ -331,7 +361,7 @@
       const metaEntries = await Promise.all(
         standardPeriods.map(async (period) => [period, await fetchMetaPayload(getDateRange(period))])
       );
-      state.transactions = payload.transactions.map(normalizeTransaction);
+      state.transactions = applyTransactionDrafts(payload.transactions.map(normalizeTransaction));
       state.costs = normalizeCosts(payload.costs);
       state.attendantConfigs = normalizeAttendantConfigs(payload.attendants);
       state.goalConfigs = normalizeGoalConfigs(payload.goals);
@@ -346,7 +376,7 @@
     } catch (error) {
       console.error(error);
       const fallback = buildEmptyPayload();
-      state.transactions = fallback.transactions.map(normalizeTransaction);
+      state.transactions = applyTransactionDrafts(fallback.transactions.map(normalizeTransaction));
       state.costs = normalizeCosts(fallback.costs);
       state.manualSaleOptions = normalizeManualSaleOptions(fallback.manualSaleOptions);
       state.attendantConfigs = normalizeAttendantConfigs(fallback.attendants);
@@ -446,6 +476,7 @@
     payload.set("moeda", currency);
     payload.set("valor", String(value).replace(".", ","));
     payload.set("pagador", els.manualSalePayer.value.trim() || "Cliente manual");
+    payload.set("telefone", els.manualSalePhone ? els.manualSalePhone.value.trim() : "");
     payload.set("atendente", els.manualSaleAttendant.value || "Sem atendente");
     payload.set("produto", els.manualSaleProduct ? els.manualSaleProduct.value || "" : "");
     payload.set("timestamp", saleTimestamp.toISOString());
@@ -456,6 +487,7 @@
     try {
       await submitMutation(payload);
       els.manualSaleForm.reset();
+      if (els.manualSaleCurrency) updateCurrencyPlaceholder(els.manualSaleValue, els.manualSaleCurrency.value);
       await refreshData({ applySelection: true });
     } catch (error) {
       console.error(error);
@@ -469,6 +501,67 @@
     }
   }
 
+  async function addGoalFromForm(event) {
+    event.preventDefault();
+    const attendant = (els.addGoalAttendant.value || "").trim();
+    const title = (els.addGoalTitle.value || "").trim();
+    if (!attendant || !title) {
+      alert("Informe atendente e título da meta.");
+      return;
+    }
+    const payload = new FormData();
+    payload.set("action", "updateGoal");
+    payload.set("slug", attendant);
+    payload.set("meta_titulo", title);
+    payload.set("meta_valor", els.addGoalValue.value || "0");
+    payload.set("meta_premio", els.addGoalPrize.value || "");
+    payload.set("meta_ativa", "TRUE");
+    payload.set("mutation_id", createMutationId("goal"));
+    await submitMutation(payload);
+    els.addGoalForm.reset();
+    showNotificationSavedToast("Meta adicionada");
+    await refreshData({ applySelection: true });
+  }
+
+  async function addAttendantFromForm(event) {
+    event.preventDefault();
+    const name = (els.addAttendantName.value || "").trim();
+    if (!name) {
+      alert("Informe o nome do atendente.");
+      return;
+    }
+    const payload = new FormData();
+    payload.set("action", "updateAttendant");
+    payload.set("nome", name);
+    payload.set("comissao_percentual", "0");
+    payload.set("salario_fixo_mensal", "0");
+    payload.set("mutation_id", createMutationId("attendant"));
+    await submitMutation(payload);
+    els.addAttendantForm.reset();
+    showNotificationSavedToast("Atendente adicionado");
+    await refreshData({ applySelection: true });
+  }
+
+  async function addProductFromForm(event) {
+    event.preventDefault();
+    const product = (els.addProductName.value || "").trim();
+    if (!product) {
+      alert("Selecione um produto vendido.");
+      return;
+    }
+    const payload = new FormData();
+    payload.set("action", "updateProductCost");
+    payload.set("produto", product);
+    payload.set("custo_fixo", "0");
+    payload.set("custo_percentual", "0");
+    payload.set("front", "FALSE");
+    payload.set("mutation_id", createMutationId("product-cost"));
+    await submitMutation(payload);
+    els.addProductForm.reset();
+    showNotificationSavedToast("Produto adicionado");
+    await refreshData({ applySelection: true });
+  }
+
   async function submitTransactionEdit(event) {
     event.preventDefault();
     if (!config.apiUrl) {
@@ -476,7 +569,7 @@
       return;
     }
     const id = els.transactionEditId.value;
-    const transaction = state.transactions.find((item) => item.id === id);
+    const transaction = getTransactionById(id);
     if (!transaction) {
       alert("Transação não encontrada.");
       closeTransactionEditor();
@@ -489,6 +582,24 @@
       return;
     }
     const currency = normalizeCurrency(els.transactionEditCurrency.value || transaction.moedaOriginal || "BRL");
+    const brlValue = currency === "BRL" ? value : convertToBrl(value, currency);
+    state.transactionDrafts[id] = {
+      data: els.transactionEditDate.value,
+      hora: els.transactionEditTime.value,
+      pagador: els.transactionEditPayer.value.trim() || "Sem cliente",
+      telefone: els.transactionEditPhone ? els.transactionEditPhone.value.trim() : transaction.telefone || "",
+      atendente: els.transactionEditAttendant.value.trim() || "Sem atendente",
+      produto: els.transactionEditProduct ? els.transactionEditProduct.value || "" : transaction.produto || "",
+      moedaOriginal: currency,
+      valorOriginal: value,
+      moeda: "BRL",
+      valor: brlValue
+    };
+    state.transactions = applyTransactionDrafts(state.transactions);
+    closeTransactionEditor();
+    showNotificationSavedToast("Rascunho salvo");
+    render();
+    return;
     const payload = new FormData();
     payload.set("action", "updateTransaction");
     payload.set("id", id);
@@ -533,6 +644,41 @@
     return { ok: true, mutation_id: mutationId };
   }
 
+  async function savePendingTransactionDrafts() {
+    if (!config.apiUrl || !hasTransactionDrafts()) return;
+    els.refreshButton.disabled = true;
+    setRefreshButtonLoading(true);
+    try {
+      for (const [id, draft] of Object.entries(state.transactionDrafts)) {
+        const payload = new FormData();
+        payload.set("action", "updateTransaction");
+        payload.set("id", id);
+        payload.set("data", draft.data || "");
+        payload.set("hora", draft.hora || "");
+        payload.set("pagador", draft.pagador || "Sem cliente");
+        payload.set("telefone", draft.telefone || "");
+        payload.set("atendente", draft.atendente || "Sem atendente");
+        payload.set("produto", draft.produto || "");
+        payload.set("moeda_original", draft.moedaOriginal || "BRL");
+        payload.set("valor_original", String(draft.valorOriginal || 0).replace(".", ","));
+        payload.set("moeda", "BRL");
+        payload.set("valor", String(draft.valor || 0).replace(".", ","));
+        payload.set("mutation_id", createMutationId("edit"));
+        await submitMutation(payload);
+      }
+      state.transactionDrafts = {};
+      showNotificationSavedToast("Alterações salvas");
+      await refreshData({ applySelection: true });
+    } catch (error) {
+      console.error(error);
+      alert(error && error.message ? error.message : "Não foi possível salvar as alterações agora.");
+    } finally {
+      els.refreshButton.disabled = false;
+      setRefreshButtonLoading(false);
+      updateRefreshButtonState();
+    }
+  }
+
   function createMutationId(prefix) {
     const random =
       window.crypto && typeof window.crypto.randomUUID === "function"
@@ -542,7 +688,7 @@
   }
 
   function openTransactionEditor(id) {
-    const transaction = state.transactions.find((item) => item.id === id);
+    const transaction = getTransactionById(id);
     if (!transaction || !els.transactionEditor) return;
     els.transactionEditId.value = transaction.id;
     els.transactionEditDate.value = transaction.data || toIsoDate(transaction.timestamp);
@@ -569,7 +715,7 @@
       return;
     }
     const id = els.transactionEditId.value;
-    const transaction = state.transactions.find((item) => item.id === id);
+    const transaction = getTransactionById(id);
     if (!transaction) {
       alert("Transação não encontrada.");
       closeTransactionEditor();
@@ -585,6 +731,7 @@
     setTransactionDeleteLoading(true);
     try {
       await submitMutation(payload);
+      delete state.transactionDrafts[id];
       closeTransactionEditor();
       await refreshData({ applySelection: true });
     } catch (error) {
@@ -691,7 +838,8 @@
       map.set(normalizeFilterValue(product), {
         product,
         fixed: parseMoneyValue(item.custo_fixo || item.fixed || 0),
-        percent: parseMoneyValue(item.custo_percentual || item.percent || 0)
+        percent: parseMoneyValue(item.custo_percentual || item.percent || 0),
+        front: parseBoolean(item.front || item.produto_front || item.is_front)
       });
     });
     return map;
@@ -790,8 +938,14 @@
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
+  function parseBoolean(value) {
+    const text = String(value || "").trim().toLowerCase();
+    return ["true", "sim", "yes", "1", "ativo", "ativa"].includes(text);
+  }
+
   function render() {
     renderPeriodControls();
+    updateRefreshButtonState();
     renderManualSaleOptions();
     state.filteredTransactions = getFilteredTransactions();
     renderDashboardFilters();
@@ -805,9 +959,35 @@
     }
     renderAttendants();
     renderProducts();
+    renderAddProductOptions();
     renderSettingsPages();
     renderTransactions();
     renderNotificationSummary();
+  }
+
+  function hasTransactionDrafts() {
+    return Boolean(state.transactionDrafts && Object.keys(state.transactionDrafts).length);
+  }
+
+  function getTransactionById(id) {
+    return state.transactions.find((item) => item.id === id);
+  }
+
+  function applyTransactionDrafts(transactions) {
+    if (!hasTransactionDrafts()) return transactions;
+    return transactions.map((item) => {
+      const draft = state.transactionDrafts[item.id];
+      return draft ? Object.assign({}, item, draft, { isDraft: true }) : item;
+    });
+  }
+
+  function updateRefreshButtonState() {
+    if (!els.refreshButton) return;
+    const hasDrafts = hasTransactionDrafts();
+    els.refreshButton.classList.toggle("has-drafts", hasDrafts);
+    if (!els.refreshButton.classList.contains("is-loading")) {
+      els.refreshButton.textContent = hasDrafts ? "Salvar" : "Atualizar";
+    }
   }
 
   function renderPeriodControls() {
@@ -1035,7 +1215,8 @@
   function countFrontConversionSales(periodTransactions, allTransactions) {
     const periodIds = new Set(periodTransactions.map((item) => item.id));
     const seenBuyers = new Set();
-    const frontProducts = new Set(state.frontProducts || []);
+    const sheetFrontProducts = Array.from(state.costs.values()).filter((item) => item.front).map((item) => normalizeFilterValue(item.product));
+    const frontProducts = new Set(sheetFrontProducts.length ? sheetFrontProducts : state.frontProducts || []);
     return (allTransactions || [])
       .filter((item) => !isGalleryTransaction(item))
       .filter((item) => !frontProducts.size || frontProducts.has(normalizeFilterValue(item.produto || "Sem produto")))
@@ -1094,6 +1275,16 @@
     ];
     const value = candidates.find((item) => Number.isFinite(Number(item)) && Number(item) > 0);
     return value == null ? 0 : Number(value);
+  }
+
+  function renderAddProductOptions() {
+    if (!els.addProductName) return;
+    const current = els.addProductName.value;
+    const options = getProductSelectOptions("").filter((name) => name && name !== "Sem produto");
+    els.addProductName.innerHTML = `<option value="">Selecione um produto vendido</option>` + options
+      .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
+      .join("");
+    if (options.includes(current)) els.addProductName.value = current;
   }
 
   function renderMetrics() {
@@ -1650,7 +1841,7 @@
     }
     list.innerHTML = goals.map((goal) => `
       <div class="settings-table-row settings-goal-row">
-        <input data-goal-field="slug" value="${escapeHtml(goal.slug || "")}" aria-label="Slug">
+        <input data-goal-field="slug" value="${escapeHtml(goal.slug || "")}" aria-label="Atendente">
         <input data-goal-field="title" value="${escapeHtml(goal.title)}" aria-label="Meta">
         <input data-goal-field="value" value="${escapeHtml(decimal(goal.value || 0))}" inputmode="decimal" aria-label="Valor">
         <input data-goal-field="prize" value="${escapeHtml(goal.prize || "")}" aria-label="Prêmio">
@@ -1658,9 +1849,10 @@
           <option value="TRUE" ${goal.active ? "selected" : ""}>Ativa</option>
           <option value="FALSE" ${!goal.active ? "selected" : ""}>Inativa</option>
         </select>
-        <button class="settings-edit-button" type="button" data-settings-edit="goal" data-slug="${escapeHtml(goal.slug || "")}" data-title="${escapeHtml(goal.title)}" data-value="${escapeHtml(String(goal.value || 0))}" data-prize="${escapeHtml(goal.prize || "")}" data-active="${goal.active ? "true" : "false"}" aria-label="Editar meta ${escapeHtml(goal.title)}" title="Editar meta">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path></svg>
-        </button>
+        <div class="settings-row-actions">
+          <button class="settings-save-button" type="button" data-settings-edit="goal" data-slug="${escapeHtml(goal.slug || "")}" data-title="${escapeHtml(goal.title)}" data-value="${escapeHtml(String(goal.value || 0))}" data-prize="${escapeHtml(goal.prize || "")}" data-active="${goal.active ? "true" : "false"}">Salvar</button>
+          <button class="settings-delete-button" type="button" data-settings-delete="goal" data-slug="${escapeHtml(goal.slug || "")}" data-title="${escapeHtml(goal.title)}" aria-label="Excluir meta ${escapeHtml(goal.title)}">Apagar</button>
+        </div>
       </div>
     `).join("");
     bindSettingsMirrorEditButtons();
@@ -1683,23 +1875,27 @@
     }
     els.frontProductsList.innerHTML = products.map((product) => {
       const key = normalizeFilterValue(product.name);
+      const isFront = product.front || state.frontProducts.includes(key);
       return `
         <div class="settings-table-row settings-product-row">
           <input data-product-field="name" value="${escapeHtml(product.name)}" readonly aria-label="Produto">
           <input data-product-field="fixed" value="${escapeHtml(decimal(product.fixed || 0))}" inputmode="decimal" aria-label="Custo fixo">
           <input data-product-field="percent" value="${escapeHtml(decimal(product.percent || 0))}" inputmode="decimal" aria-label="Custo percentual">
-          <label class="switch" aria-label="Produto de front">
-            <input type="checkbox" data-front-toggle value="${escapeHtml(key)}" ${state.frontProducts.includes(key) ? "checked" : ""}>
-            <span class="slider"></span>
-          </label>
-          <button class="settings-edit-button" type="button" data-settings-edit="product" data-name="${escapeHtml(product.name)}" data-fixed="${escapeHtml(String(product.fixed || 0))}" data-percent="${escapeHtml(String(product.percent || 0))}" aria-label="Editar produto ${escapeHtml(product.name)}" title="Editar produto">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path></svg>
-          </button>
+          <select data-front-toggle value="${escapeHtml(key)}" aria-label="Produto de front">
+            <option value="yes" ${isFront ? "selected" : ""}>Sim</option>
+            <option value="no" ${!isFront ? "selected" : ""}>Não</option>
+          </select>
+          <div class="settings-row-actions">
+            <button class="settings-save-button" type="button" data-settings-edit="product" data-name="${escapeHtml(product.name)}" data-fixed="${escapeHtml(String(product.fixed || 0))}" data-percent="${escapeHtml(String(product.percent || 0))}" data-front="${isFront ? "true" : "false"}">Salvar</button>
+            <button class="settings-delete-button" type="button" data-settings-delete="product" data-name="${escapeHtml(product.name)}" aria-label="Excluir produto ${escapeHtml(product.name)}">Apagar</button>
+          </div>
         </div>`;
     }).join("");
-    els.frontProductsList.querySelectorAll("input[data-front-toggle]").forEach((input) => {
+    els.frontProductsList.querySelectorAll("select[data-front-toggle]").forEach((input) => {
       input.addEventListener("change", () => {
-        state.frontProducts = Array.from(els.frontProductsList.querySelectorAll("input[data-front-toggle]:checked")).map((node) => node.value);
+        state.frontProducts = Array.from(els.frontProductsList.querySelectorAll("select[data-front-toggle]"))
+          .filter((node) => node.value === "yes")
+          .map((node) => normalizeFilterValue(node.closest(".settings-product-row").querySelector("[data-product-field='name']").value));
         saveStringList("hsbi-front-products", state.frontProducts);
         state.animateDashboard = state.page === "dashboard";
         render();
@@ -1723,18 +1919,21 @@
           <input data-attendant-field="salary" value="${escapeHtml(decimal(attendant.salary || 0))}" inputmode="decimal" aria-label="Fixo mensal">
           <input data-attendant-field="start" value="${escapeHtml(attendant.start || "")}" placeholder="aaaa-mm-dd" aria-label="Início">
           <input data-attendant-field="pauses" value="${escapeHtml(attendant.pauses || "")}" placeholder="Sem pausas" aria-label="Pausas">
-          <label class="switch" aria-label="Permitir venda manual">
-            <input type="checkbox" data-manual-toggle value="${escapeHtml(key)}" ${state.manualSalePermissions.includes(key) ? "checked" : ""}>
-            <span class="slider"></span>
-          </label>
-          <button class="settings-edit-button" type="button" data-settings-edit="attendant" data-slug="${escapeHtml(attendant.slug || "")}" data-name="${escapeHtml(attendant.name)}" data-commission="${escapeHtml(String(attendant.commission || 0))}" data-salary="${escapeHtml(String(attendant.salary || 0))}" data-start="${escapeHtml(attendant.start || "")}" data-pauses="${escapeHtml(attendant.pauses || "")}" aria-label="Editar atendente ${escapeHtml(attendant.name)}" title="Editar atendente">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path></svg>
-          </button>
+          <select data-manual-toggle aria-label="Permitir lançamento manual">
+            <option value="yes" ${state.manualSalePermissions.includes(key) ? "selected" : ""}>Sim</option>
+            <option value="no" ${!state.manualSalePermissions.includes(key) ? "selected" : ""}>Não</option>
+          </select>
+          <div class="settings-row-actions">
+            <button class="settings-save-button" type="button" data-settings-edit="attendant" data-slug="${escapeHtml(attendant.slug || "")}" data-name="${escapeHtml(attendant.name)}" data-commission="${escapeHtml(String(attendant.commission || 0))}" data-salary="${escapeHtml(String(attendant.salary || 0))}" data-start="${escapeHtml(attendant.start || "")}" data-pauses="${escapeHtml(attendant.pauses || "")}">Salvar</button>
+            <button class="settings-delete-button" type="button" data-settings-delete="attendant" data-slug="${escapeHtml(attendant.slug || "")}" data-name="${escapeHtml(attendant.name)}" aria-label="Excluir atendente ${escapeHtml(attendant.name)}">Apagar</button>
+          </div>
         </div>`;
     }).join("");
-    els.manualSaleAttendantsList.querySelectorAll("input[data-manual-toggle]").forEach((input) => {
+    els.manualSaleAttendantsList.querySelectorAll("select[data-manual-toggle]").forEach((input) => {
       input.addEventListener("change", () => {
-        state.manualSalePermissions = Array.from(els.manualSaleAttendantsList.querySelectorAll("input[data-manual-toggle]:checked")).map((node) => node.value);
+        state.manualSalePermissions = Array.from(els.manualSaleAttendantsList.querySelectorAll("select[data-manual-toggle]"))
+          .filter((node) => node.value === "yes")
+          .map((node) => normalizeFilterValue(node.closest(".settings-attendant-row").querySelector("[data-attendant-field='name']").value));
         saveStringList("hsbi-manual-sale-attendants", state.manualSalePermissions);
       });
     });
@@ -1760,6 +1959,41 @@
         }
       });
     });
+    document.querySelectorAll("[data-settings-delete]").forEach((button) => {
+      if (button.dataset.bound === "1") return;
+      button.dataset.bound = "1";
+      button.addEventListener("click", async () => {
+        try {
+          await deleteSettingsRowFromButton(button);
+        } catch (error) {
+          if (error && error.name === "AbortError") return;
+          alert(error && error.message ? error.message : "Não foi possível apagar agora.");
+        }
+      });
+    });
+  }
+
+  async function deleteSettingsRowFromButton(button) {
+    const type = button.dataset.settingsDelete;
+    const label = button.dataset.title || button.dataset.name || button.dataset.slug || "linha";
+    if (!window.confirm(`Apagar ${label}?`)) return;
+    const payload = new FormData();
+    payload.set("mutation_id", createMutationId(`delete-${type}`));
+    if (type === "goal") {
+      payload.set("action", "deleteGoal");
+      payload.set("slug", button.dataset.slug || "");
+      payload.set("meta_titulo", button.dataset.title || "");
+    } else if (type === "product") {
+      payload.set("action", "deleteProductCost");
+      payload.set("produto", button.dataset.name || "");
+    } else {
+      payload.set("action", "deleteAttendant");
+      payload.set("slug", button.dataset.slug || "");
+      payload.set("nome", button.dataset.name || "");
+    }
+    await submitMutation(payload);
+    showNotificationSavedToast("Linha apagada");
+    await refreshData({ applySelection: true });
   }
 
   async function editGoalFromButton(button) {
@@ -1797,6 +2031,7 @@
     const product = getSettingsFieldValue(row, "[data-product-field='name']", button.dataset.name || "");
     const fixed = getSettingsFieldValue(row, "[data-product-field='fixed']", decimal(Number(button.dataset.fixed || 0)));
     const percentValue = getSettingsFieldValue(row, "[data-product-field='percent']", decimal(Number(button.dataset.percent || 0)));
+    const frontValue = getSettingsFieldValue(row, "[data-front-toggle]", button.dataset.front === "true" ? "yes" : "no");
     if (!product.trim()) {
       alert("Produto não informado.");
       return;
@@ -1806,6 +2041,7 @@
     payload.set("produto", product);
     payload.set("custo_fixo", fixed);
     payload.set("custo_percentual", percentValue);
+    payload.set("front", frontValue === "yes" ? "TRUE" : "FALSE");
     payload.set("mutation_id", createMutationId("product-cost"));
     await submitMutation(payload);
     showNotificationSavedToast("Produto salvo");
@@ -1864,12 +2100,12 @@
     const byName = new Map();
     getProductSelectOptions("").forEach((name) => {
       if (!name || name === "Sem produto") return;
-      byName.set(normalizeFilterValue(name), { name, fixed: 0, percent: 0 });
+      byName.set(normalizeFilterValue(name), { name, fixed: 0, percent: 0, front: false });
     });
     if (state.costs && state.costs.forEach) {
       state.costs.forEach((cost, key) => {
         const name = cost.product || key;
-        byName.set(key, { name, fixed: Number(cost.fixed || 0), percent: Number(cost.percent || 0) });
+        byName.set(key, { name, fixed: Number(cost.fixed || 0), percent: Number(cost.percent || 0), front: Boolean(cost.front) });
       });
     }
     return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
@@ -1903,6 +2139,7 @@
     } else {
       visible.forEach((item) => {
         const tr = document.createElement("tr");
+        if (item.isDraft) tr.classList.add("is-draft-row");
         tr.innerHTML = `
           <td>${formatIsoDateBr(item.data)}</td>
           <td>${escapeHtml(item.hora)}</td>
@@ -1912,6 +2149,7 @@
           <td>${escapeHtml(item.moedaOriginal)}</td>
           <td class="transaction-value-cell">
             <span>${formatOriginalValue(item)}</span>
+            ${item.isDraft ? '<small class="draft-label">Rascunho</small>' : ""}
             <button class="transaction-edit-button" type="button" data-id="${escapeHtml(item.id)}" aria-label="Editar transação">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.25V20h2.75L17.8 8.95l-2.75-2.75L4 17.25zm15.92-11.17a1 1 0 0 0 0-1.42l-.58-.58a1 1 0 0 0-1.42 0l-1.16 1.16 2.75 2.75 1.41-1.41z"></path></svg>
             </button>

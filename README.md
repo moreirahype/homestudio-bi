@@ -1,4 +1,4 @@
-# High Sales
+﻿# HS Metrics
 
 Este repositorio e o app pessoal/operacional da minha estrutura atual.
 
@@ -14,7 +14,7 @@ Estrutura mantida aqui para o uso pessoal:
 - `landing/`: copia da landing criada durante o desenvolvimento.
 - `x7p4r9m2/` e `k9v2m7q4/`: slugs do PWA.
 
-A versao comercial do High Sales sera desenvolvida separadamente nos repositorios novos:
+A versao comercial do HS Metrics sera desenvolvida separadamente nos repositorios novos:
 
 - https://github.com/moreirahype/high-sales
 - https://github.com/moreirahype/high-sales-app

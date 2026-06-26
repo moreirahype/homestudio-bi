@@ -1,4 +1,4 @@
-const SHEET_NAME = 'Transações';
+﻿const SHEET_NAME = 'Transações';
 const ATTENDANTS_SHEET_NAME = 'Atendentes';
 const GOALS_SHEET_NAME = 'Metas';
 const MANUAL_SALES_SHEET_NAME = 'Vendas Manuais';
@@ -10,7 +10,7 @@ const HEADERS = ['id', 'timestamp', 'data', 'hora', 'pagador', 'telefone', 'moed
 const ATTENDANT_HEADERS = ['slug', 'nome', 'comissao_percentual', 'salario_fixo_mensal', 'inicio_trabalho', 'pausas'];
 const GOAL_HEADERS = ['slug', 'meta_titulo', 'meta_valor', 'meta_premio', 'meta_ativa'];
 const MANUAL_SALE_HEADERS = ['atendente', 'produto'];
-const COST_HEADERS = ['produto', 'custo_fixo', 'custo_percentual'];
+const COST_HEADERS = ['produto', 'custo_fixo', 'custo_percentual', 'front'];
 
 function doGet(e) {
   const params = e.parameter || {};
@@ -43,7 +43,7 @@ function doGet(e) {
   if (params.action === 'attendant') {
     return outputJson_(readAttendantData_(params.slug, params.from, params.to), params.callback);
   }
-  return outputJson_({ ok: true, app: 'High Sales' }, params.callback);
+  return outputJson_({ ok: true, app: 'HS Metrics' }, params.callback);
 }
 
 function runDiagnostics_(params) {
@@ -103,15 +103,33 @@ function doPost(e) {
     recordMutationResult_(mutationId, result);
     return outputJson_(result);
   }
+  if (String(pickValue_(payload, ['action']) || '') === 'deleteAttendant') {
+    const result = deleteAttendant_(payload);
+    appendDebugLog_(result.ok ? 'attendant_deleted' : 'attendant_delete_error', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
+  }
   if (String(pickValue_(payload, ['action']) || '') === 'updateProductCost') {
     const result = updateProductCost_(payload);
     appendDebugLog_(result.ok ? 'product_cost_updated' : 'product_cost_update_error', payload, result);
     recordMutationResult_(mutationId, result);
     return outputJson_(result);
   }
+  if (String(pickValue_(payload, ['action']) || '') === 'deleteProductCost') {
+    const result = deleteProductCost_(payload);
+    appendDebugLog_(result.ok ? 'product_cost_deleted' : 'product_cost_delete_error', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
+  }
   if (String(pickValue_(payload, ['action']) || '') === 'updateGoal') {
     const result = updateGoal_(payload);
     appendDebugLog_(result.ok ? 'goal_updated' : 'goal_update_error', payload, result);
+    recordMutationResult_(mutationId, result);
+    return outputJson_(result);
+  }
+  if (String(pickValue_(payload, ['action']) || '') === 'deleteGoal') {
+    const result = deleteGoal_(payload);
+    appendDebugLog_(result.ok ? 'goal_deleted' : 'goal_delete_error', payload, result);
     recordMutationResult_(mutationId, result);
     return outputJson_(result);
   }
@@ -650,6 +668,22 @@ function findAttendantRow_(sheet, slug, name) {
   return 0;
 }
 
+function deleteAttendant_(payload) {
+  const slug = String(pickValue_(payload, ['slug']) || '').trim();
+  const name = String(pickValue_(payload, ['nome', 'name']) || '').trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getAttendantsSheet_();
+    const rowNumber = findAttendantRow_(sheet, slug, name);
+    if (!rowNumber) return { ok: false, error: 'Atendente não encontrado.' };
+    sheet.deleteRow(rowNumber);
+    return { ok: true, deleted: true, slug: slug, name: name };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function updateProductCost_(payload) {
   const product = String(pickValue_(payload, ['produto', 'product']) || '').trim();
   if (!product) return { ok: false, error: 'Produto não informado.' };
@@ -661,7 +695,8 @@ function updateProductCost_(payload) {
     const row = [
       product,
       parseNumber_(pickValue_(payload, ['custo_fixo', 'fixed']) || 0),
-      parseNumber_(pickValue_(payload, ['custo_percentual', 'percent']) || 0)
+      parseNumber_(pickValue_(payload, ['custo_percentual', 'percent']) || 0),
+      normalizeGoalCell_('front', pickValue_(payload, ['front', 'produto_front', 'is_front']))
     ];
     if (rowNumber) {
       sheet.getRange(rowNumber, 1, 1, COST_HEADERS.length).setValues([row]);
@@ -683,6 +718,21 @@ function findProductCostRow_(sheet, product) {
     if (normalizePersonName_(values[index][0] || '') === target) return index + 2;
   }
   return 0;
+}
+
+function deleteProductCost_(payload) {
+  const product = String(pickValue_(payload, ['produto', 'product']) || '').trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getCostsSheet_();
+    const rowNumber = findProductCostRow_(sheet, product);
+    if (!rowNumber) return { ok: false, error: 'Produto não encontrado.' };
+    sheet.deleteRow(rowNumber);
+    return { ok: true, deleted: true, product: product };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function updateGoal_(payload) {
@@ -727,6 +777,22 @@ function findGoalRow_(sheet, slug, title) {
     if (slugKey && rowSlug === slugKey && (!titleKey || rowTitle === titleKey)) return index + 2;
   }
   return 0;
+}
+
+function deleteGoal_(payload) {
+  const slug = String(pickValue_(payload, ['slug']) || '').trim();
+  const title = String(pickValue_(payload, ['meta_titulo', 'title']) || '').trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sheet = getGoalsSheet_();
+    const rowNumber = findGoalRow_(sheet, slug, title);
+    if (!rowNumber) return { ok: false, error: 'Meta não encontrada.' };
+    sheet.deleteRow(rowNumber);
+    return { ok: true, deleted: true, slug: slug, title: title };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function findTransactionRowById_(sheet, id) {
@@ -844,7 +910,8 @@ function readCosts_() {
     .map((row) => ({
       produto: String(row[0] || '').trim(),
       custo_fixo: parseNumber_(row[1] || 0),
-      custo_percentual: parseNumber_(row[2] || 0)
+      custo_percentual: parseNumber_(row[2] || 0),
+      front: normalizeGoalCell_('front', row[3])
     }))
     .filter((item) => item.produto);
 }
@@ -1079,7 +1146,7 @@ function getGoalStartKey_(goal) {
 
 function normalizeGoalCell_(header, value) {
   if (header === 'meta_valor') return parseNumber_(value);
-  if (header === 'meta_ativa') {
+  if (header === 'meta_ativa' || header === 'front') {
     if (typeof value === 'boolean') return value;
     return ['true', 'sim', 's', '1', 'ativo', 'ativa'].indexOf(String(value || '').toLowerCase().trim()) > -1;
   }

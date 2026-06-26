@@ -1,4 +1,4 @@
-const CACHE_NAME = "high-sales-v81";
+const CACHE_NAME = "hs-metrics-v82";
 const ASSETS = [
   "./styles.css",
   "./app.js",
@@ -13,7 +13,8 @@ const ASSETS = [
   "./k9v2m7q4/index.html",
   "./assets/apple-touch-icon.png",
   "./assets/icon-192.png",
-  "./assets/icon-512.png"
+  "./assets/icon-512.png",
+  "./assets/hs-metrics-written-logo.webp"
 ];
 
 self.addEventListener("install", (event) => {
@@ -50,11 +51,11 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
-    payload = { title: "High Sales", body: event.data ? event.data.text() : "" };
+    payload = { title: "HS Metrics", body: event.data ? event.data.text() : "" };
   }
   const url = payload.url || self.registration.scope;
   event.waitUntil(
-    self.registration.showNotification(payload.title || "High Sales", {
+    self.registration.showNotification(payload.title || "HS Metrics", {
       body: payload.body || "",
       icon: new URL("./assets/icon-192.png", self.registration.scope).href,
       badge: new URL("./assets/icon-192.png", self.registration.scope).href,

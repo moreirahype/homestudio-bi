@@ -124,10 +124,12 @@ button {
 
 .brand-wordmark {
   display: block;
-  width: 138px;
-  max-width: min(138px, calc(100vw - 130px));
-  height: auto;
+  width: 168px;
+  max-width: min(168px, calc(100vw - 130px));
+  height: 42px;
   flex: 0 1 auto;
+  object-fit: cover;
+  object-position: center;
 }
 
 .brand-mark {
@@ -354,10 +356,10 @@ body[data-current-page="settings"] .control-panel {
   min-height: 44px;
   border: 1px solid rgba(159, 232, 112, 0.17);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, .014)), var(--panel-soft);
+  background: rgba(255, 255, 255, .035);
   color: var(--text);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
-  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  box-shadow: none;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
 }
 
 .period-button {
@@ -367,8 +369,8 @@ body[data-current-page="settings"] .control-panel {
 .period-button.is-active {
   border-color: var(--accent);
   color: var(--accent);
-  background: linear-gradient(180deg, rgba(159, 232, 112, .14), rgba(159, 232, 112, .055)), var(--panel-soft);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045), 0 0 0 1px rgba(159, 232, 112, .12);
+  background: rgba(159, 232, 112, .12);
+  box-shadow: 0 0 0 1px rgba(159, 232, 112, .08);
 }
 
 .period-button:hover,
@@ -377,7 +379,7 @@ body[data-current-page="settings"] .control-panel {
 .report-heading button:hover,
 .test-notification:hover {
   border-color: rgba(159, 232, 112, .36);
-  transform: translateY(-1px);
+  background: rgba(159, 232, 112, .07);
 }
 
 label span {
@@ -424,11 +426,11 @@ select {
   border: 1px solid rgba(159, 232, 112, 0.18);
   border-radius: var(--radius);
   outline: none;
-  background-color: #0b120c;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, .012));
+  background-color: #081009;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .026), rgba(255, 255, 255, .008));
   color: var(--text);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035), 0 10px 24px rgba(0, 0, 0, .10);
-  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease, transform 150ms ease;
 }
 
 select {
@@ -456,6 +458,7 @@ select:focus {
 select:hover,
 input:hover {
   border-color: rgba(159, 232, 112, .34);
+  background-color: #0a140b;
 }
 
 .mobile-period-control {
@@ -472,6 +475,10 @@ input:hover {
   background: var(--accent);
   color: #071009;
   font-weight: var(--weight-medium);
+}
+
+.refresh-button.has-drafts {
+  background: #d4ff86;
 }
 
 .refresh-button:disabled {
@@ -724,6 +731,20 @@ th:last-child {
 
 .transaction-value-cell > span {
   display: block;
+}
+
+.is-draft-row {
+  outline: 1px solid rgba(212, 255, 134, .26);
+  outline-offset: -1px;
+  background: rgba(159, 232, 112, .035);
+}
+
+.draft-label {
+  display: block;
+  margin-top: 3px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
 }
 
 .transaction-edit-button {
@@ -1023,6 +1044,32 @@ tr:hover .transaction-edit-button,
   line-height: 1.55;
 }
 
+.settings-add-form {
+  display: grid;
+  grid-template-columns: minmax(140px, .8fr) minmax(160px, 1fr) 120px minmax(160px, 1fr) 150px;
+  gap: 10px;
+  align-items: end;
+  margin-top: 18px;
+  padding: 12px;
+  border: 1px solid rgba(159, 232, 112, 0.14);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.settings-add-form.compact {
+  grid-template-columns: minmax(240px, 1fr) 180px;
+  max-width: 620px;
+}
+
+.settings-add-form button {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: #071009;
+  font-weight: var(--weight-bold);
+}
+
 .settings-shortcut {
   color: var(--text);
   text-align: left;
@@ -1104,20 +1151,20 @@ tr:hover .transaction-edit-button,
 
 .settings-attendants-table .settings-table-head,
 .settings-attendants-table .settings-table-row {
-  grid-template-columns: minmax(150px, 1.15fr) 92px 116px 116px minmax(150px, 1fr) 72px 42px;
-  min-width: 830px;
+  grid-template-columns: minmax(150px, 1.15fr) 92px 116px 116px minmax(150px, 1fr) 112px 132px;
+  min-width: 980px;
 }
 
 .settings-products-table .settings-table-head,
 .settings-products-table .settings-table-row {
-  grid-template-columns: minmax(260px, 1fr) 118px 104px 72px 42px;
-  min-width: 680px;
+  grid-template-columns: minmax(260px, 1fr) 118px 104px 94px 132px;
+  min-width: 780px;
 }
 
 .settings-goals-table .settings-table-head,
 .settings-goals-table .settings-table-row {
-  grid-template-columns: minmax(100px, .62fr) minmax(160px, 1fr) 112px minmax(150px, 1fr) 112px 42px;
-  min-width: 780px;
+  grid-template-columns: minmax(130px, .7fr) minmax(160px, 1fr) 112px minmax(150px, 1fr) 112px 132px;
+  min-width: 860px;
 }
 
 .settings-status {
@@ -1148,27 +1195,39 @@ tr:hover .transaction-edit-button,
   color: var(--text);
 }
 
-.settings-edit-button {
+.settings-row-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.settings-save-button,
+.settings-delete-button {
   display: inline-grid;
-  width: 34px;
-  height: 34px;
+  min-height: 34px;
   place-items: center;
   border: 1px solid rgba(159, 232, 112, 0.18);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.026);
+  background: rgba(255, 255, 255, 0.032);
   color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
 }
 
-.settings-edit-button:hover,
-.settings-edit-button:focus-visible {
+.settings-save-button:hover,
+.settings-save-button:focus-visible {
   border-color: rgba(159, 232, 112, 0.44);
   color: var(--accent);
 }
 
-.settings-edit-button svg {
-  width: 15px;
-  height: 15px;
-  fill: currentColor;
+.settings-delete-button {
+  border-color: rgba(255, 123, 114, 0.18);
+}
+
+.settings-delete-button:hover,
+.settings-delete-button:focus-visible {
+  border-color: rgba(255, 123, 114, 0.45);
+  color: var(--danger);
 }
 
 .settings-empty {
@@ -1349,7 +1408,8 @@ tr:hover .transaction-edit-button,
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: conic-gradient(rgba(159,232,112,.18) 0 100%);
+  background: conic-gradient(#9fe870 0 100%);
+  opacity: .78;
   -webkit-mask: radial-gradient(circle, transparent 0 58%, #000 59% 100%);
   mask: radial-gradient(circle, transparent 0 58%, #000 59% 100%);
 }
@@ -1376,9 +1436,7 @@ tr:hover .transaction-edit-button,
 
 .product-slice:hover {
   opacity: 1;
-  filter: brightness(1.16) saturate(1.08);
-  stroke: rgba(255, 255, 255, .28);
-  stroke-width: .65;
+  filter: brightness(1.14) drop-shadow(0 0 9px currentColor);
 }
 
 .manual-sale-panel {
@@ -1915,7 +1973,8 @@ tr:hover .transaction-edit-button,
   }
 
   .mobile-header .brand-wordmark {
-    width: min(148px, calc(100vw - 188px));
+    width: min(160px, calc(100vw - 188px));
+    height: 40px;
   }
 
   .mobile-header .brand-mark {
@@ -2411,7 +2470,8 @@ tr:hover .transaction-edit-button,
   }
 
   .mobile-header .brand-wordmark {
-    width: min(132px, calc(100vw - 172px));
+    width: min(148px, calc(100vw - 172px));
+    height: 38px;
   }
 
   .period-button {
