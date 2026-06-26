@@ -124,12 +124,14 @@ button {
 
 .brand-wordmark {
   display: block;
-  width: 168px;
-  max-width: min(168px, calc(100vw - 130px));
-  height: 42px;
+  width: 190px;
+  max-width: min(190px, calc(100vw - 130px));
+  height: 52px;
   flex: 0 1 auto;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
+  filter: none;
+  box-shadow: none;
 }
 
 .brand-mark {
@@ -334,7 +336,7 @@ body[data-current-page="settings"] .control-panel {
 
 .control-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 360px);
   gap: 14px;
   align-items: end;
   margin: 16px 0 18px;
@@ -424,10 +426,10 @@ select {
   min-height: 44px;
   padding: 0 42px 0 14px;
   border: 1px solid rgba(159, 232, 112, 0.18);
-  border-radius: var(--radius);
+  border-radius: 8px;
   outline: none;
   background-color: #081009;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .026), rgba(255, 255, 255, .008));
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .018), rgba(255, 255, 255, .006));
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
   transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease, transform 150ms ease;
@@ -461,13 +463,27 @@ input:hover {
   background-color: #0a140b;
 }
 
+select:active,
+input:active,
+.period-button:active,
+.discard-drafts-button:active {
+  transform: translateY(1px);
+}
+
 .mobile-period-control {
   display: none;
 }
 
-.refresh-button {
+.refresh-actions {
   grid-column: 2;
   grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.refresh-button {
   width: 100%;
   min-height: 44px;
   border: 0;
@@ -475,6 +491,37 @@ input:hover {
   background: var(--accent);
   color: #071009;
   font-weight: var(--weight-medium);
+}
+
+.discard-drafts-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(159, 232, 112, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .035);
+  color: var(--text);
+  white-space: nowrap;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.discard-drafts-button[hidden] {
+  display: none;
+}
+
+.discard-drafts-button svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.discard-drafts-button:hover {
+  border-color: rgba(159, 232, 112, .42);
+  background: rgba(159, 232, 112, .07);
+  color: var(--accent);
 }
 
 .refresh-button.has-drafts {
@@ -582,6 +629,9 @@ input:hover {
 .metric-leads { order: 10; }
 .metric-cpl { order: 11; }
 .metric-conversion-rate { order: 12; }
+.metric-refunded-sales { order: 13; grid-column: span 2; }
+.metric-refund-rate { order: 14; }
+.metric-chargeback-rate { order: 15; }
 
 .panel {
   margin-top: 18px;
@@ -1046,7 +1096,7 @@ tr:hover .transaction-edit-button,
 
 .settings-add-form {
   display: grid;
-  grid-template-columns: minmax(140px, .8fr) minmax(160px, 1fr) 120px minmax(160px, 1fr) 150px;
+  grid-template-columns: repeat(4, minmax(130px, 1fr)) minmax(150px, auto);
   gap: 10px;
   align-items: end;
   margin-top: 18px;
@@ -1056,15 +1106,21 @@ tr:hover .transaction-edit-button,
   background: rgba(255, 255, 255, 0.018);
 }
 
+.settings-search {
+  width: min(100%, 420px);
+  margin: 4px 0 14px;
+}
+
 .settings-add-form.compact {
-  grid-template-columns: minmax(240px, 1fr) 180px;
-  max-width: 620px;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
+  max-width: 760px;
 }
 
 .settings-add-form button {
   min-height: 44px;
+  padding: 0 18px;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: 8px;
   background: var(--accent);
   color: #071009;
   font-weight: var(--weight-bold);
@@ -1431,12 +1487,12 @@ tr:hover .transaction-edit-button,
   outline: none;
   transform-box: fill-box;
   transform-origin: center;
-  transition: opacity 120ms ease, filter 120ms ease, stroke-width 120ms ease;
+  transition: opacity 120ms ease, filter 120ms ease;
 }
 
 .product-slice:hover {
   opacity: 1;
-  filter: brightness(1.14) drop-shadow(0 0 9px currentColor);
+  filter: brightness(1.12);
 }
 
 .manual-sale-panel {
@@ -1490,6 +1546,26 @@ tr:hover .transaction-edit-button,
   font-weight: var(--weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.products-total-row td,
+.attendants-total-row td {
+  color: var(--text);
+  font-weight: var(--weight-bold);
+}
+
+.products-panel th:nth-child(2),
+.products-panel td:nth-child(2) {
+  text-align: center;
+}
+
+.products-panel th:nth-child(3),
+.products-panel td:nth-child(3),
+.products-panel th:nth-child(4),
+.products-panel td:nth-child(4),
+.products-panel th:nth-child(5),
+.products-panel td:nth-child(5) {
+  text-align: center;
 }
 
 .product-legend-item {
@@ -1973,8 +2049,9 @@ tr:hover .transaction-edit-button,
   }
 
   .mobile-header .brand-wordmark {
-    width: min(160px, calc(100vw - 188px));
-    height: 40px;
+    width: min(170px, calc(100vw - 188px));
+    height: 48px;
+    object-fit: contain;
   }
 
   .mobile-header .brand-mark {
@@ -2008,6 +2085,20 @@ tr:hover .transaction-edit-button,
 
   .period-grid {
     display: none;
+  }
+
+  .refresh-actions {
+    grid-column: 1;
+    grid-row: auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .discard-drafts-button,
+  .refresh-button {
+    width: 100%;
   }
 
   .mobile-period-control {
@@ -2171,6 +2262,12 @@ tr:hover .transaction-edit-button,
     grid-template-columns: 1fr;
   }
 
+  .settings-add-form,
+  .settings-add-form.compact {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+
   .settings-table {
     margin-inline: -2px;
   }
@@ -2273,7 +2370,7 @@ tr:hover .transaction-edit-button,
   }
 
   .products-panel table {
-    min-width: 780px;
+    min-width: 720px;
     table-layout: auto;
   }
 
@@ -2294,24 +2391,28 @@ tr:hover .transaction-edit-button,
 
   .products-panel th:nth-child(1),
   .products-panel td:nth-child(1) {
-    min-width: 240px;
+    min-width: 220px;
     width: auto;
   }
 
   .products-panel th:nth-child(2),
   .products-panel td:nth-child(2) {
-    width: 14%;
+    width: 11%;
     text-align: center;
   }
 
   .products-panel th:nth-child(3),
-  .products-panel td:nth-child(3),
+  .products-panel td:nth-child(3) {
+    width: 18%;
+    text-align: center;
+  }
+
   .products-panel th:nth-child(4),
   .products-panel td:nth-child(4),
   .products-panel th:nth-child(5),
   .products-panel td:nth-child(5) {
-    width: 18%;
-    text-align: right;
+    width: 16%;
+    text-align: center;
   }
 
   .products-panel .desktop-label {
@@ -2471,7 +2572,8 @@ tr:hover .transaction-edit-button,
 
   .mobile-header .brand-wordmark {
     width: min(148px, calc(100vw - 172px));
-    height: 38px;
+    height: 42px;
+    object-fit: contain;
   }
 
   .period-button {

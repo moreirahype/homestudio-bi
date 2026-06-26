@@ -30,6 +30,7 @@
     frontProducts: loadStringList("hsbi-front-products"),
     manualSalePermissions: loadStringList("hsbi-manual-sale-attendants"),
     attendantCostOptions: loadAttendantCostOptions(),
+    refundMetricOptions: loadRefundMetricOptions(),
     metrics: {},
     pageIndex: 1,
     lastUpdated: null,
@@ -46,6 +47,7 @@
     startDate: document.getElementById("startDate"),
     endDate: document.getElementById("endDate"),
     refreshButton: document.getElementById("refreshButton"),
+    discardDraftsButton: document.getElementById("discardDraftsButton"),
     sidebarToggle: document.getElementById("sidebarToggle"),
     syncStatus: document.getElementById("syncStatus"),
     desktopSyncStatus: document.getElementById("desktopSyncStatus"),
@@ -95,6 +97,10 @@
     reportPreviewTitle: document.getElementById("reportPreviewTitle"),
     leadMetricOptions: document.getElementById("leadMetricOptions"),
     attendantCostOptions: document.getElementById("attendantCostOptions"),
+    refundMetricOptions: document.getElementById("refundMetricOptions"),
+    goalsSearch: document.getElementById("goalsSearch"),
+    attendantsSearch: document.getElementById("attendantsSearch"),
+    productsSearch: document.getElementById("productsSearch"),
     frontProductsList: document.getElementById("frontProductsList"),
     addGoalForm: document.getElementById("addGoalForm"),
     addGoalAttendant: document.getElementById("addGoalAttendant"),
@@ -122,7 +128,10 @@
     averageTicket: ["metricAverageTicket", "metricArpu"],
     leads: "metricLeads",
     cpl: "metricCpl",
-    conversionRate: "metricConversionRate"
+    conversionRate: "metricConversionRate",
+    refundedSales: "metricRefundedSales",
+    refundRate: "metricRefundRate",
+    chargebackRate: "metricChargebackRate"
   };
 
   const notificationTimes = ["08:00", "12:00", "18:00", "23:00"];
@@ -176,6 +185,9 @@
         refreshData({ applySelection: true, buttonLoading: true });
       }
     });
+    if (els.discardDraftsButton) {
+      els.discardDraftsButton.addEventListener("click", discardTransactionDrafts);
+    }
     if (els.sidebarToggle) {
       els.sidebarToggle.addEventListener("click", toggleSidebar);
     }
@@ -227,6 +239,19 @@
         render();
       });
     }
+    if (els.refundMetricOptions) {
+      els.refundMetricOptions.addEventListener("change", (event) => {
+        const input = event.target.closest("[data-refund-metric]");
+        if (!input) return;
+        state.refundMetricOptions[input.dataset.refundMetric] = input.checked;
+        saveRefundMetricOptions();
+        showNotificationSavedToast("Alteração salva");
+        render();
+      });
+    }
+    [els.goalsSearch, els.attendantsSearch, els.productsSearch].filter(Boolean).forEach((input) => {
+      input.addEventListener("input", renderSettingsPages);
+    });
     if (els.addGoalForm) els.addGoalForm.addEventListener("submit", addGoalFromForm);
     if (els.addAttendantForm) els.addAttendantForm.addEventListener("submit", addAttendantFromForm);
     if (els.addProductForm) els.addProductForm.addEventListener("submit", addProductFromForm);
@@ -969,6 +994,14 @@
     return Boolean(state.transactionDrafts && Object.keys(state.transactionDrafts).length);
   }
 
+  function discardTransactionDrafts() {
+    if (!hasTransactionDrafts()) return;
+    state.transactionDrafts = {};
+    showNotificationSavedToast("Rascunhos descartados");
+    render();
+    updateRefreshButtonState();
+  }
+
   function getTransactionById(id) {
     return state.transactions.find((item) => item.id === id);
   }
@@ -987,6 +1020,9 @@
     els.refreshButton.classList.toggle("has-drafts", hasDrafts);
     if (!els.refreshButton.classList.contains("is-loading")) {
       els.refreshButton.textContent = hasDrafts ? "Salvar" : "Atualizar";
+    }
+    if (els.discardDraftsButton) {
+      els.discardDraftsButton.hidden = !hasDrafts;
     }
   }
 
@@ -1305,6 +1341,18 @@
     setMetric("leads", state.metrics.leads, null, { animate, formatter: integer });
     setMetric("cpl", state.metrics.cpl, null, { animate, formatter: money, fallback: "N/A" });
     setMetric("conversionRate", state.metrics.conversionRate, null, { animate, formatter: percent, fallback: "N/A" });
+    renderRefundMetricCards(animate);
+  }
+
+  function renderRefundMetricCards(animate) {
+    const enabled = Boolean(state.refundMetricOptions && state.refundMetricOptions.enabled);
+    document.querySelectorAll(".optional-refund-metric").forEach((card) => {
+      card.hidden = !enabled;
+    });
+    if (!enabled) return;
+    setMetric("refundedSales", state.metrics.refundedSales || 0, null, { animate, formatter: money });
+    setMetric("refundRate", state.metrics.refundRate || 0, null, { animate, formatter: percent });
+    setMetric("chargebackRate", state.metrics.chargebackRate || 0, null, { animate, formatter: percent });
   }
 
   function setMetric(key, value, tone, options = {}) {
@@ -1686,6 +1734,19 @@
       `;
       tbody.append(tr);
     });
+    if (rows.length) {
+      const totalSales = sum(rows.map((row) => row.sales));
+      const totalRow = document.createElement("tr");
+      totalRow.className = "products-total-row";
+      totalRow.innerHTML = `
+        <td>Total</td>
+        <td>${integer(totalSales)}</td>
+        <td>${money(totalRevenue)}</td>
+        <td>${totalSales ? money(totalRevenue / totalSales) : "N/A"}</td>
+        <td>100,0%</td>
+      `;
+      tbody.append(totalRow);
+    }
     empty.classList.toggle("is-visible", rows.length === 0);
     renderProductsDonut(rows);
   }
@@ -1819,6 +1880,7 @@
     renderGoalSettings();
     renderLeadMetricOptions();
     renderAttendantCostOptions();
+    renderRefundMetricOptions();
     renderFrontProductsSettings();
     renderManualSalePermissionSettings();
     bindSettingsMirrorEditButtons();
@@ -1831,10 +1893,21 @@
     });
   }
 
+  function renderRefundMetricOptions() {
+    if (!els.refundMetricOptions) return;
+    els.refundMetricOptions.querySelectorAll("[data-refund-metric]").forEach((input) => {
+      input.checked = Boolean(state.refundMetricOptions && state.refundMetricOptions[input.dataset.refundMetric]);
+    });
+  }
+
   function renderGoalSettings() {
     const list = document.getElementById("goalsSettingsList");
     if (!list) return;
-    const goals = state.goalConfigs || [];
+    const query = normalizeSearchText(els.goalsSearch ? els.goalsSearch.value : "");
+    const goals = (state.goalConfigs || []).filter((goal) => {
+      const haystack = normalizeSearchText(`${goal.slug || ""} ${goal.title || ""} ${goal.prize || ""}`);
+      return !query || haystack.includes(query);
+    });
     if (!goals.length) {
       list.innerHTML = `<p class="settings-empty">Nenhuma meta cadastrada ainda.</p>`;
       return;
@@ -1868,7 +1941,8 @@
 
   function renderFrontProductsSettings() {
     if (!els.frontProductsList) return;
-    const products = getConfigProductRows();
+    const query = normalizeSearchText(els.productsSearch ? els.productsSearch.value : "");
+    const products = getConfigProductRows().filter((product) => !query || normalizeSearchText(product.name).includes(query));
     if (!products.length) {
       els.frontProductsList.innerHTML = `<p class="settings-empty">Nenhum produto cadastrado ainda.</p>`;
       return;
@@ -1905,7 +1979,8 @@
 
   function renderManualSalePermissionSettings() {
     if (!els.manualSaleAttendantsList) return;
-    const attendants = getConfigAttendantRows();
+    const query = normalizeSearchText(els.attendantsSearch ? els.attendantsSearch.value : "");
+    const attendants = getConfigAttendantRows().filter((attendant) => !query || normalizeSearchText(attendant.name).includes(query));
     if (!attendants.length) {
       els.manualSaleAttendantsList.innerHTML = `<p class="settings-empty">Nenhum atendente cadastrado ainda.</p>`;
       return;
@@ -2211,6 +2286,7 @@
         renderNotifications();
         try {
           await syncOwnerPush();
+          showNotificationSavedToast();
         } catch (error) {
           state.notifications.salesEnabled = previous;
           saveNotificationPrefs();
@@ -2289,6 +2365,7 @@
         renderNotifications();
         try {
           await syncOwnerPush();
+          showNotificationSavedToast();
         } catch (error) {
           state.notifications[input.dataset.time] = previous;
           saveNotificationPrefs();
@@ -2440,6 +2517,18 @@
 
   function saveAttendantCostOptions() {
     localStorage.setItem("hsbi-attendant-cost-options", JSON.stringify(state.attendantCostOptions || {}));
+  }
+
+  function loadRefundMetricOptions() {
+    try {
+      return Object.assign({ enabled: false }, JSON.parse(localStorage.getItem("hsbi-refund-metric-options") || "{}"));
+    } catch {
+      return { enabled: false };
+    }
+  }
+
+  function saveRefundMetricOptions() {
+    localStorage.setItem("hsbi-refund-metric-options", JSON.stringify(state.refundMetricOptions || {}));
   }
 
   function saveNotificationPrefs() {
