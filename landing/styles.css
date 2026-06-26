@@ -90,9 +90,9 @@ svg {
 }
 
 .brand-wordmark {
-  width: 130px;
+  width: 112px;
   height: auto;
-  max-height: 42px;
+  max-height: 36px;
   object-fit: contain;
 }
 

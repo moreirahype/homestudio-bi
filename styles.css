@@ -124,9 +124,9 @@ button {
 
 .brand-wordmark {
   display: block;
-  width: 190px;
-  max-width: min(190px, calc(100vw - 130px));
-  height: 52px;
+  width: 164px;
+  max-width: min(164px, calc(100vw - 130px));
+  height: 46px;
   flex: 0 1 auto;
   object-fit: contain;
   object-position: center;
@@ -2205,8 +2205,8 @@ tr:hover .transaction-edit-button,
   }
 
   .mobile-header .brand-wordmark {
-    width: min(170px, calc(100vw - 188px));
-    height: 48px;
+    width: min(146px, calc(100vw - 188px));
+    height: 42px;
     object-fit: contain;
   }
 
@@ -2726,8 +2726,8 @@ tr:hover .transaction-edit-button,
   }
 
   .mobile-header .brand-wordmark {
-    width: min(148px, calc(100vw - 172px));
-    height: 42px;
+    width: min(128px, calc(100vw - 172px));
+    height: 38px;
     object-fit: contain;
   }
 
