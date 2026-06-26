@@ -24,6 +24,7 @@
     dashboardTransactions: [],
     manualSaleOptions: [],
     transactionDrafts: {},
+    settingsDrafts: {},
     loadedTransactionRange: null,
     filters: { attendant: "all", product: "all", account: "all" },
     leadMetricSource: loadLeadMetricSource(),
@@ -179,14 +180,14 @@
     });
 
     els.refreshButton.addEventListener("click", () => {
-      if (hasTransactionDrafts()) {
-        savePendingTransactionDrafts();
+      if (hasAnyDrafts()) {
+        savePendingDrafts();
       } else {
         refreshData({ applySelection: true, buttonLoading: true });
       }
     });
     if (els.discardDraftsButton) {
-      els.discardDraftsButton.addEventListener("click", discardTransactionDrafts);
+      els.discardDraftsButton.addEventListener("click", discardDrafts);
     }
     if (els.sidebarToggle) {
       els.sidebarToggle.addEventListener("click", toggleSidebar);
@@ -328,6 +329,8 @@
 
     document.addEventListener("pointerdown", (event) => {
       if (event.target.closest(".chart-point") || event.target.closest(".product-donut")) return;
+      if (event.target.closest(".custom-select")) return;
+      closeCustomSelects();
       hideTooltips();
     });
 
@@ -386,7 +389,7 @@
       const metaEntries = await Promise.all(
         standardPeriods.map(async (period) => [period, await fetchMetaPayload(getDateRange(period))])
       );
-      state.transactions = applyTransactionDrafts(payload.transactions.map(normalizeTransaction));
+      state.transactions = payload.transactions.map(normalizeTransaction);
       state.costs = normalizeCosts(payload.costs);
       state.attendantConfigs = normalizeAttendantConfigs(payload.attendants);
       state.goalConfigs = normalizeGoalConfigs(payload.goals);
@@ -401,7 +404,7 @@
     } catch (error) {
       console.error(error);
       const fallback = buildEmptyPayload();
-      state.transactions = applyTransactionDrafts(fallback.transactions.map(normalizeTransaction));
+      state.transactions = fallback.transactions.map(normalizeTransaction);
       state.costs = normalizeCosts(fallback.costs);
       state.manualSaleOptions = normalizeManualSaleOptions(fallback.manualSaleOptions);
       state.attendantConfigs = normalizeAttendantConfigs(fallback.attendants);
@@ -620,7 +623,6 @@
       moeda: "BRL",
       valor: brlValue
     };
-    state.transactions = applyTransactionDrafts(state.transactions);
     closeTransactionEditor();
     showNotificationSavedToast("Rascunho salvo");
     render();
@@ -704,6 +706,43 @@
     }
   }
 
+  async function savePendingSettingsDrafts() {
+    if (!config.apiUrl || !hasSettingsDrafts()) return;
+    els.refreshButton.disabled = true;
+    setRefreshButtonLoading(true);
+    try {
+      const drafts = Object.values(state.settingsDrafts);
+      for (const draft of drafts) {
+        const row = findSettingsDraftRow(draft.key);
+        const button = row ? row.querySelector(`[data-settings-${draft.action === "delete" ? "delete" : "edit"}]`) : null;
+        if (!button) continue;
+        if (draft.action === "delete") {
+          await deleteSettingsRowFromButton(button, { confirm: false, refresh: false });
+        } else if (button.dataset.settingsEdit === "product") {
+          await editProductCostFromButton(button, { refresh: false });
+        } else if (button.dataset.settingsEdit === "goal") {
+          await editGoalFromButton(button, { refresh: false });
+        } else {
+          await editAttendantFromButton(button, { refresh: false });
+        }
+      }
+      state.settingsDrafts = {};
+      showNotificationSavedToast("Alterações salvas");
+      await refreshData({ applySelection: true });
+    } catch (error) {
+      console.error(error);
+      alert(error && error.message ? error.message : "Não foi possível salvar as alterações agora.");
+    } finally {
+      els.refreshButton.disabled = false;
+      setRefreshButtonLoading(false);
+      updateRefreshButtonState();
+    }
+  }
+
+  function findSettingsDraftRow(key) {
+    return Array.from(document.querySelectorAll(".settings-table-row")).find((row) => row.dataset.settingsDraftKey === key);
+  }
+
   function createMutationId(prefix) {
     const random =
       window.crypto && typeof window.crypto.randomUUID === "function"
@@ -726,6 +765,7 @@
     els.transactionEditCurrency.value = transaction.moedaOriginal || "BRL";
     els.transactionEditValue.value = decimal(transaction.valorOriginal || transaction.valor || 0);
     updateCurrencyPlaceholder(els.transactionEditValue, els.transactionEditCurrency.value);
+    refreshCustomSelects();
     if (typeof els.transactionEditor.showModal === "function") {
       els.transactionEditor.showModal();
     } else {
@@ -988,22 +1028,37 @@
     renderSettingsPages();
     renderTransactions();
     renderNotificationSummary();
+    refreshCustomSelects();
   }
 
   function hasTransactionDrafts() {
     return Boolean(state.transactionDrafts && Object.keys(state.transactionDrafts).length);
   }
 
-  function discardTransactionDrafts() {
-    if (!hasTransactionDrafts()) return;
+  function hasSettingsDrafts() {
+    return Boolean(state.settingsDrafts && Object.keys(state.settingsDrafts).length);
+  }
+
+  function hasAnyDrafts() {
+    return hasTransactionDrafts() || hasSettingsDrafts();
+  }
+
+  async function savePendingDrafts() {
+    if (hasTransactionDrafts()) await savePendingTransactionDrafts();
+    if (hasSettingsDrafts()) await savePendingSettingsDrafts();
+  }
+
+  function discardDrafts() {
+    if (!hasAnyDrafts()) return;
     state.transactionDrafts = {};
+    state.settingsDrafts = {};
     showNotificationSavedToast("Rascunhos descartados");
     render();
     updateRefreshButtonState();
   }
 
   function getTransactionById(id) {
-    return state.transactions.find((item) => item.id === id);
+    return applyTransactionDrafts(state.transactions).find((item) => item.id === id);
   }
 
   function applyTransactionDrafts(transactions) {
@@ -1016,7 +1071,7 @@
 
   function updateRefreshButtonState() {
     if (!els.refreshButton) return;
-    const hasDrafts = hasTransactionDrafts();
+    const hasDrafts = hasAnyDrafts();
     els.refreshButton.classList.toggle("has-drafts", hasDrafts);
     if (!els.refreshButton.classList.contains("is-loading")) {
       els.refreshButton.textContent = hasDrafts ? "Salvar" : "Atualizar";
@@ -1024,6 +1079,72 @@
     if (els.discardDraftsButton) {
       els.discardDraftsButton.hidden = !hasDrafts;
     }
+  }
+
+  function refreshCustomSelects() {
+    document.querySelectorAll("select").forEach(enhanceSelect);
+  }
+
+  function enhanceSelect(select) {
+    if (!select || select.dataset.nativeOnly === "true") return;
+    let custom = select.nextElementSibling;
+    if (!custom || !custom.classList || !custom.classList.contains("custom-select")) {
+      custom = document.createElement("div");
+      custom.className = "custom-select";
+      custom.innerHTML = `
+        <button class="custom-select-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+          <span></span>
+          <i aria-hidden="true"></i>
+        </button>
+        <div class="custom-select-menu" role="listbox"></div>
+      `;
+      select.insertAdjacentElement("afterend", custom);
+      select.classList.add("native-hidden-select");
+      select.setAttribute("aria-hidden", "true");
+      select.tabIndex = -1;
+      custom.querySelector("button").addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (select.disabled) return;
+        const isOpen = custom.classList.contains("is-open");
+        closeCustomSelects(custom);
+        custom.classList.toggle("is-open", !isOpen);
+        custom.querySelector("button").setAttribute("aria-expanded", String(!isOpen));
+      });
+    }
+    custom.classList.toggle("is-disabled", select.disabled);
+    custom.dataset.value = select.value;
+    const buttonText = custom.querySelector(".custom-select-button span");
+    const selectedOption = select.options[select.selectedIndex] || select.options[0];
+    buttonText.textContent = selectedOption ? selectedOption.textContent : "";
+    const menu = custom.querySelector(".custom-select-menu");
+    const optionSignature = Array.from(select.options).map((option) => `${option.value}:${option.textContent}:${option.selected}`).join("|");
+    if (menu.dataset.signature === optionSignature) return;
+    menu.dataset.signature = optionSignature;
+    menu.innerHTML = Array.from(select.options).map((option) => `
+      <button class="custom-select-option ${option.selected ? "is-selected" : ""}" type="button" role="option" aria-selected="${option.selected ? "true" : "false"}" data-value="${escapeHtml(option.value)}">
+        ${escapeHtml(option.textContent)}
+      </button>
+    `).join("");
+    menu.querySelectorAll(".custom-select-option").forEach((optionButton) => {
+      optionButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        select.value = optionButton.dataset.value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        closeCustomSelects();
+        enhanceSelect(select);
+      });
+    });
+  }
+
+  function closeCustomSelects(except) {
+    document.querySelectorAll(".custom-select.is-open").forEach((custom) => {
+      if (custom === except) return;
+      custom.classList.remove("is-open");
+      const button = custom.querySelector(".custom-select-button");
+      if (button) button.setAttribute("aria-expanded", "false");
+    });
   }
 
   function renderPeriodControls() {
@@ -1204,7 +1325,7 @@
 
   function getFilteredTransactions() {
     const range = getDateRange();
-    return state.transactions
+    return applyTransactionDrafts(state.transactions)
       .filter((item) => item.timestamp >= startOfDay(range.start) && item.timestamp <= endOfDay(range.end))
       .sort((a, b) => b.timestamp - a.timestamp);
   }
@@ -1884,6 +2005,7 @@
     renderFrontProductsSettings();
     renderManualSalePermissionSettings();
     bindSettingsMirrorEditButtons();
+    bindSettingsDraftEvents();
   }
 
   function renderAttendantCostOptions() {
@@ -1913,7 +2035,7 @@
       return;
     }
     list.innerHTML = goals.map((goal) => `
-      <div class="settings-table-row settings-goal-row">
+      <div class="settings-table-row settings-goal-row" data-settings-draft-key="goal:${escapeHtml(`${goal.slug || ""}:${goal.title || ""}`)}">
         <input data-goal-field="slug" value="${escapeHtml(goal.slug || "")}" aria-label="Atendente">
         <input data-goal-field="title" value="${escapeHtml(goal.title)}" aria-label="Meta">
         <input data-goal-field="value" value="${escapeHtml(decimal(goal.value || 0))}" inputmode="decimal" aria-label="Valor">
@@ -1951,7 +2073,7 @@
       const key = normalizeFilterValue(product.name);
       const isFront = product.front || state.frontProducts.includes(key);
       return `
-        <div class="settings-table-row settings-product-row">
+        <div class="settings-table-row settings-product-row" data-settings-draft-key="product:${escapeHtml(product.name)}">
           <input data-product-field="name" value="${escapeHtml(product.name)}" readonly aria-label="Produto">
           <input data-product-field="fixed" value="${escapeHtml(decimal(product.fixed || 0))}" inputmode="decimal" aria-label="Custo fixo">
           <input data-product-field="percent" value="${escapeHtml(decimal(product.percent || 0))}" inputmode="decimal" aria-label="Custo percentual">
@@ -1988,7 +2110,7 @@
     els.manualSaleAttendantsList.innerHTML = attendants.map((attendant) => {
       const key = normalizeFilterValue(attendant.name);
       return `
-        <div class="settings-table-row settings-attendant-row">
+        <div class="settings-table-row settings-attendant-row" data-settings-draft-key="attendant:${escapeHtml(attendant.slug || attendant.name)}">
           <input data-attendant-field="name" value="${escapeHtml(attendant.name)}" aria-label="Nome">
           <input data-attendant-field="commission" value="${escapeHtml(decimal(attendant.commission || 0))}" inputmode="decimal" aria-label="Comissão">
           <input data-attendant-field="salary" value="${escapeHtml(decimal(attendant.salary || 0))}" inputmode="decimal" aria-label="Fixo mensal">
@@ -2037,21 +2159,39 @@
     document.querySelectorAll("[data-settings-delete]").forEach((button) => {
       if (button.dataset.bound === "1") return;
       button.dataset.bound = "1";
-      button.addEventListener("click", async () => {
-        try {
-          await deleteSettingsRowFromButton(button);
-        } catch (error) {
-          if (error && error.name === "AbortError") return;
-          alert(error && error.message ? error.message : "Não foi possível apagar agora.");
-        }
+      button.addEventListener("click", () => {
+        const row = button.closest(".settings-table-row");
+        if (!row) return;
+        markSettingsRowDraft(row, "delete");
       });
     });
   }
 
-  async function deleteSettingsRowFromButton(button) {
+  function bindSettingsDraftEvents() {
+    document.querySelectorAll(".settings-table-row").forEach((row) => {
+      if (row.dataset.draftEventsBound === "1") return;
+      row.dataset.draftEventsBound = "1";
+      row.querySelectorAll("input, select").forEach((field) => {
+        field.addEventListener("input", () => markSettingsRowDraft(row, "save"));
+        field.addEventListener("change", () => markSettingsRowDraft(row, "save"));
+      });
+    });
+  }
+
+  function markSettingsRowDraft(row, action) {
+    const key = row.dataset.settingsDraftKey;
+    if (!key) return;
+    state.settingsDrafts[key] = { key, action: action || "save" };
+    row.classList.add("is-draft-row");
+    row.classList.toggle("is-delete-draft", action === "delete");
+    updateRefreshButtonState();
+    showNotificationSavedToast(action === "delete" ? "Exclusão em rascunho" : "Rascunho salvo");
+  }
+
+  async function deleteSettingsRowFromButton(button, options = {}) {
     const type = button.dataset.settingsDelete;
     const label = button.dataset.title || button.dataset.name || button.dataset.slug || "linha";
-    if (!window.confirm(`Apagar ${label}?`)) return;
+    if (options.confirm !== false && !window.confirm(`Apagar ${label}?`)) return;
     const payload = new FormData();
     payload.set("mutation_id", createMutationId(`delete-${type}`));
     if (type === "goal") {
@@ -2068,10 +2208,10 @@
     }
     await submitMutation(payload);
     showNotificationSavedToast("Linha apagada");
-    await refreshData({ applySelection: true });
+    if (options.refresh !== false) await refreshData({ applySelection: true });
   }
 
-  async function editGoalFromButton(button) {
+  async function editGoalFromButton(button, options = {}) {
     const row = button.closest(".settings-goal-row");
     const currentTitle = button.dataset.title || "";
     const slug = getSettingsFieldValue(row, "[data-goal-field='slug']", button.dataset.slug || "");
@@ -2098,10 +2238,10 @@
     payload.set("mutation_id", createMutationId("goal"));
     await submitMutation(payload);
     showNotificationSavedToast("Meta salva");
-    await refreshData({ applySelection: true });
+    if (options.refresh !== false) await refreshData({ applySelection: true });
   }
 
-  async function editProductCostFromButton(button) {
+  async function editProductCostFromButton(button, options = {}) {
     const row = button.closest(".settings-product-row");
     const product = getSettingsFieldValue(row, "[data-product-field='name']", button.dataset.name || "");
     const fixed = getSettingsFieldValue(row, "[data-product-field='fixed']", decimal(Number(button.dataset.fixed || 0)));
@@ -2120,10 +2260,10 @@
     payload.set("mutation_id", createMutationId("product-cost"));
     await submitMutation(payload);
     showNotificationSavedToast("Produto salvo");
-    await refreshData({ applySelection: true });
+    if (options.refresh !== false) await refreshData({ applySelection: true });
   }
 
-  async function editAttendantFromButton(button) {
+  async function editAttendantFromButton(button, options = {}) {
     const row = button.closest(".settings-attendant-row");
     const currentName = button.dataset.name || "";
     const name = getSettingsFieldValue(row, "[data-attendant-field='name']", currentName);
@@ -2147,7 +2287,7 @@
     payload.set("mutation_id", createMutationId("attendant"));
     await submitMutation(payload);
     showNotificationSavedToast("Atendente salvo");
-    await refreshData({ applySelection: true });
+    if (options.refresh !== false) await refreshData({ applySelection: true });
   }
 
   function getSettingsFieldValue(row, selector, fallback = "") {
