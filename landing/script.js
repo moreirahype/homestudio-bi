@@ -19,3 +19,33 @@ for (const card of tiltCards) {
     card.style.transform = baseTransform;
   });
 }
+
+const faqItems = document.querySelectorAll(".faq-grid details");
+
+for (const item of faqItems) {
+  const summary = item.querySelector("summary");
+  summary?.addEventListener("click", (event) => {
+    event.preventDefault();
+    const shouldOpen = !item.open;
+    for (const other of faqItems) {
+      other.open = false;
+    }
+    item.open = shouldOpen;
+  });
+}
+
+const whatsappButton = document.querySelector(".whatsapp-float");
+const protectedSections = document.querySelectorAll(".pricing, .final-cta, .site-footer");
+
+if (whatsappButton && protectedSections.length && "IntersectionObserver" in window) {
+  const visibleSections = new Set();
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) visibleSections.add(entry.target);
+      else visibleSections.delete(entry.target);
+    }
+    whatsappButton.classList.toggle("is-hidden", visibleSections.size > 0);
+  }, { threshold: 0.08 });
+
+  for (const section of protectedSections) observer.observe(section);
+}
