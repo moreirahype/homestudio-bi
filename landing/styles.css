@@ -25,12 +25,12 @@
 html {
   min-width: 320px;
   scroll-behavior: smooth;
-  scroll-padding-top: 92px;
+  scroll-padding-top: 116px;
   background: var(--bg);
 }
 
 [id] {
-  scroll-margin-top: 92px;
+  scroll-margin-top: 116px;
 }
 
 body {
@@ -586,9 +586,7 @@ details {
 
 .mini-metrics b {
   display: block;
-  overflow: hidden;
   font-size: clamp(17px, 1.8vw, 24px);
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -942,7 +940,29 @@ details {
   max-width: 560px;
 }
 
+.notification-visuals {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+
+.notification-device {
+  position: relative;
+  z-index: 0;
+  display: block;
+  width: min(78%, 540px);
+  margin-bottom: -72px;
+  filter: drop-shadow(0 28px 64px rgba(0, 0, 0, 0.32));
+}
+
+.notification-device img {
+  width: 100%;
+  height: auto;
+}
+
 .notification-phone {
+  position: relative;
+  z-index: 1;
   display: block;
   justify-self: center;
   width: min(100%, 760px);
@@ -1372,11 +1392,11 @@ details p a {
 
 @media (max-width: 760px) {
   html {
-    scroll-padding-top: 90px;
+    scroll-padding-top: 116px;
   }
 
   [id] {
-    scroll-margin-top: 90px;
+    scroll-margin-top: 116px;
   }
 
   .site-header {
@@ -1608,6 +1628,11 @@ details p a {
     margin: 0 auto;
   }
 
+  .notification-device {
+    width: min(92%, 360px);
+    margin-bottom: -22px;
+  }
+
   .notification-section {
     gap: 20px;
   }
@@ -1639,6 +1664,11 @@ details p a {
   .final-cta {
     margin-bottom: 42px;
     padding: 48px 18px;
+  }
+
+  .final-cta h2 {
+    font-size: 29px;
+    line-height: 1.06;
   }
 
   .whatsapp-float {
