@@ -1370,6 +1370,23 @@ details p a {
   }
 }
 
+@media (max-width: 900px) {
+  .site-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: min(100% - 28px, 1180px);
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .header-cta {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
 @media (min-width: 1121px) and (max-width: 1320px) {
   .site-header {
     width: min(100% - 32px, 1240px);
